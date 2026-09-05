@@ -1,0 +1,640 @@
+{
+  "common": {
+    "appName": "CampusHub",
+    "save": "Save",
+    "cancel": "Cancel",
+    "continue": "Continue",
+    "back": "Back",
+    "submit": "Submit",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "loading": "Loading...",
+    "retry": "Try again",
+    "close": "Close",
+    "optional": "optional",
+    "required": "required",
+    "showMore": "Show more",
+    "showLess": "Show less",
+    "step": "Step {current} of {total}",
+    "saveChanges": "Save changes",
+    "saved": "Saved",
+    "discard": "Discard",
+    "comingSoon": "Coming soon"
+  },
+  "nav": {
+    "feed": "Feed",
+    "notes": "UniNotes",
+    "mentors": "PocketMentor",
+    "wallet": "Wallet",
+    "notifications": "Notifications",
+    "profile": "Profile",
+    "settings": "Settings",
+    "logout": "Log out",
+    "login": "Log in",
+    "register": "Sign up",
+    "language": "Language",
+    "languageSwitcher": "Change language",
+    "theme": "Theme",
+    "help": "Help",
+    "messages": "Messages",
+    "bookmarks": "Bookmarks",
+    "explore": "Explore"
+  },
+  "auth": {
+    "register": {
+      "title": "Join CampusHub",
+      "subtitle": "The verified platform for your university community",
+      "fullName": "Full name",
+      "fullNameHint": "Exactly as it appears on your national ID",
+      "email": "Email",
+      "emailHint": "A university address speeds up verification",
+      "password": "Password",
+      "passwordConfirm": "Confirm password",
+      "passwordHint": "At least 12 characters, with letters and numbers",
+      "university": "University",
+      "universityPlaceholder": "Select your university",
+      "faculty": "Faculty",
+      "graduationYear": "Graduation year",
+      "graduationMonth": "Graduation month",
+      "termsAccept": "I agree to the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>",
+      "dataConsent": "I consent to my identity documents being processed solely to verify my student status",
+      "createAccount": "Create account",
+      "haveAccount": "Already have an account?",
+      "phone": "Phone number",
+      "phoneHint": "Optional, but needed for account recovery and payouts",
+      "nickname": "Nickname",
+      "nicknameHint": "This is what people see across the platform. Letters, numbers and underscore, 3-24 characters.",
+      "graduationDate": "Graduation date",
+      "consentsLegend": "Consents",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "termsShort": "Terms of Service",
+      "consentShort": "Document processing consent",
+      "strength": {
+        "weak": "Weak",
+        "fair": "Fair",
+        "good": "Good",
+        "strong": "Strong"
+      },
+      "universityAutoDetected": "Selected automatically from your email domain"
+    },
+    "login": {
+      "title": "Welcome back",
+      "email": "Email",
+      "password": "Password",
+      "forgotPassword": "Forgot your password?",
+      "submit": "Log in",
+      "noAccount": "No account yet?"
+    },
+    "errors": {
+      "invalidCredentials": "Username (email) or password is incorrect",
+      "emailTaken": "This email is already in use",
+      "weakPassword": "This password is too weak",
+      "passwordMismatch": "Passwords do not match",
+      "tooManyAttempts": "Too many attempts. Try again in {minutes} minutes",
+      "accountLocked": "This account is temporarily locked",
+      "termsRequired": "Accept the terms to continue",
+      "nameTooShort": "Your full name needs at least 3 characters",
+      "nameInvalid": "Use letters, spaces and hyphens only",
+      "nicknameInvalid": "Letters, numbers and underscore only. 3-24 characters.",
+      "nicknameReserved": "That nickname is not available",
+      "nicknameTaken": "That nickname is already taken",
+      "emailInvalid": "Enter a valid email address",
+      "phoneInvalid": "Enter a valid Azerbaijani number (+994 5X XXX XX XX)",
+      "phoneTaken": "That number is already in use",
+      "consentRequired": "You must consent to document processing",
+      "credentialsUnavailable": "An account cannot be created with these details. Try a different email or phone number."
+    }
+  },
+  "verification": {
+    "title": "Identity verification",
+    "subtitle": "Upload your documents so we can keep fake profiles out",
+    "banner": {
+      "unverified": "Account unverified: pending security check. Some features are limited.",
+      "unverifiedCta": "Upload documents",
+      "pending": "Your documents are being checked. This usually takes 5 minutes to 24 hours.",
+      "needsReview": "Your documents are under manual review. We will notify you with the result.",
+      "rejected": "Verification failed. {remaining} attempts remaining.",
+      "rejectedCta": "Upload again",
+      "processing": "Your documents are being checked right now. This takes a few seconds.",
+      "resubmitRequired": "The review window expired. Please upload your documents again.",
+      "attemptsExhausted": "You have used all attempts. Please contact support."
+    },
+    "badge": {
+      "unverified": "Unverified",
+      "pending": "Checking",
+      "verified": "Verified student",
+      "verifiedAlumni": "Verified alumni",
+      "rejected": "Rejected"
+    },
+    "slots": {
+      "idFront": "National ID - front",
+      "idBack": "National ID - back",
+      "studentFront": "Student card - front",
+      "studentBack": "Student card - back"
+    },
+    "upload": {
+      "dropHere": "Drop the photo here, or click to choose",
+      "takePhoto": "Take a photo",
+      "chooseFile": "Choose file",
+      "replace": "Replace",
+      "remove": "Remove",
+      "uploading": "Uploading... {percent}%",
+      "checking": "Checking quality...",
+      "ready": "Ready"
+    },
+    "quality": {
+      "tooBlurry": "The photo is blurry. Try a sharper shot.",
+      "glare": "There is glare on the document. Change the angle.",
+      "tooSmall": "The image is too small. It needs to be at least 1000 pixels wide.",
+      "cropped": "Not all edges of the document are visible.",
+      "screenshot": "Screenshots are not accepted. Photograph the physical document.",
+      "wrongFormat": "Only JPG, PNG or HEIC is accepted.",
+      "tooLarge": "The file is larger than {max} MB.",
+      "pdfUnsafe": "This PDF contains active content and cannot be accepted.",
+      "pdfEncrypted": "Password-protected PDFs are not accepted. Upload an unlocked file."
+    },
+    "tips": {
+      "title": "For a smooth verification",
+      "flat": "Place the document on a flat surface",
+      "light": "Make sure the lighting is even",
+      "corners": "Keep all four corners in frame",
+      "noEdit": "Do not edit the photo - alterations are detected"
+    },
+    "submit": "Submit for verification",
+    "submitted": {
+      "title": "Documents received",
+      "body": "Your account is active. We will notify you once the check is complete.",
+      "goToFeed": "Go to the feed"
+    },
+    "restricted": {
+      "title": "This feature requires verification",
+      "body": "Unverified accounts cannot sell notes, book mentors, or withdraw funds.",
+      "allowed": "You can still: read the feed, post, and buy notes."
+    },
+    "graduation": {
+      "promptTitle": "Have you graduated?",
+      "promptBody": "Your profile says you graduate in {month} {year}. Update your status.",
+      "becomeAlumni": "Switch to alumni",
+      "stillStudying": "Still studying",
+      "updateLater": "Remind me later"
+    },
+    "failure": {
+      "generic": "We could not complete your registration. Please contact support.",
+      "supportCode": "Reference code: {code}"
+    },
+    "errors": {
+      "allFourRequired": "Upload all four documents to continue"
+    }
+  },
+  "feed": {
+    "title": "Feed",
+    "composerPlaceholder": "What is happening?",
+    "post": "Post",
+    "reply": "Reply",
+    "like": "Like",
+    "comment": "Comment",
+    "share": "Share",
+    "attachImage": "Attach image",
+    "addTag": "Add tag",
+    "visibility": {
+      "label": "Who can see this",
+      "public": "Everyone",
+      "universityOnly": "Only {university}",
+      "verifiedOnly": "Verified users only",
+      "followers": "Followers"
+    },
+    "filters": {
+      "all": "All",
+      "myUniversity": "My university",
+      "following": "Following",
+      "tag": "#{tag}"
+    },
+    "empty": "No posts yet. Be the first.",
+    "loadNew": "{count} new posts",
+    "deleted": "This post was deleted",
+    "characterCount": "{remaining} characters left"
+  },
+  "notes": {
+    "title": "UniNotes",
+    "subtitle": "Student-to-student study material marketplace",
+    "browse": "Browse notes",
+    "sell": "Sell notes",
+    "myPurchases": "My purchases",
+    "myListings": "My listings",
+    "filters": {
+      "university": "University",
+      "subject": "Subject",
+      "courseCode": "Course code",
+      "language": "Language",
+      "priceRange": "Price range",
+      "rating": "Rating",
+      "freeOnly": "Free only"
+    },
+    "card": {
+      "pages": "{count} pages",
+      "sales": "{count} sales",
+      "byAuthor": "by {name}",
+      "free": "Free"
+    },
+    "detail": {
+      "preview": "First page preview",
+      "previewNote": "The full document unlocks after purchase",
+      "buy": "Buy for {price}",
+      "download": "Download",
+      "alreadyOwned": "You own this note",
+      "reviews": "Reviews ({count})",
+      "writeReview": "Write a review",
+      "reportListing": "Report listing"
+    },
+    "upload": {
+      "title": "New note",
+      "file": "PDF file",
+      "fileHint": "Up to 50 MB, PDF only",
+      "noteTitle": "Title",
+      "description": "Description",
+      "subject": "Subject",
+      "price": "Price (AZN)",
+      "priceHint": "Enter 0 to publish it for free. Maximum 50 AZN.",
+      "processing": "Processing file: generating preview...",
+      "pendingReview": "Your note is in moderation and will be published once approved."
+    },
+    "errors": {
+      "notVerified": "Your account must be verified before you can sell notes",
+      "insufficientFunds": "Your balance is not enough",
+      "duplicate": "This exact file is already on the platform",
+      "encrypted": "Password-protected PDFs are not accepted"
+    }
+  },
+  "mentors": {
+    "title": "PocketMentor",
+    "subtitle": "One-on-one career guidance from working professionals",
+    "becomeMentor": "Become a mentor",
+    "industries": {
+      "IT": "Information technology",
+      "MARKETING": "Marketing",
+      "LAW": "Law",
+      "ENGINEERING": "Engineering",
+      "FINANCE": "Finance",
+      "MEDICINE": "Medicine",
+      "EDUCATION": "Education",
+      "DESIGN": "Design",
+      "OTHER": "Other"
+    },
+    "profile": {
+      "sessions": "{count} sessions",
+      "experience": "{years} years of experience",
+      "rate": "{price} / {minutes} min",
+      "languages": "Languages",
+      "about": "About",
+      "bookSession": "Book a session",
+      "notAccepting": "Not taking new bookings right now"
+    },
+    "booking": {
+      "selectDate": "Pick a date",
+      "selectTime": "Pick a time",
+      "timezoneNote": "Times are shown in {timezone}",
+      "noSlots": "No open slots on this day",
+      "topic": "Session topic",
+      "topicPlaceholder": "What would you like to talk about?",
+      "confirm": "Confirm and pay",
+      "summary": "{date} at {time} - {duration} minutes",
+      "total": "Total: {price}",
+      "escrowNote": "The amount is held until the session is completed",
+      "confirmed": {
+        "title": "Session confirmed",
+        "body": "The video call link becomes active 30 minutes before the session.",
+        "addToCalendar": "Add to calendar",
+        "joinCall": "Join call"
+      },
+      "cancel": "Cancel session",
+      "cancelPolicy": "Cancel more than 24 hours ahead for a full refund"
+    },
+    "errors": {
+      "slotTaken": "That slot was just taken. Please pick another.",
+      "tooSoon": "Sessions must start at least {hours} hours from now",
+      "selfBooking": "You cannot book a session with yourself"
+    }
+  },
+  "wallet": {
+    "title": "Wallet",
+    "available": "Available",
+    "pending": "Pending",
+    "topUp": "Add funds",
+    "withdraw": "Withdraw",
+    "history": "Transaction history",
+    "pendingNote": "Sales become available {hours} hours after purchase",
+    "txn": {
+      "TOPUP": "Top-up",
+      "NOTE_PURCHASE": "Note purchase",
+      "NOTE_PAYOUT_RELEASE": "Note sale",
+      "BOOKING_ESCROW_HOLD": "Session payment",
+      "BOOKING_ESCROW_RELEASE": "Mentoring income",
+      "BOOKING_REFUND": "Session refund",
+      "WITHDRAWAL": "Withdrawal",
+      "PLATFORM_FEE": "Platform fee",
+      "ADJUSTMENT": "Adjustment"
+    },
+    "empty": "No transactions yet"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all as read",
+    "empty": "Nothing new",
+    "enablePush": "Enable browser notifications",
+    "types": {
+      "VERIFICATION_APPROVED": "Your account is verified",
+      "VERIFICATION_REJECTED": "Verification did not pass",
+      "GRADUATION_TRANSITION_PROMPT": "Update your alumni status",
+      "NOTE_SOLD": "Your note sold: {title}",
+      "NOTE_REVIEWED": "New review on your note",
+      "BOOKING_REQUESTED": "New session request",
+      "BOOKING_CONFIRMED": "Session confirmed",
+      "BOOKING_REMINDER_24H": "You have a session tomorrow",
+      "BOOKING_REMINDER_1H": "Your session starts in an hour",
+      "BOOKING_CANCELLED": "Session cancelled",
+      "POST_REPLY": "{name} replied to your post",
+      "POST_LIKE": "{name} liked your post",
+      "NEW_FOLLOWER": "{name} started following you",
+      "WALLET_CREDIT": "{amount} was added to your balance",
+      "VERIFICATION_NEEDS_REVIEW": "Your documents need a closer look",
+      "VERIFICATION_RESUBMIT_REQUIRED": "Please upload your documents again"
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "network": "Check your internet connection",
+    "notFound": "Page not found",
+    "forbidden": "You do not have access to this page",
+    "serverError": "Server error. Our team has been notified.",
+    "rateLimited": "Too many requests. Please wait a moment.",
+    "validationFailed": "Please fix the errors in the form",
+    "sessionExpired": "Your session expired. Please log in again.",
+    "fileTooLarge": "That file is too large",
+    "unsupportedFile": "That file type is not supported",
+    "fieldRequired": "This field is required",
+    "summaryTitle": "There are {count} problems with this form",
+    "methodNotAllowed": "That request method is not supported",
+    "unsupportedMediaType": "That request format is not supported",
+    "credentialsInQueryString": "Request blocked for your security. Reload the page and try again."
+  },
+  "a11y": {
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "userMenu": "User menu",
+    "unreadCount": "{count} unread notifications",
+    "verifiedBadge": "Verified account",
+    "loadingContent": "Loading content",
+    "requiredField": "Required field"
+  },
+  "landing": {
+    "nav": {
+      "features": "Features",
+      "how": "How it works",
+      "about": "About"
+    },
+    "hero": {
+      "badge": "Verified students only",
+      "titleLead": "The complete ecosystem for students and",
+      "titleAccent": "future professionals",
+      "subtitle": "Buy and sell study notes, book working professionals for 1-on-1 career advice, and keep up with your campus — all in one place. Every account is verified with a student card and national ID.",
+      "ctaNotes": "Explore notes",
+      "ctaMentor": "Find a mentor",
+      "trust": "No fake profiles — every account is document-verified"
+    },
+    "stats": {
+      "students": "Active students",
+      "notes": "Notes shared",
+      "hours": "Mentorship hours",
+      "universities": "Universities",
+      "live": "Live"
+    },
+    "features": {
+      "eyebrow": "Three products, one account",
+      "title": "Everything your university years actually need",
+      "subtitle": "A verified student identity is the spine all three products run on. Get checked once, use it everywhere.",
+      "notes": {
+        "title": "UniNotes",
+        "body": "A student-to-student marketplace for study material. Upload, earn, or find what you need.",
+        "p1": "First-page preview generated automatically",
+        "p2": "Secure payment through your internal balance",
+        "p3": "Only verified buyers can leave reviews"
+      },
+      "mentor": {
+        "title": "PocketMentor",
+        "body": "One-on-one career guidance from people actually doing the job.",
+        "p1": "IT, marketing, law, engineering and more",
+        "p2": "Pick an open slot, confirm instantly",
+        "p3": "Payment held until the session is done"
+      },
+      "feed": {
+        "title": "Campus feed",
+        "body": "Exam alerts, scholarship deadlines, questions and answers — filtered to your university.",
+        "p1": "Filter by university",
+        "p2": "Follow topics through tags",
+        "p3": "Share images and notes inline"
+      }
+    },
+    "ticker": {
+      "title": "Happening on campus",
+      "joined": "{name} joined",
+      "verified": "{name} got verified",
+      "uploaded": "{name} uploaded a new note",
+      "booked": "{name} booked a mentor session",
+      "popular": "{title} bought {count} times today"
+    },
+    "cta": {
+      "title": "Start today",
+      "body": "Signing up takes two minutes. You can use the platform while your documents are being checked.",
+      "button": "Create a free account",
+      "secondary": "Browse notes first"
+    },
+    "footer": {
+      "tagline": "The verified student platform for Azerbaijani universities.",
+      "product": "Product",
+      "company": "Company",
+      "legal": "Legal",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "security": "Security",
+      "contact": "Contact",
+      "rights": "All rights reserved."
+    }
+  },
+  "register": {
+    "steps": {
+      "account": "Account",
+      "documents": "Documents",
+      "review": "Review"
+    },
+    "stepHint": {
+      "account": "Basic details",
+      "documents": "Four photos required",
+      "review": "Check before sending"
+    },
+    "next": "Continue",
+    "back": "Back",
+    "finish": "Submit for verification",
+    "aside": {
+      "title": "Why we ask for documents",
+      "b1": "Keeps fake profiles and stolen notes off the platform",
+      "b2": "Mentors know who they are talking to",
+      "b3": "Makes payments safe for both sides",
+      "privacy": "Images are stored in an encrypted vault and destroyed 30 days after the check completes."
+    },
+    "scanner": {
+      "title": "Document integrity scanner",
+      "idle": "Ready",
+      "scanning": "Scanning...",
+      "passed": "All documents passed",
+      "failed": "Problem detected",
+      "checkEdit": "Editing traces",
+      "checkScreen": "Screen recapture",
+      "checkQuality": "Image quality",
+      "checkMatch": "Name consistency",
+      "note": "This is a first-pass check in your browser. The final decision is made server-side."
+    },
+    "review": {
+      "title": "Check your details",
+      "body": "Your account activates immediately after you submit; verification continues in the background.",
+      "edit": "Edit",
+      "documents": "Uploaded documents"
+    },
+    "blocked": {
+      "title": "Registration could not be completed",
+      "body": "A security check has blocked this submission."
+    },
+    "retention": {
+      "title": "Your documents are not stored",
+      "lead": "The images are processed at the moment of verification and deleted immediately. They are never kept on our servers or in cloud storage.",
+      "deleted": "Erased the instant the check finishes",
+      "flagsOnly": "The database keeps only \"verified: yes/no\"",
+      "humanReview": "A moderator may look if the check is inconclusive",
+      "window": "In that case the image is held encrypted for at most 24 hours"
+    }
+  },
+  "dashboard": {
+    "greeting": "Hi, {name}",
+    "subtitle": "Here is what is happening on campus today",
+    "graduation": {
+      "title": "Graduation countdown",
+      "months": "{count} months to go",
+      "days": "{count} days to go",
+      "body": "You graduate in {month} {year}. We will remind you to switch to alumni status when the time comes.",
+      "cta": "Update profile"
+    },
+    "trending": {
+      "title": "Trending notes",
+      "subtitle": "Most bought this week",
+      "viewAll": "View all"
+    },
+    "quickActions": "Quick actions",
+    "sellNote": "Sell a note",
+    "findMentor": "Find a mentor"
+  },
+  "admin": {
+    "title": "Moderation",
+    "queue": {
+      "title": "Verification queue",
+      "empty": "Nothing waiting for review",
+      "priority": "Priority",
+      "submitted": "Submitted",
+      "expiresIn": "{minutes} minutes left",
+      "confidence": "Confidence"
+    },
+    "review": {
+      "title": "Document review",
+      "applicant": "Applicant",
+      "signals": "Detected signals",
+      "devices": "Devices",
+      "relatedAccounts": "Other accounts on this device",
+      "approve": "Approve",
+      "reject": "Reject",
+      "ban": "Ban",
+      "reason": "Reason",
+      "reasonHint": "At least 10 characters. Recorded in the audit log.",
+      "bufferExpired": "The images have expired. Ask the applicant to submit again.",
+      "confirmBan": "This permanently bans the account. Continue?",
+      "noteAutoBan": "The system never bans automatically — this decision is yours."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your profile and privacy",
+    "saved": "Your changes were saved",
+    "nav": {
+      "profile": "Profile",
+      "privacy": "Privacy",
+      "appearance": "Appearance",
+      "account": "Account"
+    },
+    "profile": {
+      "title": "Profile",
+      "description": "This is what other people see",
+      "avatar": "Profile picture",
+      "avatarHint": "JPG or PNG, up to 2 MB",
+      "changeAvatar": "Change picture",
+      "removeAvatar": "Remove picture",
+      "headline": "Headline",
+      "headlinePlaceholder": "Computer Science, 3rd year",
+      "bio": "About"
+    },
+    "academic": {
+      "title": "Academic details",
+      "description": "University and graduation date"
+    },
+    "privacy": {
+      "title": "Privacy",
+      "description": "Choose who can see each piece of information",
+      "note": "Your nickname and picture are always public — the platform does not work without them.",
+      "realName": "Full name",
+      "realNameHint": "The name on your ID document",
+      "email": "Email",
+      "phone": "Phone number",
+      "university": "University",
+      "faculty": "Faculty",
+      "graduationYear": "Graduation year",
+      "options": {
+        "PUBLIC": "Everyone",
+        "PUBLIC_hint": "Including signed-out visitors",
+        "VERIFIED_ONLY": "Verified students",
+        "VERIFIED_ONLY_hint": "Only document-verified users",
+        "PRIVATE": "Only me",
+        "PRIVATE_hint": "Nobody else can see it"
+      }
+    },
+    "theme": {
+      "label": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System",
+      "description": "System follows your device setting"
+    },
+    "language": {
+      "title": "Language",
+      "description": "Interface language"
+    },
+    "account": {
+      "title": "Account",
+      "description": "Security and account management",
+      "changePassword": "Change password",
+      "devices": "Devices",
+      "devicesHint": "Devices that have signed in to your account",
+      "exportData": "Download my data",
+      "exportHint": "A JSON copy of everything we hold",
+      "deleteAccount": "Delete account",
+      "deleteHint": "This cannot be undone"
+    }
+  },
+  "stub": {
+    "title": "This section is under construction",
+    "body": "We are still building this part of CampusHub. It will be available soon.",
+    "back": "Go back",
+    "toFeed": "Go to the feed"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "The page you are looking for does not exist or has moved."
+  }
+}

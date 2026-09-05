@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+build/
+.env
+.env.local
+*.tsbuildinfo
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+
+# graphify: generated knowledge graph (rebuild with `graphify update .`)
+graphify-out/

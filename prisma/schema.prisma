@@ -1,0 +1,1019 @@
+// CampusHub - PostgreSQL / Prisma schema
+//
+// TWO RULES THAT SHAPE THIS ENTIRE FILE:
+//
+//  1. ZERO RETENTION. There is no column anywhere in this schema that holds a
+//     national ID image, a student card image, an object-storage key pointing
+//     at one, or any text extracted from one. Documents exist only in RAM,
+//     only for the duration of one verification request. Grep for "storageKey"
+//     in the verification models: there is nothing to find, and that is the
+//     point.
+//
+//  2. NO IP-BASED BANNING. BlocklistType has no IP or CIDR member, by
+//     construction rather than by convention. Azerbaijani dormitories and
+//     mobile carriers put thousands of students behind one NAT'd address, so
+//     an IP ban is a collective punishment. Bans are per account, per device
+//     fingerprint, per email, per phone.
+//
+// Money is stored as integer minor units (qepik). Never use Float for money.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// =============================================================
+// ENUMS
+// =============================================================
+
+enum Locale {
+  az
+  en
+  ru
+}
+
+enum UserRole {
+  STUDENT
+  ALUMNI
+  MENTOR
+  TEACHER
+  MODERATOR
+  ADMIN
+}
+
+/// Lifecycle of the account's identity assurance.
+enum VerificationStatus {
+  UNVERIFIED // signed up, documents not yet submitted
+  PROCESSING // documents in the in-memory pipeline right now (seconds)
+  NEEDS_REVIEW // AI was not confident -> human moderator queue
+  VERIFIED
+  REJECTED // soft failure, user may resubmit (limited attempts)
+  BANNED // confirmed fraud, terminal
+}
+
+enum AccountStatus {
+  ACTIVE
+  RESTRICTED // e.g. payouts frozen pending review
+  SUSPENDED // temporary
+  BANNED // terminal
+  DELETED
+}
+
+enum DocumentKind {
+  ID_FRONT
+  ID_BACK
+  STUDENT_CARD_FRONT
+  STUDENT_CARD_BACK
+}
+
+/// Outcome of the automated stage of the pipeline.
+enum FraudVerdict {
+  CLEAN // high confidence genuine -> auto-verify
+  AMBIGUOUS // -> NEEDS_REVIEW, a human decides
+  TAMPERED // high confidence forged -> NEEDS_REVIEW with high priority
+}
+
+/// Identifiers a ban can attach to.
+///
+/// Deliberately contains NO network-level type. Adding one would reintroduce
+/// the shared-NAT collateral damage this design exists to avoid; if someone
+/// proposes it later, the absence here is the argument.
+enum BlocklistType {
+  USER_ID
+  EMAIL_HASH
+  PHONE_HASH
+  DEVICE_FINGERPRINT
+}
+
+/// Who may see one profile field.
+///
+/// Per-field rather than a single global "private profile" switch, because the
+/// choices genuinely differ: a student will happily show their nickname and
+/// university publicly while keeping their legal name to verified peers and
+/// their phone number to nobody.
+enum FieldVisibility {
+  PUBLIC // anyone, including signed-out visitors
+  VERIFIED_ONLY // signed-in, verified students
+  PRIVATE // the owner and platform moderators only
+}
+
+enum PostVisibility {
+  PUBLIC
+  UNIVERSITY_ONLY
+  VERIFIED_ONLY
+  FOLLOWERS
+}
+
+enum NoteStatus {
+  DRAFT
+  PROCESSING
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  DELISTED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+  DISPUTED
+}
+
+enum LedgerAccountType {
+  USER_AVAILABLE
+  USER_PENDING
+  PLATFORM_REVENUE
+  PLATFORM_ESCROW
+  EXTERNAL_GATEWAY
+}
+
+enum LedgerTxnKind {
+  TOPUP
+  NOTE_PURCHASE
+  NOTE_PAYOUT_RELEASE
+  BOOKING_ESCROW_HOLD
+  BOOKING_ESCROW_RELEASE
+  BOOKING_REFUND
+  WITHDRAWAL
+  PLATFORM_FEE
+  ADJUSTMENT
+}
+
+enum MentorIndustry {
+  IT
+  MARKETING
+  LAW
+  ENGINEERING
+  FINANCE
+  MEDICINE
+  EDUCATION
+  DESIGN
+  OTHER
+}
+
+enum BookingStatus {
+  REQUESTED
+  CONFIRMED
+  RESCHEDULED
+  COMPLETED
+  CANCELLED_BY_MENTEE
+  CANCELLED_BY_MENTOR
+  NO_SHOW
+  EXPIRED
+}
+
+enum NotificationChannel {
+  IN_APP
+  WEB_PUSH
+  EMAIL
+}
+
+enum NotificationType {
+  VERIFICATION_APPROVED
+  VERIFICATION_REJECTED
+  VERIFICATION_NEEDS_REVIEW
+  VERIFICATION_RESUBMIT_REQUIRED
+  GRADUATION_TRANSITION_PROMPT
+  NOTE_SOLD
+  NOTE_REVIEWED
+  NOTE_MODERATION
+  BOOKING_REQUESTED
+  BOOKING_CONFIRMED
+  BOOKING_REMINDER_24H
+  BOOKING_REMINDER_1H
+  BOOKING_CANCELLED
+  POST_REPLY
+  POST_LIKE
+  NEW_FOLLOWER
+  WALLET_CREDIT
+  SYSTEM
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  COPYRIGHT
+  ACADEMIC_DISHONESTY
+  FAKE_PROFILE
+  SEXUAL_CONTENT
+  OTHER
+}
+
+// =============================================================
+// IDENTITY & ORGANISATION
+// =============================================================
+
+model University {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  nameAz       String
+  nameEn       String
+  nameRu       String
+  city         String
+  emailDomains String[]
+  logoUrl      String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  users     User[]
+  posts     Post[]
+  notes     Note[]
+  faculties Faculty[]
+
+  @@index([isActive])
+  @@map("universities")
+}
+
+model Faculty {
+  id           String     @id @default(cuid())
+  universityId String
+  nameAz       String
+  nameEn       String
+  nameRu       String
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  users        User[]
+
+  @@unique([universityId, nameEn])
+  @@map("faculties")
+}
+
+model User {
+  id    String @id @default(cuid())
+  email String @unique
+  /// HMAC-SHA256(pepper, email). Survives account deletion so a banned address
+  /// cannot be recycled without our retaining the address itself.
+  emailHash    String  @unique
+  /// E.164. Optional at signup, required before a payout.
+  phone        String? @unique
+  phoneHash    String? @unique
+  passwordHash String
+
+  fullName  String
+  /// Public handle. This - never fullName - is what renders in the feed, on
+  /// note listings and in mentor reviews. Separating the two is what lets a
+  /// student participate socially without publishing the legal name that has
+  /// to match their ID document.
+  nickname  String  @unique @db.VarChar(24)
+  avatarUrl String?
+  headline  String? @db.VarChar(160)
+  bio       String? @db.VarChar(1000)
+  locale    Locale  @default(az)
+  timezone  String  @default("Asia/Baku")
+
+  role          UserRole      @default(STUDENT)
+  accountStatus AccountStatus @default(ACTIVE)
+
+  universityId String?
+  university   University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
+  facultyId    String?
+  faculty      Faculty?    @relation(fields: [facultyId], references: [id], onDelete: SetNull)
+
+  // ---- Verification: FLAGS ONLY -------------------------------------------
+  // This is the complete set of what survives a verification. There is no
+  // document, no extracted name, no ID number, no image hash. A subject access
+  // request against this table returns exactly what you see here.
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  isVerified         Boolean            @default(false)
+  verifiedAt         DateTime?
+  /// Which document types the pipeline confirmed. Booleans, not content.
+  studentStatusConfirmed Boolean @default(false)
+  identityConfirmed      Boolean @default(false)
+
+  // ---- Graduation lifecycle (drives the 1 May cron) -----------------------
+  /// 1-12. Both fields must be set for the annual sweep to target the user.
+  graduationYear         Int?
+  graduationMonth        Int? @db.SmallInt
+  /// Set when the user answers the alumni prompt, so the cron skips them.
+  alumniTransitionedAt   DateTime?
+  /// Last time the annual sweep prompted this user; makes the job idempotent
+  /// within a year without a separate task table.
+  graduationPromptedAt   DateTime?
+
+  // ---- Per-field privacy -------------------------------------------------
+  // Defaults are the conservative reading of "share as little as possible
+  // until asked": the nickname is public because the product does not work
+  // otherwise, everything identifying starts closed.
+  showRealName       FieldVisibility @default(VERIFIED_ONLY)
+  showEmail          FieldVisibility @default(PRIVATE)
+  showPhone          FieldVisibility @default(PRIVATE)
+  showUniversity     FieldVisibility @default(PUBLIC)
+  showGraduationYear FieldVisibility @default(VERIFIED_ONLY)
+  showFaculty        FieldVisibility @default(VERIFIED_ONLY)
+
+  emailVerifiedAt  DateTime?
+  lastLoginAt      DateTime?
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  sessions          Session[]
+  devices           UserDevice[]
+  verificationCases VerificationCase[]
+  mentorProfile     MentorProfile?
+  wallet            Wallet?
+  posts             Post[]
+  comments          Comment[]
+  likes             PostLike[]
+  notes             Note[]                   @relation("NoteSeller")
+  orders            Order[]                  @relation("OrderBuyer")
+  noteReviews       NoteReview[]
+  bookingsAsMentee  Booking[]                @relation("BookingMentee")
+  notifications     Notification[]
+  pushSubs          PushSubscription[]
+  notifPrefs        NotificationPreference[]
+  followers         Follow[]                 @relation("Followee")
+  following         Follow[]                 @relation("Follower")
+  reportsFiled      ContentReport[]          @relation("Reporter")
+  moderationActions ModerationAction[]       @relation("Moderator")
+  reviewedCases     VerificationCase[]       @relation("CaseModerator")
+  auditLogs         AuditLog[]
+
+  @@index([nickname])
+  @@index([universityId, verificationStatus])
+  /// The 1 May sweep's covering index.
+  @@index([graduationYear, graduationMonth, alumniTransitionedAt])
+  @@index([accountStatus])
+  @@map("users")
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String    @unique
+  userAgent        String    @db.VarChar(512)
+  /// FK to the device, not a raw network identifier.
+  deviceId         String?
+  createdAt        DateTime  @default(now())
+  lastSeenAt       DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device UserDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// A browser/device seen on the platform.
+///
+/// Replaces IP tracking entirely. The fingerprint is a hash of client signals
+/// (canvas, WebGL renderer, font metrics, screen geometry, timezone, hardware
+/// concurrency) combined with a server-observed TLS JA4 hash, which the client
+/// cannot alter from JavaScript.
+///
+/// Honest limitation, recorded here so nobody over-trusts this column: a
+/// fingerprint drifts on browser upgrade and a determined attacker resets it
+/// in about a minute with a fresh browser profile. It raises cost; it is not
+/// a wall. Its value is catching the lazy majority and correlating rings.
+model UserDevice {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// HMAC of the combined client + TLS signal set.
+  fingerprint String
+  /// Coarse, non-identifying descriptor for the "your devices" screen:
+  /// "Chrome on Windows". Never a full user-agent string.
+  label       String  @db.VarChar(120)
+  trusted     Boolean @default(false)
+
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  sessions Session[]
+
+  @@unique([userId, fingerprint])
+  @@index([fingerprint])
+  @@map("user_devices")
+}
+
+// =============================================================
+// VERIFICATION - zero document retention
+// =============================================================
+
+/// The audit trail of one verification attempt.
+///
+/// What this row does NOT contain, permanently and by design: image bytes,
+/// object-storage keys, OCR text, the holder's name as printed, the national
+/// ID number, the date of birth, or any hash derived from a document.
+///
+/// The images that produced this row lived in process memory for a few seconds
+/// and were overwritten before the HTTP response was sent.
+model VerificationCase {
+  id     String             @id @default(cuid())
+  userId String
+  user   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status VerificationStatus @default(PROCESSING)
+  /// 1-based; capped by VERIFICATION_MAX_ATTEMPTS.
+  attempt Int @default(1)
+
+  submittedAt DateTime  @default(now())
+  decidedAt   DateTime?
+
+  verdict FraudVerdict?
+  /// 0.000-1.000 confidence that the submission is genuine.
+  confidence Decimal? @db.Decimal(4, 3)
+  /// Machine-readable reasons, e.g. ["SCREEN_RECAPTURE","NAME_MISMATCH"].
+  /// Codes only. A code is a category, never a quoted value from the document.
+  failureCodes String[]
+  /// Per-check numeric scores for moderator context and model monitoring,
+  /// e.g. {"blur":0.82,"moire":0.13,"ela":0.44}. Numbers only - a CHECK
+  /// constraint in 0002_zero_retention.sql rejects any string value, so this
+  /// column cannot become a back door for retaining extracted text.
+  checkScores Json?
+  /// Locale key shown to the user. Generic for fraud outcomes.
+  publicMessageKey String?
+
+  // ---- Ephemeral review buffer -------------------------------------------
+  // Populated ONLY when status = NEEDS_REVIEW. Points at an encrypted blob in
+  // Redis with a hard TTL, never at durable storage. When the TTL elapses the
+  // images are unrecoverable and the case auto-closes as RESUBMIT_REQUIRED.
+  //
+  // This is the one place where a document outlives its request, and it exists
+  // solely because the spec requires a human to review flagged cases - you
+  // cannot review an image you deleted. Auto-approved and auto-rejected cases
+  // never touch it.
+  reviewBufferKey String?
+  reviewExpiresAt DateTime?
+  reviewPriority  Int       @default(0) // higher = sooner
+
+  decidedByModeratorId String?
+  decidedByModerator   User?   @relation("CaseModerator", fields: [decidedByModeratorId], references: [id], onDelete: SetNull)
+  moderatorNote        String? @db.VarChar(2000)
+
+  @@index([status, reviewPriority(sort: Desc), submittedAt])
+  @@index([userId, attempt])
+  @@index([reviewExpiresAt])
+  @@map("verification_cases")
+}
+
+/// Deferred, idempotent work: seller-payout clearing, booking reminders,
+/// mentorship escrow release.
+///
+/// NOTE what is NOT here any more: graduation prompts. Those moved to the
+/// annual 1 May cron (src/server/cron/graduation.ts) because a per-user row
+/// scheduled years in advance is dead weight - one dated sweep over an indexed
+/// column does the same job without a table that grows with every signup.
+///
+/// Also note this table never references a verification case. Nothing about
+/// identity documents is ever deferred; that pipeline is synchronous by design.
+model ScheduledTask {
+  id      String   @id @default(cuid())
+  kind    String   @db.VarChar(48) // ESCROW_RELEASE | BOOKING_REMINDER_24H | BOOKING_REMINDER_1H
+  runAt   DateTime
+  payload Json?
+  /// Prevents duplicate scheduling, e.g. "clear:order:<id>".
+  dedupeKey  String    @unique
+  executedAt DateTime?
+  attempts   Int       @default(0)
+  lastError  String?   @db.VarChar(1000)
+
+  @@index([runAt, executedAt])
+  @@map("scheduled_tasks")
+}
+
+/// Ban list. Account-level and device-level only - see BlocklistType.
+model Blocklist {
+  id   String        @id @default(cuid())
+  type BlocklistType
+  /// Hashed for every PII type. Never a readable email, phone, or address.
+  value  String
+  reason String @db.VarChar(500)
+
+  sourceCaseId String?
+  createdById  String?
+  /// NULL = permanent. Device blocks default to an expiry because a
+  /// fingerprint can be inherited by a second-hand phone or a shared lab
+  /// machine; account-identifier blocks are permanent.
+  expiresAt DateTime?
+  hitCount  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@unique([type, value])
+  @@index([type, expiresAt])
+  @@map("blocklist")
+}
+
+model ModerationAction {
+  id          String   @id @default(cuid())
+  moderatorId String
+  moderator   User     @relation("Moderator", fields: [moderatorId], references: [id])
+  targetType  String   @db.VarChar(32)
+  targetId    String
+  action      String   @db.VarChar(48)
+  reason      String   @db.VarChar(1000)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([moderatorId, createdAt])
+  @@map("moderation_actions")
+}
+
+/// Append-only. The app role holds no UPDATE/DELETE grant.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String   @db.VarChar(64)
+  entityType String   @db.VarChar(32)
+  entityId   String?
+  /// Device, not IP. Nothing in this schema logs a network address.
+  deviceFingerprint String?
+  userAgent         String? @db.VarChar(512)
+  before            Json?
+  after             Json?
+  createdAt         DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
+
+// =============================================================
+// FEED
+// =============================================================
+
+model Post {
+  id       String @id @default(cuid())
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  body         String         @db.VarChar(2000)
+  visibility   PostVisibility @default(PUBLIC)
+  universityId String?
+  university   University?    @relation(fields: [universityId], references: [id], onDelete: SetNull)
+
+  parentPostId String?
+  parentPost   Post?   @relation("Repost", fields: [parentPostId], references: [id], onDelete: SetNull)
+  reposts      Post[]  @relation("Repost")
+
+  likeCount    Int @default(0)
+  commentCount Int @default(0)
+
+  isPinned  Boolean   @default(false)
+  isDeleted Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  editedAt  DateTime?
+
+  media    PostMedia[]
+  tags     PostTag[]
+  comments Comment[]
+  likes    PostLike[]
+  reports  ContentReport[]
+
+  @@index([createdAt(sort: Desc)])
+  @@index([universityId, createdAt(sort: Desc)])
+  @@index([authorId, createdAt(sort: Desc)])
+  @@map("posts")
+}
+
+model PostMedia {
+  id         String  @id @default(cuid())
+  postId     String
+  post       Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  storageKey String
+  mimeType   String  @db.VarChar(64)
+  width      Int?
+  height     Int?
+  blurhash   String?
+  altText    String? @db.VarChar(300)
+  position   Int     @default(0)
+
+  @@index([postId])
+  @@map("post_media")
+}
+
+model Tag {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  label      String
+  usageCount Int      @default(0)
+  isBlocked  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  posts PostTag[]
+
+  @@index([usageCount(sort: Desc)])
+  @@map("tags")
+}
+
+model PostTag {
+  postId String
+  tagId  String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@index([tagId])
+  @@map("post_tags")
+}
+
+model Comment {
+  id       String    @id @default(cuid())
+  postId   String
+  post     Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId String
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parentId String?
+  parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[] @relation("CommentThread")
+
+  body      String   @db.VarChar(1000)
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  reports ContentReport[]
+
+  @@index([postId, createdAt])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model PostLike {
+  postId    String
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([postId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("post_likes")
+}
+
+model Follow {
+  followerId String
+  followeeId String
+  follower   User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followee   User     @relation("Followee", fields: [followeeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([followerId, followeeId])
+  @@index([followeeId])
+  @@map("follows")
+}
+
+model ContentReport {
+  id         String       @id @default(cuid())
+  reporterId String
+  reporter   User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reason     ReportReason
+  detail     String?      @db.VarChar(1000)
+  postId     String?
+  post       Post?        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId  String?
+  comment    Comment?     @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  noteId     String?
+  note       Note?        @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  resolvedAt DateTime?
+  createdAt  DateTime     @default(now())
+
+  @@index([resolvedAt, createdAt])
+  @@map("content_reports")
+}
+
+// =============================================================
+// UNINOTES MARKETPLACE
+// =============================================================
+
+model Note {
+  id       String @id @default(cuid())
+  sellerId String
+  seller   User   @relation("NoteSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  title        String      @db.VarChar(160)
+  description  String      @db.VarChar(4000)
+  universityId String?
+  university   University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
+  courseCode   String?     @db.VarChar(32)
+  subject      String      @db.VarChar(80)
+  language     Locale      @default(az)
+  academicYear String?     @db.VarChar(16)
+
+  priceMinor Int    @default(0)
+  currency   String @default("AZN") @db.Char(3)
+
+  status NoteStatus @default(DRAFT)
+
+  // Note PDFs are ordinary user content, not identity documents. They ARE
+  // stored durably - the zero-retention rule applies to KYC material only.
+  fileKey    String
+  fileSha256 String
+  sizeBytes  Int
+  pageCount  Int?
+  previewKey String?
+  searchText String? @db.Text
+
+  downloadCount Int     @default(0)
+  purchaseCount Int     @default(0)
+  ratingAvg     Decimal @default(0) @db.Decimal(3, 2)
+  ratingCount   Int     @default(0)
+
+  rejectionReason String?   @db.VarChar(500)
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  orders  Order[]
+  reviews NoteReview[]
+  reports ContentReport[]
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([universityId, subject, status])
+  @@index([sellerId, status])
+  @@index([fileSha256])
+  @@map("notes")
+}
+
+model Order {
+  id      String @id @default(cuid())
+  buyerId String
+  buyer   User   @relation("OrderBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  noteId  String
+  note    Note   @relation(fields: [noteId], references: [id], onDelete: Restrict)
+
+  priceMinor       Int
+  platformFeeMinor Int
+  sellerNetMinor   Int
+  currency         String      @default("AZN") @db.Char(3)
+  status           OrderStatus @default(PENDING)
+
+  idempotencyKey String  @unique
+  ledgerTxnId    String?
+
+  paidAt     DateTime?
+  refundedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  review NoteReview?
+
+  @@unique([buyerId, noteId])
+  @@index([status, createdAt])
+  @@map("orders")
+}
+
+model NoteReview {
+  id        String   @id @default(cuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  rating    Int      @db.SmallInt
+  body      String?  @db.VarChar(1500)
+  createdAt DateTime @default(now())
+
+  @@unique([noteId, authorId])
+  @@index([noteId, createdAt(sort: Desc)])
+  @@map("note_reviews")
+}
+
+// =============================================================
+// WALLET - double-entry ledger
+// =============================================================
+
+model Wallet {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency       String   @default("AZN") @db.Char(3)
+  availableMinor Int      @default(0)
+  pendingMinor   Int      @default(0)
+  version        Int      @default(0)
+  isFrozen       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  accounts LedgerAccount[]
+
+  @@map("wallets")
+}
+
+model LedgerAccount {
+  id        String            @id @default(cuid())
+  type      LedgerAccountType
+  walletId  String?
+  wallet    Wallet?           @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  currency  String            @default("AZN") @db.Char(3)
+  createdAt DateTime          @default(now())
+
+  entries LedgerEntry[]
+
+  @@unique([walletId, type, currency])
+  @@map("ledger_accounts")
+}
+
+model LedgerTransaction {
+  id           String        @id @default(cuid())
+  kind         LedgerTxnKind
+  referenceKey String        @unique
+  description  String        @db.VarChar(300)
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+
+  entries LedgerEntry[]
+
+  @@index([kind, createdAt])
+  @@map("ledger_transactions")
+}
+
+model LedgerEntry {
+  id            String            @id @default(cuid())
+  transactionId String
+  transaction   LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  accountId     String
+  account       LedgerAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  amountMinor   Int
+  currency      String            @default("AZN") @db.Char(3)
+  createdAt     DateTime          @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([transactionId])
+  @@map("ledger_entries")
+}
+
+// =============================================================
+// POCKETMENTOR
+// =============================================================
+
+model MentorProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  industry        MentorIndustry
+  specialties     String[]
+  headline        String         @db.VarChar(160)
+  about           String         @db.VarChar(4000)
+  company         String?        @db.VarChar(120)
+  jobTitle        String?        @db.VarChar(120)
+  yearsExperience Int            @default(0)
+  linkedinUrl     String?
+  languages       Locale[]
+
+  hourlyRateMinor Int    @default(0)
+  sessionMinutes  Int    @default(45)
+  bufferMinutes   Int    @default(15)
+  minNoticeHours  Int    @default(12)
+  timezone        String @default("Asia/Baku")
+
+  isApproved          Boolean   @default(false)
+  approvedAt          DateTime?
+  isAcceptingBookings Boolean   @default(true)
+
+  ratingAvg         Decimal @default(0) @db.Decimal(3, 2)
+  ratingCount       Int     @default(0)
+  sessionsCompleted Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  availabilityRules      AvailabilityRule[]
+  availabilityExceptions AvailabilityException[]
+  bookings               Booking[]
+  reviews                MentorReview[]
+
+  @@index([industry, isApproved, isAcceptingBookings])
+  @@index([ratingAvg(sort: Desc)])
+  @@map("mentor_profiles")
+}
+
+model AvailabilityRule {
+  id          String        @id @default(cuid())
+  mentorId    String
+  mentor      MentorProfile @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  weekday     Int           @db.SmallInt
+  startMinute Int
+  endMinute   Int
+  validFrom   DateTime?
+  validUntil  DateTime?
+
+  @@index([mentorId, weekday])
+  @@map("availability_rules")
+}
+
+model AvailabilityException {
+  id          String        @id @default(cuid())
+  mentorId    String
+  mentor      MentorProfile @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  date        DateTime      @db.Date
+  isBlocked   Boolean       @default(true)
+  startMinute Int?
+  endMinute   Int?
+
+  @@unique([mentorId, date, startMinute])
+  @@map("availability_exceptions")
+}
+
+model Booking {
+  id       String        @id @default(cuid())
+  mentorId String
+  mentor   MentorProfile @relation(fields: [mentorId], references: [id], onDelete: Restrict)
+  menteeId String
+  mentee   User          @relation("BookingMentee", fields: [menteeId], references: [id], onDelete: Restrict)
+
+  startsAt DateTime
+  endsAt   DateTime
+  timezone String        @default("Asia/Baku")
+  status   BookingStatus @default(REQUESTED)
+
+  topic           String  @db.VarChar(300)
+  menteeNote      String? @db.VarChar(2000)
+  meetingUrlEnc   String? @db.Text
+  meetingProvider String? @db.VarChar(32)
+
+  priceMinor       Int
+  platformFeeMinor Int
+  currency         String  @default("AZN") @db.Char(3)
+  escrowTxnId      String?
+  idempotencyKey   String  @unique
+
+  confirmedAt  DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?   @db.VarChar(500)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  review MentorReview?
+
+  @@unique([mentorId, startsAt])
+  @@index([menteeId, startsAt(sort: Desc)])
+  @@index([status, startsAt])
+  @@map("bookings")
+}
+
+model MentorReview {
+  id        String        @id @default(cuid())
+  mentorId  String
+  mentor    MentorProfile @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  bookingId String        @unique
+  booking   Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  rating    Int           @db.SmallInt
+  body      String?       @db.VarChar(1500)
+  createdAt DateTime      @default(now())
+
+  @@index([mentorId, createdAt(sort: Desc)])
+  @@map("mentor_reviews")
+}
+
+// =============================================================
+// NOTIFICATIONS
+// =============================================================
+
+model Notification {
+  id       String           @id @default(cuid())
+  userId   String
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type     NotificationType
+  titleKey String           @db.VarChar(120)
+  bodyKey  String           @db.VarChar(120)
+  params   Json?
+  linkUrl  String?          @db.VarChar(500)
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model PushSubscription {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint     String   @unique @db.VarChar(600)
+  p256dh       String
+  auth         String
+  userAgent    String?  @db.VarChar(512)
+  failureCount Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model NotificationPreference {
+  userId  String
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type    NotificationType
+  channel NotificationChannel
+  enabled Boolean             @default(true)
+
+  @@id([userId, type, channel])
+  @@map("notification_preferences")
+}

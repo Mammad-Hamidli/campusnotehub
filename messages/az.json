@@ -1,0 +1,640 @@
+{
+  "common": {
+    "appName": "CampusHub",
+    "save": "Yadda saxla",
+    "cancel": "Ləğv et",
+    "continue": "Davam et",
+    "back": "Geri",
+    "submit": "Göndər",
+    "delete": "Sil",
+    "edit": "Redaktə et",
+    "search": "Axtar",
+    "loading": "Yüklənir...",
+    "retry": "Yenidən cəhd et",
+    "close": "Bağla",
+    "optional": "seçimli",
+    "required": "mütləq",
+    "showMore": "Daha çox göstər",
+    "showLess": "Daha az göstər",
+    "step": "Addım {current} / {total}",
+    "saveChanges": "Dəyişiklikləri saxla",
+    "saved": "Saxlanıldı",
+    "discard": "Ləğv et",
+    "comingSoon": "Tezliklə"
+  },
+  "nav": {
+    "feed": "Lent",
+    "notes": "UniNotes",
+    "mentors": "PocketMentor",
+    "wallet": "Balans",
+    "notifications": "Bildirişlər",
+    "profile": "Profil",
+    "settings": "Tənzimləmələr",
+    "logout": "Çıxış",
+    "login": "Daxil ol",
+    "register": "Qeydiyyat",
+    "language": "Dil",
+    "languageSwitcher": "Dili dəyiş",
+    "theme": "Mövzu",
+    "help": "Kömək",
+    "messages": "Mesajlar",
+    "bookmarks": "Yadda saxlanılanlar",
+    "explore": "Kəşf et"
+  },
+  "auth": {
+    "register": {
+      "title": "CampusHub-a qoşul",
+      "subtitle": "Universitet icması üçün doğrulanmış platforma",
+      "fullName": "Ad və soyad",
+      "fullNameHint": "Şəxsiyyət vəsiqənizdəki kimi yazın",
+      "email": "E-poçt",
+      "emailHint": "Universitet e-poçtu varsa, doğrulama daha sürətli olur",
+      "password": "Şifrə",
+      "passwordConfirm": "Şifrəni təsdiqlə",
+      "passwordHint": "Ən azı 12 simvol, rəqəm və hərf",
+      "university": "Universitet",
+      "universityPlaceholder": "Universitetinizi seçin",
+      "faculty": "Fakültə",
+      "graduationYear": "Məzuniyyət ili",
+      "graduationMonth": "Məzuniyyət ayı",
+      "termsAccept": "<terms>İstifadə şərtləri</terms> və <privacy>Məxfilik siyasəti</privacy> ilə razıyam",
+      "dataConsent": "Şəxsiyyət sənədlərimin yalnız tələbə statusunun doğrulanması üçün emal olunmasına razılıq verirəm",
+      "createAccount": "Hesab yarat",
+      "haveAccount": "Artıq hesabınız var?",
+      "phone": "Telefon nömrəsi",
+      "phoneHint": "Seçimlidir, lakin hesabın bərpası və ödənişlər üçün lazım olacaq",
+      "nickname": "İstifadəçi adı",
+      "nicknameHint": "Platformada bu ad görünəcək. Hərf, rəqəm və alt xətt, 3-24 simvol.",
+      "graduationDate": "Məzuniyyət tarixi",
+      "consentsLegend": "Razılıqlar",
+      "showPassword": "Şifrəni göstər",
+      "hidePassword": "Şifrəni gizlət",
+      "termsShort": "İstifadə şərtləri",
+      "consentShort": "Sənəd emalına razılıq",
+      "strength": {
+        "weak": "Zəif",
+        "fair": "Orta",
+        "good": "Yaxşı",
+        "strong": "Güclü"
+      },
+      "universityAutoDetected": "E-poçt domeninə görə avtomatik seçildi"
+    },
+    "login": {
+      "title": "Xoş gəlmisiniz",
+      "email": "E-poçt",
+      "password": "Şifrə",
+      "forgotPassword": "Şifrəni unutmusunuz?",
+      "submit": "Daxil ol",
+      "noAccount": "Hesabınız yoxdur?"
+    },
+    "errors": {
+      "invalidCredentials": "İstifadəçi adı (e-poçt) və ya şifrə yanlışdır",
+      "emailTaken": "Bu e-poçt artıq istifadə olunur",
+      "weakPassword": "Şifrə çox zəifdir",
+      "passwordMismatch": "Şifrələr uyğun gəlmir",
+      "tooManyAttempts": "Çox sayda cəhd. {minutes} dəqiqə sonra yenidən yoxlayın",
+      "accountLocked": "Hesab müvəqqəti bloklanıb",
+      "termsRequired": "Davam etmək üçün şərtləri qəbul edin",
+      "nameTooShort": "Ad və soyad ən azı 3 simvol olmalıdır",
+      "nameInvalid": "Yalnız hərf, boşluq və defis istifadə edin",
+      "nicknameInvalid": "Yalnız hərf, rəqəm və alt xətt. 3-24 simvol.",
+      "nicknameReserved": "Bu istifadəçi adı istifadə edilə bilməz",
+      "nicknameTaken": "Bu istifadəçi adı artıq tutulub",
+      "emailInvalid": "Düzgün e-poçt ünvanı daxil edin",
+      "phoneInvalid": "Düzgün Azərbaycan nömrəsi daxil edin (+994 5X XXX XX XX)",
+      "phoneTaken": "Bu nömrə artıq istifadə olunur",
+      "consentRequired": "Sənədlərin emalına razılıq verməlisiniz",
+      "credentialsUnavailable": "Bu məlumatlarla hesab yaratmaq mümkün deyil. Başqa e-poçt və ya nömrə yoxlayın."
+    }
+  },
+  "verification": {
+    "title": "Şəxsiyyətin doğrulanması",
+    "subtitle": "Saxta profillərin qarşısını almaq üçün sənədlərinizi yükləyin",
+    "banner": {
+      "unverified": "Hesab doğrulanmayıb: təhlükəsizlik yoxlaması gözlənilir. Bəzi funksiyalar məhduddur.",
+      "unverifiedCta": "Sənədləri yüklə",
+      "pending": "Sənədləriniz yoxlanılır. Bu adətən 5 dəqiqə - 24 saat çəkir.",
+      "needsReview": "Sənədləriniz əl ilə yoxlanılır. Nəticəni bildirişlə göndərəcəyik.",
+      "rejected": "Doğrulama alınmadı. {remaining} cəhd qalıb.",
+      "rejectedCta": "Yenidən yüklə",
+      "processing": "Sənədləriniz indi yoxlanılır. Bu bir neçə saniyə çəkir.",
+      "resubmitRequired": "Yoxlama müddəti bitdi. Sənədləri yenidən yükləyin.",
+      "attemptsExhausted": "Cəhd limiti bitib. Dəstək xidməti ilə əlaqə saxlayın."
+    },
+    "badge": {
+      "unverified": "Doğrulanmayıb",
+      "pending": "Yoxlanılır",
+      "verified": "Doğrulanmış tələbə",
+      "verifiedAlumni": "Doğrulanmış məzun",
+      "rejected": "Rədd edilib"
+    },
+    "slots": {
+      "idFront": "Şəxsiyyət vəsiqəsi - ön tərəf",
+      "idBack": "Şəxsiyyət vəsiqəsi - arxa tərəf",
+      "studentFront": "Tələbə bileti - ön tərəf",
+      "studentBack": "Tələbə bileti - arxa tərəf"
+    },
+    "upload": {
+      "dropHere": "Şəkli bura atın və ya seçmək üçün klikləyin",
+      "takePhoto": "Kamera ilə çək",
+      "chooseFile": "Fayl seç",
+      "replace": "Dəyişdir",
+      "remove": "Sil",
+      "uploading": "Yüklənir... {percent}%",
+      "checking": "Keyfiyyət yoxlanılır...",
+      "ready": "Hazırdır"
+    },
+    "quality": {
+      "tooBlurry": "Şəkil bulanıqdır. Daha aydın çəkin.",
+      "glare": "Sənəddə işıq parıltısı var. Bucağı dəyişin.",
+      "tooSmall": "Şəkil çox kiçikdir. Ən azı 1000 piksel enində olmalıdır.",
+      "cropped": "Sənədin bütün kənarları görünmür.",
+      "screenshot": "Ekran şəkli qəbul edilmir. Sənədin özünü çəkin.",
+      "wrongFormat": "Yalnız JPG, PNG və ya HEIC formatı qəbul edilir.",
+      "tooLarge": "Fayl {max} MB-dan böyükdür.",
+      "pdfUnsafe": "Bu PDF-də icra oluna bilən məzmun var və qəbul edilmir.",
+      "pdfEncrypted": "Şifrələnmiş PDF qəbul edilmir. Parolsuz fayl yükləyin."
+    },
+    "tips": {
+      "title": "Uğurlu doğrulama üçün",
+      "flat": "Sənədi düz səthə qoyun",
+      "light": "Yaxşı işıqlandırma təmin edin",
+      "corners": "Bütün dörd künc görünsün",
+      "noEdit": "Şəkli redaktə etməyin - dəyişikliklər aşkarlanır"
+    },
+    "submit": "Doğrulamaya göndər",
+    "submitted": {
+      "title": "Sənədləriniz qəbul edildi",
+      "body": "Hesabınız aktivdir. Yoxlama bitəndə sizə bildiriş göndərəcəyik.",
+      "goToFeed": "Lentə keç"
+    },
+    "restricted": {
+      "title": "Bu funksiya doğrulama tələb edir",
+      "body": "Doğrulanmayan hesablar konspekt sata, mentor sifarişi verə və ya balans çıxara bilmir.",
+      "allowed": "İndi edə bilərsiniz: lenti oxumaq, paylaşım etmək, konspekt almaq."
+    },
+    "graduation": {
+      "promptTitle": "Məzun olmusunuz?",
+      "promptBody": "Profilinizə görə {month} {year} tarixində məzun olmalısınız. Statusunuzu yeniləyin.",
+      "becomeAlumni": "Məzun statusuna keç",
+      "stillStudying": "Hələ oxuyuram",
+      "updateLater": "Sonra xatırlat"
+    },
+    "failure": {
+      "generic": "Qeydiyyatı tamamlamaq mümkün olmadı. Dəstək xidməti ilə əlaqə saxlayın.",
+      "supportCode": "Müraciət kodu: {code}"
+    },
+    "errors": {
+      "allFourRequired": "Dörd sənədin hamısını yükləyin"
+    }
+  },
+  "feed": {
+    "title": "Lent",
+    "composerPlaceholder": "Nə baş verir?",
+    "post": "Paylaş",
+    "reply": "Cavab yaz",
+    "like": "Bəyən",
+    "comment": "Şərh",
+    "share": "Paylaş",
+    "attachImage": "Şəkil əlavə et",
+    "addTag": "Etiket əlavə et",
+    "visibility": {
+      "label": "Kim görə bilər",
+      "public": "Hamı",
+      "universityOnly": "Yalnız {university}",
+      "verifiedOnly": "Yalnız doğrulanmış istifadəçilər",
+      "followers": "İzləyicilər"
+    },
+    "filters": {
+      "all": "Hamısı",
+      "myUniversity": "Universitetim",
+      "following": "İzlədiklərim",
+      "tag": "#{tag}"
+    },
+    "empty": "Hələ paylaşım yoxdur. İlk sən ol.",
+    "loadNew": "{count} yeni paylaşım",
+    "deleted": "Bu paylaşım silinib",
+    "characterCount": "{remaining} simvol qalıb"
+  },
+  "notes": {
+    "title": "UniNotes",
+    "subtitle": "Tələbədən tələbəyə konspekt bazarı",
+    "browse": "Konspektlərə bax",
+    "sell": "Konspekt sat",
+    "myPurchases": "Aldıqlarım",
+    "myListings": "Satdıqlarım",
+    "filters": {
+      "university": "Universitet",
+      "subject": "Fənn",
+      "courseCode": "Fənn kodu",
+      "language": "Dil",
+      "priceRange": "Qiymət aralığı",
+      "rating": "Reytinq",
+      "freeOnly": "Yalnız pulsuz"
+    },
+    "card": {
+      "pages": "{count} səhifə",
+      "sales": "{count} satış",
+      "byAuthor": "{name} tərəfindən",
+      "free": "Pulsuz"
+    },
+    "detail": {
+      "preview": "İlk səhifə önizləməsi",
+      "previewNote": "Tam sənəd alışdan sonra əlçatan olur",
+      "buy": "Al - {price}",
+      "download": "Yüklə",
+      "alreadyOwned": "Bu konspekt sizdədir",
+      "reviews": "Rəylər ({count})",
+      "writeReview": "Rəy yaz",
+      "reportListing": "Şikayət et"
+    },
+    "upload": {
+      "title": "Yeni konspekt",
+      "file": "PDF faylı",
+      "fileHint": "Maksimum 50 MB, yalnız PDF",
+      "noteTitle": "Başlıq",
+      "description": "Təsvir",
+      "subject": "Fənn",
+      "price": "Qiymət (AZN)",
+      "priceHint": "0 yazsanız pulsuz olacaq. Maksimum 50 AZN.",
+      "processing": "Fayl emal olunur: önizləmə yaradılır...",
+      "pendingReview": "Konspekt moderasiyada. Təsdiqdən sonra dərc olunacaq."
+    },
+    "errors": {
+      "notVerified": "Konspekt satmaq üçün hesabınız doğrulanmalıdır",
+      "insufficientFunds": "Balansınız kifayət etmir",
+      "duplicate": "Eyni fayl artıq platformada mövcuddur",
+      "encrypted": "Şifrələnmiş PDF qəbul edilmir"
+    }
+  },
+  "mentors": {
+    "title": "PocketMentor",
+    "subtitle": "Peşəkarlarla birbaşa karyera məsləhəti",
+    "becomeMentor": "Mentor ol",
+    "industries": {
+      "IT": "İnformasiya texnologiyaları",
+      "MARKETING": "Marketinq",
+      "LAW": "Hüquq",
+      "ENGINEERING": "Mühəndislik",
+      "FINANCE": "Maliyyə",
+      "MEDICINE": "Tibb",
+      "EDUCATION": "Təhsil",
+      "DESIGN": "Dizayn",
+      "OTHER": "Digər"
+    },
+    "profile": {
+      "sessions": "{count} görüş",
+      "experience": "{years} il təcrübə",
+      "rate": "{price} / {minutes} dəq",
+      "languages": "Dillər",
+      "about": "Haqqında",
+      "bookSession": "Görüş təyin et",
+      "notAccepting": "Hazırda yeni sifariş qəbul etmir"
+    },
+    "booking": {
+      "selectDate": "Tarix seçin",
+      "selectTime": "Vaxt seçin",
+      "timezoneNote": "Vaxtlar {timezone} saat qurşağında göstərilir",
+      "noSlots": "Bu gün üçün boş vaxt yoxdur",
+      "topic": "Görüşün mövzusu",
+      "topicPlaceholder": "Nə haqqında danışmaq istəyirsiniz?",
+      "confirm": "Təsdiqlə və ödə",
+      "summary": "{date}, {time} - {duration} dəqiqə",
+      "total": "Cəmi: {price}",
+      "escrowNote": "Məbləğ görüş bitənə qədər saxlanılır",
+      "confirmed": {
+        "title": "Görüş təsdiqləndi",
+        "body": "Video zəng linki görüşdən 30 dəqiqə əvvəl aktivləşəcək.",
+        "addToCalendar": "Təqvimə əlavə et",
+        "joinCall": "Zəngə qoşul"
+      },
+      "cancel": "Görüşü ləğv et",
+      "cancelPolicy": "24 saatdan əvvəl ləğv edilərsə tam məbləğ qaytarılır"
+    },
+    "errors": {
+      "slotTaken": "Bu vaxt artıq tutulub. Başqa vaxt seçin.",
+      "tooSoon": "Görüş ən azı {hours} saat sonraya təyin edilməlidir",
+      "selfBooking": "Özünüzə görüş təyin edə bilməzsiniz"
+    }
+  },
+  "wallet": {
+    "title": "Balans",
+    "available": "İstifadəyə hazır",
+    "pending": "Gözləyən",
+    "topUp": "Balans artır",
+    "withdraw": "Çıxarış et",
+    "history": "Əməliyyat tarixçəsi",
+    "pendingNote": "Satış məbləği {hours} saat sonra istifadəyə açılır",
+    "txn": {
+      "TOPUP": "Balans artırma",
+      "NOTE_PURCHASE": "Konspekt alışı",
+      "NOTE_PAYOUT_RELEASE": "Konspekt satışı",
+      "BOOKING_ESCROW_HOLD": "Görüş ödənişi",
+      "BOOKING_ESCROW_RELEASE": "Mentorluq gəliri",
+      "BOOKING_REFUND": "Görüş qaytarılması",
+      "WITHDRAWAL": "Çıxarış",
+      "PLATFORM_FEE": "Platforma komissiyası",
+      "ADJUSTMENT": "Düzəliş"
+    },
+    "empty": "Hələ əməliyyat yoxdur"
+  },
+  "notifications": {
+    "title": "Bildirişlər",
+    "markAllRead": "Hamısını oxunmuş et",
+    "empty": "Yeni bildiriş yoxdur",
+    "enablePush": "Brauzer bildirişlərini aktivləşdir",
+    "types": {
+      "VERIFICATION_APPROVED": "Hesabınız doğrulandı",
+      "VERIFICATION_REJECTED": "Doğrulama alınmadı",
+      "GRADUATION_TRANSITION_PROMPT": "Məzun statusunu yeniləyin",
+      "NOTE_SOLD": "Konspektiniz satıldı: {title}",
+      "NOTE_REVIEWED": "Konspektinizə yeni rəy",
+      "BOOKING_REQUESTED": "Yeni görüş sorğusu",
+      "BOOKING_CONFIRMED": "Görüş təsdiqləndi",
+      "BOOKING_REMINDER_24H": "Sabah görüşünüz var",
+      "BOOKING_REMINDER_1H": "Görüşünüz 1 saat sonra başlayır",
+      "BOOKING_CANCELLED": "Görüş ləğv edildi",
+      "POST_REPLY": "{name} paylaşımınıza cavab yazdı",
+      "POST_LIKE": "{name} paylaşımınızı bəyəndi",
+      "NEW_FOLLOWER": "{name} sizi izləməyə başladı",
+      "WALLET_CREDIT": "Balansınıza {amount} əlavə olundu",
+      "VERIFICATION_NEEDS_REVIEW": "Əlavə yoxlama tələb olunur",
+      "VERIFICATION_RESUBMIT_REQUIRED": "Sənədləri yenidən yükləyin"
+    }
+  },
+  "errors": {
+    "generic": "Xəta baş verdi. Yenidən cəhd edin.",
+    "network": "İnternet bağlantısını yoxlayın",
+    "notFound": "Səhifə tapılmadı",
+    "forbidden": "Bu səhifəyə girişiniz yoxdur",
+    "serverError": "Server xətası. Komandamız məlumatlandırıldı.",
+    "rateLimited": "Çox sayda sorğu. Bir az gözləyin.",
+    "validationFailed": "Formada xətalar var",
+    "sessionExpired": "Sessiya bitdi. Yenidən daxil olun.",
+    "fileTooLarge": "Fayl çox böyükdür",
+    "unsupportedFile": "Bu fayl növü dəstəklənmir",
+    "fieldRequired": "Bu sahə mütləqdir",
+    "summaryTitle": "Formada {count} xəta var",
+    "methodNotAllowed": "Bu sorğu üsulu dəstəklənmir",
+    "unsupportedMediaType": "Sorğunun formatı dəstəklənmir",
+    "credentialsInQueryString": "Təhlükəsizlik səbəbindən sorğu ləğv edildi. Səhifəni yeniləyin və yenidən cəhd edin."
+  },
+  "a11y": {
+    "openMenu": "Menyunu aç",
+    "closeMenu": "Menyunu bağla",
+    "userMenu": "İstifadəçi menyusu",
+    "unreadCount": "{count} oxunmamış bildiriş",
+    "verifiedBadge": "Doğrulanmış hesab",
+    "loadingContent": "Məzmun yüklənir",
+    "requiredField": "Mütləq sahə"
+  },
+  "landing": {
+    "nav": {
+      "features": "İmkanlar",
+      "how": "Necə işləyir",
+      "about": "Haqqımızda"
+    },
+    "hero": {
+      "badge": "Yalnız doğrulanmış tələbələr",
+      "titleLead": "Tələbələr və gələcək peşəkarlar üçün",
+      "titleAccent": "tam ekosistem",
+      "subtitle": "Konspekt al və sat, sahəsində çalışan peşəkarlarla birbaşa görüş, kampus xəbərlərini bir yerdə izlə. Hər hesab tələbə bileti və şəxsiyyət vəsiqəsi ilə doğrulanır.",
+      "ctaNotes": "Konspektlərə bax",
+      "ctaMentor": "Mentor tap",
+      "trust": "Saxta profil yoxdur — hər hesab sənədlə yoxlanılır"
+    },
+    "stats": {
+      "students": "Aktiv tələbə",
+      "notes": "Paylaşılan konspekt",
+      "hours": "Mentorluq saatı",
+      "universities": "Universitet",
+      "live": "Canlı"
+    },
+    "features": {
+      "eyebrow": "Üç məhsul, bir hesab",
+      "title": "Universitet həyatın üçün lazım olan hər şey",
+      "subtitle": "Doğrulanmış tələbə şəxsiyyəti üç məhsulun da təməlidir. Bir dəfə yoxlanırsan, hər yerdə istifadə edirsən.",
+      "notes": {
+        "title": "UniNotes",
+        "body": "Tələbədən tələbəyə konspekt bazarı. Yüklə, qazanc əldə et və ya lazım olanı tap.",
+        "p1": "İlk səhifə önizləməsi avtomatik yaradılır",
+        "p2": "Daxili balans ilə təhlükəsiz ödəniş",
+        "p3": "Yalnız alanlar rəy yaza bilir"
+      },
+      "mentor": {
+        "title": "PocketMentor",
+        "body": "Sahəsində çalışan peşəkarlarla fərdi karyera məsləhəti.",
+        "p1": "IT, marketinq, hüquq, mühəndislik və daha çox",
+        "p2": "Boş vaxtlardan seç, dərhal təsdiqlə",
+        "p3": "Görüş bitənə qədər ödəniş saxlanılır"
+      },
+      "feed": {
+        "title": "Kampus lenti",
+        "body": "İmtahan xəbərdarlıqları, təqaüd elanları, sual-cavab — universitetin üzrə filtrlə.",
+        "p1": "Universitetə görə filtr",
+        "p2": "Etiketlərlə mövzu axtarışı",
+        "p3": "Şəkil və qeyd paylaşımı"
+      }
+    },
+    "ticker": {
+      "title": "Kampusda indi",
+      "joined": "{name} qoşuldu",
+      "verified": "{name} doğrulandı",
+      "uploaded": "{name} yeni konspekt yüklədi",
+      "booked": "{name} mentor görüşü təyin etdi",
+      "popular": "{title} bu gün {count} dəfə alındı"
+    },
+    "cta": {
+      "title": "Bu gün başla",
+      "body": "Qeydiyyat 2 dəqiqə çəkir. Sənədlər yoxlanarkən platformadan istifadə edə bilərsən.",
+      "button": "Pulsuz hesab yarat",
+      "secondary": "Əvvəlcə konspektlərə bax"
+    },
+    "footer": {
+      "tagline": "Azərbaycan universitetləri üçün doğrulanmış tələbə platforması.",
+      "product": "Məhsul",
+      "company": "Şirkət",
+      "legal": "Hüquqi",
+      "terms": "İstifadə şərtləri",
+      "privacy": "Məxfilik siyasəti",
+      "security": "Təhlükəsizlik",
+      "contact": "Əlaqə",
+      "rights": "Bütün hüquqlar qorunur."
+    }
+  },
+  "register": {
+    "steps": {
+      "account": "Hesab",
+      "documents": "Sənədlər",
+      "review": "Yoxlama"
+    },
+    "stepHint": {
+      "account": "Əsas məlumatlar",
+      "documents": "Dörd şəkil tələb olunur",
+      "review": "Göndərməzdən əvvəl yoxla"
+    },
+    "next": "Davam et",
+    "back": "Geri",
+    "finish": "Doğrulamaya göndər",
+    "aside": {
+      "title": "Niyə sənəd tələb edirik?",
+      "b1": "Saxta profillər və konspekt oğurluğunun qarşısını alır",
+      "b2": "Mentorlar kiminlə danışdığını bilir",
+      "b3": "Ödənişlərin təhlükəsizliyini təmin edir",
+      "privacy": "Şəkillər şifrələnmiş anbarda saxlanılır və yoxlama bitdikdən 30 gün sonra silinir."
+    },
+    "scanner": {
+      "title": "Sənəd bütövlüyü skaneri",
+      "idle": "Hazırdır",
+      "scanning": "Yoxlanılır...",
+      "passed": "Bütün sənədlər keçdi",
+      "failed": "Problem aşkarlandı",
+      "checkEdit": "Redaktə izləri",
+      "checkScreen": "Ekran şəkli",
+      "checkQuality": "Şəkil keyfiyyəti",
+      "checkMatch": "Ad uyğunluğu",
+      "note": "Bu yoxlama brauzerdə ilkin nəticə verir. Yekun qərar serverdə alınır."
+    },
+    "review": {
+      "title": "Məlumatları yoxla",
+      "body": "Göndərdikdən sonra hesabın dərhal aktivləşir, yoxlama arxa planda davam edir.",
+      "edit": "Dəyiş",
+      "documents": "Yüklənmiş sənədlər"
+    },
+    "blocked": {
+      "title": "Qeydiyyat tamamlanmadı",
+      "body": "Təhlükəsizlik yoxlaması bu müraciəti bloklayıb."
+    },
+    "retention": {
+      "title": "Sənədləriniz saxlanılmır",
+      "lead": "Şəkillər yalnız yoxlama anında emal olunur və dərhal silinir. Serverlərimizdə və ya buludda qalmır.",
+      "deleted": "Yoxlamadan dərhal sonra tamamilə silinir",
+      "flagsOnly": "Bazada yalnız \"doğrulanıb: bəli/xeyr\" saxlanılır",
+      "humanReview": "Şübhəli hallarda moderator baxa bilər",
+      "window": "Belə hallarda şəkil ən çox 24 saat şifrələnmiş qalır"
+    }
+  },
+  "dashboard": {
+    "greeting": "Salam, {name}",
+    "subtitle": "Kampusda bu gün nə baş verir",
+    "graduation": {
+      "title": "Məzuniyyətə sayğac",
+      "months": "{count} ay qalıb",
+      "days": "{count} gün qalıb",
+      "body": "{month} {year} tarixində məzun olursan. Vaxtı çatanda məzun statusuna keçməyi xatırladacağıq.",
+      "cta": "Profili yenilə"
+    },
+    "trending": {
+      "title": "Populyar konspektlər",
+      "subtitle": "Bu həftə ən çox alınanlar",
+      "viewAll": "Hamısına bax"
+    },
+    "quickActions": "Sürətli əməliyyatlar",
+    "sellNote": "Konspekt sat",
+    "findMentor": "Mentor tap"
+  },
+  "admin": {
+    "title": "Moderasiya",
+    "queue": {
+      "title": "Yoxlama növbəsi",
+      "empty": "Gözləyən müraciət yoxdur",
+      "priority": "Prioritet",
+      "submitted": "Göndərilib",
+      "expiresIn": "{minutes} dəqiqə qalıb",
+      "confidence": "Etibarlılıq"
+    },
+    "review": {
+      "title": "Sənəd yoxlaması",
+      "applicant": "Müraciətçi",
+      "signals": "Aşkarlanan siqnallar",
+      "devices": "Cihazlar",
+      "relatedAccounts": "Bu cihazdakı digər hesablar",
+      "approve": "Təsdiqlə",
+      "reject": "Rədd et",
+      "ban": "Blokla",
+      "reason": "Səbəb",
+      "reasonHint": "Ən azı 10 simvol. Audit jurnalında saxlanılır.",
+      "bufferExpired": "Şəkillərin saxlanma müddəti bitib. İstifadəçidən yenidən yükləmə tələb edin.",
+      "confirmBan": "Bu hesab birdəfəlik bloklanacaq. Davam edilsin?",
+      "noteAutoBan": "Sistem avtomatik bloklamır — qərarı siz verirsiniz."
+    }
+  },
+  "settings": {
+    "title": "Tənzimləmələr",
+    "subtitle": "Profilinizi və məxfilik parametrlərinizi idarə edin",
+    "saved": "Dəyişikliklər saxlanıldı",
+    "nav": {
+      "profile": "Profil",
+      "privacy": "Məxfilik",
+      "appearance": "Görünüş",
+      "account": "Hesab"
+    },
+    "profile": {
+      "title": "Profil",
+      "description": "Bu məlumatlar platformada görünür",
+      "avatar": "Profil şəkli",
+      "avatarHint": "JPG və ya PNG, maksimum 2 MB",
+      "changeAvatar": "Şəkli dəyiş",
+      "removeAvatar": "Şəkli sil",
+      "headline": "Qısa təqdimat",
+      "headlinePlaceholder": "Kompüter elmləri, 3-cü kurs",
+      "bio": "Haqqımda"
+    },
+    "academic": {
+      "title": "Akademik məlumat",
+      "description": "Universitet və məzuniyyət tarixi"
+    },
+    "privacy": {
+      "title": "Məxfilik",
+      "description": "Hansı məlumatınızı kimin görəcəyini seçin",
+      "note": "İstifadəçi adınız və profil şəkliniz həmişə ictimaidir — platforma onlarsız işləmir.",
+      "realName": "Ad və soyad",
+      "realNameHint": "Şəxsiyyət vəsiqənizdəki ad",
+      "email": "E-poçt",
+      "phone": "Telefon nömrəsi",
+      "university": "Universitet",
+      "faculty": "Fakültə",
+      "graduationYear": "Məzuniyyət ili",
+      "options": {
+        "PUBLIC": "Hamı",
+        "PUBLIC_hint": "Qeydiyyatsız ziyarətçilər də daxil",
+        "VERIFIED_ONLY": "Doğrulanmış tələbələr",
+        "VERIFIED_ONLY_hint": "Yalnız sənədi təsdiqlənmiş istifadəçilər",
+        "PRIVATE": "Yalnız mən",
+        "PRIVATE_hint": "Heç kim görməyəcək"
+      }
+    },
+    "theme": {
+      "label": "Mövzu",
+      "light": "İşıqlı",
+      "dark": "Qaranlıq",
+      "system": "Sistem",
+      "description": "Sistem seçimi cihazınızın parametrlərinə uyğunlaşır"
+    },
+    "language": {
+      "title": "Dil",
+      "description": "Platformanın dili"
+    },
+    "account": {
+      "title": "Hesab",
+      "description": "Təhlükəsizlik və hesabın idarə edilməsi",
+      "changePassword": "Şifrəni dəyiş",
+      "devices": "Cihazlar",
+      "devicesHint": "Hesabınıza daxil olmuş cihazlar",
+      "exportData": "Məlumatlarımı yüklə",
+      "exportHint": "Bütün məlumatlarınızın JSON kopyası",
+      "deleteAccount": "Hesabı sil",
+      "deleteHint": "Bu əməliyyat geri qaytarıla bilməz"
+    }
+  },
+  "stub": {
+    "title": "Bu bölmə hazırlanır",
+    "body": "Bu hissə hazırda qurulur və tezliklə əlçatan olacaq.",
+    "back": "Geri qayıt",
+    "toFeed": "Lentə keç"
+  },
+  "notFound": {
+    "title": "Səhifə tapılmadı",
+    "body": "Axtardığınız səhifə mövcud deyil və ya köçürülüb."
+  }
+}

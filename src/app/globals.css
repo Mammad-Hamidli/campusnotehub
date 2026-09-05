@@ -1,0 +1,213 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Token definitions.
+ *
+ * Values are space-separated RGB triplets so Tailwind's `<alpha-value>` works
+ * (`bg-surface/60`). Light is the default; dark overrides via [data-theme].
+ *
+ * The three-way theme switch resolves to a concrete `data-theme` of exactly
+ * "light" or "dark" on <html>. "System" is not a third value on the element —
+ * it is a stored PREFERENCE that resolves to one of the two, and follows the
+ * OS live. Keeping the resolved value on the element means every selector here
+ * stays a simple attribute match with no media-query duplication.
+ */
+@layer base {
+  :root {
+    --canvas: 248 250 252; /* #F8FAFC */
+    --surface: 255 255 255;
+    --surface-muted: 244 246 250;
+    --surface-inset: 237 241 246;
+
+    --fg: 15 23 42;
+    --fg-muted: 71 85 105;
+    --fg-subtle: 139 148 163;
+
+    --edge: 226 232 240;
+    --edge-strong: 203 213 225;
+
+    /* Restrained indigo. Deliberately desaturated relative to Tailwind's
+       indigo-600 (#4F46E5), which reads as "default framework purple". */
+    --accent: 84 88 196;
+    --accent-hover: 68 72 174;
+    --accent-soft: 238 239 251;
+    --accent-fg: 255 255 255;
+
+    --verified: 5 122 85;
+    --verified-soft: 232 246 240;
+    --verified-fg: 4 92 64;
+
+    --warn: 176 106 8;
+    --warn-soft: 253 245 230;
+    --warn-fg: 124 74 5;
+
+    --danger: 190 44 44;
+    --danger-soft: 253 238 238;
+    --danger-fg: 150 32 32;
+
+    --shadow: 15 23 42;
+
+    color-scheme: light;
+  }
+
+  [data-theme='dark'] {
+    --canvas: 11 15 25; /* #0B0F19 */
+    --surface: 17 22 36;
+    --surface-muted: 22 28 44;
+    --surface-inset: 28 35 54;
+
+    --fg: 232 236 244;
+    --fg-muted: 148 163 184;
+    --fg-subtle: 100 116 139;
+
+    --edge: 30 38 55;
+    --edge-strong: 46 56 78;
+
+    /* Lifted for contrast against a near-black canvas; the light-mode value
+       fails WCAG AA here. */
+    --accent: 129 133 232;
+    --accent-hover: 149 153 240;
+    --accent-soft: 27 31 60;
+    --accent-fg: 12 14 28;
+
+    --verified: 52 187 137;
+    --verified-soft: 15 40 33;
+    --verified-fg: 110 224 176;
+
+    --warn: 216 156 62;
+    --warn-soft: 45 34 15;
+    --warn-fg: 240 190 110;
+
+    --danger: 235 106 106;
+    --danger-soft: 48 22 22;
+    --danger-fg: 250 155 155;
+
+    --shadow: 0 0 0;
+
+    color-scheme: dark;
+  }
+
+  * {
+    border-color: rgb(var(--edge));
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-canvas text-fg antialiased;
+    font-feature-settings: 'cv11', 'ss01', 'calt';
+    text-rendering: optimizeLegibility;
+  }
+
+  /* One focus ring everywhere. Never remove it — the whole registration flow
+     is keyboard-operable and this is how you see where you are in it. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    @apply outline-none ring-2 ring-accent/55 ring-offset-2;
+    --tw-ring-offset-color: rgb(var(--canvas));
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.22);
+  }
+
+  /* Numeric columns must not jitter as digits change. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Themed scrollbars — the default light scrollbar on a #0B0F19 page is a
+     bright stripe that undoes the whole dark mode. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--edge-strong)) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--edge-strong));
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* The base card. A hairline border, no drop shadow — shadows are reserved
+     for layers that genuinely float above the page. */
+  .card {
+    @apply rounded-xl border border-edge bg-surface;
+  }
+
+  /* Menus, popovers, dropdowns. These do float, so they get a shadow. */
+  .overlay {
+    @apply rounded-xl border border-edge bg-surface shadow-overlay;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-edge bg-surface px-3 py-2 text-md text-fg
+           placeholder:text-fg-subtle transition-colors duration-150
+           hover:border-edge-strong focus:border-accent;
+  }
+
+  .input-invalid {
+    @apply border-danger hover:border-danger focus:border-danger;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm
+           font-medium transition-all duration-150 ease-out
+           disabled:pointer-events-none disabled:opacity-45;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-accent-fg hover:bg-accent-hover active:scale-[0.985];
+  }
+  .btn-secondary {
+    @apply btn border border-edge bg-surface text-fg hover:border-edge-strong hover:bg-surface-muted;
+  }
+  .btn-ghost {
+    @apply btn text-fg-muted hover:bg-surface-muted hover:text-fg;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white hover:opacity-90;
+  }
+
+  /* A 1px rule that fades at both ends — separates sections without the heavy
+     full-width line that makes a page look like a form. */
+  .rule {
+    @apply h-px w-full border-0;
+    background: linear-gradient(90deg, transparent, rgb(var(--edge)) 12%, rgb(var(--edge)) 88%, transparent);
+  }
+
+  /* Faint grid, used once behind the hero. Masked so it dissolves rather than
+     stopping at a hard edge. */
+  .grid-field {
+    background-image:
+      linear-gradient(to right, rgb(var(--fg) / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--fg) / 0.045) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, #000 40%, transparent 100%);
+  }
+
+  .marquee-mask {
+    mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  }
+}
+
+/* Every animation here is decorative and carries no information, so all of it
+   can be switched off for someone who asked the OS for no motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
