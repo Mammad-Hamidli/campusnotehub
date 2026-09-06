@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Hash, ImagePlus, Loader2, Send, X } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { IMAGE_ACCEPT_ATTRIBUTE, MAX_IMAGE_BYTES, MAX_IMAGE_MB } from '@/lib/media/constants';
 
 const MAX_CHARS = 2000;
 const SUGGESTED_TAGS = ['ExamAlert', 'Career', 'Notes', 'Internship', 'Scholarship', 'Deadline'];
@@ -21,16 +22,44 @@ export function Composer({
   onPost,
 }: {
   author: { initials: string; name: string };
-  onPost: (post: { body: string; tags: string[]; imageName?: string }) => void;
+  /**
+   * Performs the actual write and RESOLVES when it is done.
+   *
+   * This used to be a fire-and-forget `void` callback, which is what let the
+   * composer clear itself and stop spinning before anything had been saved -
+   * a failed post looked exactly like a successful one. Returning a promise
+   * means the button's busy state tracks the real request, and a rejection is
+   * something this component can actually show.
+   */
+  onPost: (post: { body: string; tags: string[]; image?: File }) => Promise<void>;
 }) {
   const t = useT();
   const [body, setBody] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [imageName, setImageName] = useState<string | null>(null);
+  const [image, setImage] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /**
+   * Local preview, via an object URL.
+   *
+   * Revoked whenever the file changes and on unmount: an un-revoked object URL
+   * pins the whole image in memory for the life of the document, so composing
+   * several posts in a session would leak a few megabytes each time.
+   */
+  useEffect(() => {
+    if (!image) {
+      setPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(image);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [image]);
 
   const remaining = MAX_CHARS - body.length;
   const canPost = body.trim().length > 0 && remaining >= 0 && !posting;
@@ -47,39 +76,37 @@ export function Composer({
   }
 
   /**
-   * BACKEND INTEGRATION
-   * -------------------
-   *   POST /api/feed
-   *   body: { body, visibility, tags: string[], media: [{ storageKey, width, height, altText }] }
-   *   -> 201 { post }
-   *   -> 429 errors.rateLimited  (20 posts/hour, see LIMITS in ratelimit.ts)
+   * Hands the draft to the parent, which owns the request.
    *
-   * Images follow the same direct-to-S3 path as verification documents:
-   * POST /api/media/presign first, upload to S3, then send only the returned
-   * storageKey. Image bytes never pass through the Next.js server.
+   * The body of this function used to be a commented-out fetch followed by
+   * `await new Promise(r => setTimeout(r, 450))` - a simulated network delay.
+   * The composer therefore always "succeeded": it cleared the textarea and
+   * added a card locally while nothing was written, so the post vanished on
+   * reload and never existed for anyone else.
    *
-   * `visibility` is resolved server-side for UNIVERSITY_ONLY — the client may
-   * request it but cannot choose which university, otherwise anyone could post
-   * into any university's private feed.
+   * Now it awaits the real write and only clears the form if that write
+   * resolved. A failure keeps the user's text on screen, which is the whole
+   * point - retyping a lost post is the worst possible outcome here.
    */
   async function submit() {
     if (!canPost) return;
     setPosting(true);
+    setError(null);
 
-    // await fetch('/api/feed', {
-    //   method: 'POST',
-    //   headers: { 'content-type': 'application/json' },
-    //   body: JSON.stringify({ body: body.trim(), visibility: 'PUBLIC', tags, media: [] }),
-    // });
-    await new Promise((r) => setTimeout(r, 450));
+    try {
+      await onPost({ body: body.trim(), tags, image: image ?? undefined });
 
-    onPost({ body: body.trim(), tags, imageName: imageName ?? undefined });
-    setBody('');
-    setTags([]);
-    setImageName(null);
-    setTagPickerOpen(false);
-    setPosting(false);
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      setBody('');
+      setTags([]);
+      setImage(null);
+      setTagPickerOpen(false);
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    } catch (cause) {
+      // The parent throws with a locale key it got from the server.
+      setError(cause instanceof Error ? cause.message : 'errors.generic');
+    } finally {
+      setPosting(false);
+    }
   }
 
   return (
@@ -87,7 +114,7 @@ export function Composer({
       <div className="flex gap-3">
         <span
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full
- bg-surface-inset text-xs font-bold text-accent-fg"
+ bg-surface-inset text-xs font-bold text-accent"
           aria-hidden="true"
         >
           {author.initials}
@@ -133,18 +160,41 @@ export function Composer({
             </div>
           )}
 
-          {imageName && (
-            <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-surface-muted px-3 py-2">
-              <ImagePlus className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate text-xs text-fg-muted">{imageName}</span>
-              <button
-                type="button"
-                onClick={() => setImageName(null)}
-                aria-label={t('common.delete')}
-                className="rounded p-1 text-fg-subtle transition hover:bg-surface-inset hover:text-fg"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+          {image && (
+            <div className="relative mt-2.5 overflow-hidden rounded-xl border border-edge bg-surface-muted">
+              {preview && (
+                // eslint-disable-next-line @next/next/no-img-element -- a local
+                // object URL, never a remote asset; next/image cannot optimise
+                // a blob: URL and would only add a loader hop.
+                <img
+                  src={preview}
+                  alt={image.name}
+                  className="max-h-72 w-full object-contain"
+                />
+              )}
+              <div className="flex items-center gap-2 px-3 py-2">
+                <ImagePlus className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate text-xs text-fg-muted">
+                  {image.name} · {(image.size / 1024 / 1024).toFixed(1)} MB
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setImage(null)}
+                  aria-label={t('common.delete')}
+                  className="rounded p-1 text-fg-subtle transition hover:bg-surface-inset hover:text-fg"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {posting && (
+                // The upload is a real request now, and a 12 MB image on campus
+                // wifi is several seconds. An indeterminate bar is honest here:
+                // fetch cannot report upload progress (see the note in the
+                // notes form, which uses XHR for exactly that reason).
+                <div className="h-1 w-full overflow-hidden bg-surface-inset">
+                  <div className="h-full w-1/3 animate-marquee rounded-full bg-accent" />
+                </div>
+              )}
             </div>
           )}
 
@@ -160,7 +210,7 @@ export function Composer({
                     aria-pressed={selected}
                     className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
                       selected
-                        ? 'bg-accent text-accent-fg'
+                        ? 'bg-accent text-accent'
                         : 'bg-surface text-fg-muted hover:bg-surface-inset'
                     }`}
                   >
@@ -171,12 +221,19 @@ export function Composer({
             </div>
           )}
 
+          {error && (
+            <p className="mt-2.5 text-xs text-danger" role="alert">
+              {t(error)}
+            </p>
+          )}
+
           <div className="mt-3 flex items-center justify-between gap-3 border-t border-edge pt-3">
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 aria-label={t('feed.attachImage')}
+                title={t('feed.image.maxSize', { mb: MAX_IMAGE_MB })}
                 className="rounded-lg p-2 text-fg-subtle transition hover:bg-accent-soft hover:text-accent"
               >
                 <ImagePlus className="h-[1.15rem] w-[1.15rem]" />
@@ -195,11 +252,25 @@ export function Composer({
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*"
+                accept={IMAGE_ACCEPT_ATTRIBUTE}
                 className="sr-only"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) setImageName(file.name);
+                  // The FILE is kept, not just its name. Keeping only the name
+                  // is why the previous version could never upload anything -
+                  // by submit time the bytes were gone.
+                  if (file) {
+                    // Instant feedback only. The server re-derives the type
+                    // from the bytes and re-checks the size; this just saves a
+                    // pointless 12 MB round trip.
+                    if (file.size > MAX_IMAGE_BYTES) {
+                      setError('feed.image.errors.tooLarge');
+                      setImage(null);
+                    } else {
+                      setError(null);
+                      setImage(file);
+                    }
+                  }
                   e.target.value = '';
                 }}
               />
@@ -221,7 +292,7 @@ export function Composer({
                 onClick={submit}
                 disabled={!canPost}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2
- text-sm font-semibold text-accent-fg transition hover:bg-accent
+ text-sm font-semibold text-accent transition hover:bg-accent
                            active:scale-[0.98] disabled:bg-surface-inset disabled:text-fg-subtle"
               >
                 {posting ? (

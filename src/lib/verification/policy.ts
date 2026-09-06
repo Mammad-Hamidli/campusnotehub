@@ -110,7 +110,19 @@ export function decide(input: {
   maxAttempts: number;
 }): Decision {
   const acted = input.signals.filter((s) => s.confidence >= CONFIDENCE_FLOOR);
-  const codes = acted.map((s) => s.code);
+  /**
+   * De-duplicated: the verifier scores each of the four documents separately
+   * and returns a signal per document, so a card that is blurry on both sides
+   * yields BLURRY twice - up to four times across a submission.
+   *
+   * failureCodes is documented as a set of CATEGORIES ("SCREEN_RECAPTURE",
+   * "NAME_MISMATCH"), not a per-document tally, and nothing reads the
+   * multiplicity: the penalty below is computed from `acted` (the signal
+   * objects, with their individual confidences) and the tier lookups use
+   * find(). Storing the repeats only bloated the column and broke React keys
+   * in the moderator queue, which is how this surfaced.
+   */
+  const codes = [...new Set(acted.map((s) => s.code))];
 
   const integrity = acted.filter((s) => SIGNAL_TIER[s.code] === 'INTEGRITY');
   const consistency = acted.filter((s) => SIGNAL_TIER[s.code] === 'CONSISTENCY');

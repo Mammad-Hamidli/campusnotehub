@@ -1,15 +1,23 @@
 import type { Metadata } from 'next';
-import { StubPage } from '@/components/ui/UnderConstruction';
+import { MentorsList } from '@/components/mentors/MentorsList';
 
 export const metadata: Metadata = { title: 'PocketMentor' };
 
+/** The directory reflects live approval state, so it is never prerendered. */
+export const dynamic = 'force-dynamic';
+
 /**
- * Stub route. Returns 200 with an honest "not built yet" state.
+ * Replaces the previous StubPage.
  *
- * Every link in the navigation resolves to a real page, so a 404 in the logs
- * is always a genuine bug rather than a known gap. See
- * src/components/ui/UnderConstruction.tsx for the reasoning.
+ * Deliberately NOT behind the session guard: `mentors:browse` is open to
+ * signed-out visitors in the capability table, because a directory nobody can
+ * see until they sign up cannot attract the students it exists for. Booking is
+ * the gated action, and it is gated server-side.
  */
-export default function Page() {
-  return <StubPage titleKey="mentors.title" />;
+export default function MentorsPage() {
+  return (
+    <main id="main" className="min-h-dvh bg-surface-muted">
+      <MentorsList />
+    </main>
+  );
 }

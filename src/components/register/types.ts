@@ -7,6 +7,10 @@ export type AccountForm = {
   phone: string;
   password: string;
   universityId: string;
+  /** Catalogue slug from src/lib/faculties.ts. '' until chosen. */
+  facultySlug: string;
+  /** Typed value, meaningful only when facultySlug === 'other'. */
+  facultyOther: string;
   graduationYear: string;
   graduationMonth: string;
   acceptTerms: boolean;
@@ -32,6 +36,8 @@ export const FIELD_ORDER: (keyof AccountForm)[] = [
   'phone',
   'password',
   'universityId',
+  'facultySlug',
+  'facultyOther',
   'graduationYear',
   'graduationMonth',
   'acceptTerms',
@@ -46,6 +52,8 @@ export const FIELD_LABEL_KEYS: Record<keyof AccountForm, string> = {
   phone: 'auth.register.phone',
   password: 'auth.register.password',
   universityId: 'auth.register.university',
+  facultySlug: 'auth.register.faculty',
+  facultyOther: 'auth.register.facultyOther',
   graduationYear: 'auth.register.graduationYear',
   graduationMonth: 'auth.register.graduationMonth',
   acceptTerms: 'auth.register.termsShort',
@@ -59,6 +67,8 @@ export const EMPTY_ACCOUNT: AccountForm = {
   phone: '',
   password: '',
   universityId: '',
+  facultySlug: '',
+  facultyOther: '',
   graduationYear: '',
   graduationMonth: '',
   acceptTerms: false,
@@ -126,6 +136,15 @@ export function validateAccount(form: AccountForm): FieldErrors {
     errors.password = 'auth.errors.weakPassword';
 
   if (!form.universityId) errors.universityId = 'errors.fieldRequired';
+
+  // Faculty mirrors the server: a catalogue choice is required, and the free
+  // text is required only when that choice is 'other'. The same pairing is
+  // enforced by a zod refinement and by a CHECK constraint - this copy exists
+  // to say so before the round trip, not instead of it.
+  if (!form.facultySlug) errors.facultySlug = 'errors.fieldRequired';
+  else if (form.facultySlug === 'other' && !form.facultyOther.trim())
+    errors.facultyOther = 'auth.errors.facultyOtherRequired';
+
   if (!form.graduationYear) errors.graduationYear = 'errors.fieldRequired';
   if (!form.graduationMonth) errors.graduationMonth = 'errors.fieldRequired';
   if (!form.acceptTerms) errors.acceptTerms = 'auth.errors.termsRequired';

@@ -1,15 +1,25 @@
 import type { Metadata } from 'next';
-import { StubPage } from '@/components/ui/UnderConstruction';
+import { NotificationsView } from '@/components/notifications/NotificationsView';
 
-export const metadata: Metadata = { title: 'Notifications' };
+export const metadata: Metadata = {
+  title: 'Notifications',
+  robots: { index: false, follow: false },
+};
+
+/** Nothing on this page may be cached: it lists one account's own events. */
+export const dynamic = 'force-dynamic';
 
 /**
- * Stub route. Returns 200 with an honest "not built yet" state.
+ * Replaces the previous StubPage.
  *
- * Every link in the navigation resolves to a real page, so a 404 in the logs
- * is always a genuine bug rather than a known gap. See
- * src/components/ui/UnderConstruction.tsx for the reasoning.
+ * The route is in the middleware's PROTECTED list, so an anonymous visitor is
+ * redirected to /login before this renders, and /api/notifications re-checks
+ * the session independently - the page guard is convenience, not the control.
  */
-export default function Page() {
-  return <StubPage titleKey="nav.notifications" />;
+export default function NotificationsPage() {
+  return (
+    <main id="main" className="min-h-dvh bg-surface-muted">
+      <NotificationsView />
+    </main>
+  );
 }

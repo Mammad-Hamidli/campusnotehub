@@ -1,6 +1,5 @@
 import { SiteHeader } from '@/components/marketing/SiteHeader';
 import { Hero } from '@/components/marketing/Hero';
-import { ActivityTicker } from '@/components/marketing/ActivityTicker';
 import { FeatureGrid } from '@/components/marketing/FeatureGrid';
 import { CallToAction } from '@/components/marketing/CallToAction';
 import { SiteFooter } from '@/components/marketing/SiteFooter';
@@ -26,7 +25,6 @@ export default function HomePage() {
       <SiteHeader />
       <main id="main">
         <Hero />
-        <ActivityTicker />
         <FeatureGrid />
         <CallToAction />
       </main>

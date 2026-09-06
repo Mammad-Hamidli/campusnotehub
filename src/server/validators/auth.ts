@@ -1,6 +1,21 @@
 import { z } from 'zod';
+import { UNIVERSITIES } from '@/lib/universities';
+import { FACULTY_OTHER, FACULTY_SLUGS } from '@/lib/faculties';
 
 const CURRENT_YEAR = new Date().getFullYear();
+
+/**
+ * Accepted university values, taken from the same list that builds the
+ * registration dropdown and seeds the table.
+ *
+ * The form submits the stable CODE ('ADA', 'BDU'), not the database cuid -
+ * the cuid is generated at seed time and is never exposed to the client. This
+ * used to be `z.string().cuid()`, which rejected every real submission before
+ * the route could reach its duplicate handling. Matching against the known set
+ * is strictly narrower than a cuid format check, not looser: an unknown code is
+ * refused here, and the route still confirms the row exists and is active.
+ */
+const UNIVERSITY_CODES = new Set(UNIVERSITIES.map((uni) => uni.id));
 
 /** Handles that would let someone impersonate the platform or its staff. */
 const RESERVED_NICKNAMES = new Set([
@@ -44,8 +59,31 @@ export const registerSchema = z
     email: z.string().trim().toLowerCase().email().max(254),
     password,
     passwordConfirm: z.string(),
-    universityId: z.string().cuid(),
+    /** University CODE, e.g. 'ADA'. See UNIVERSITY_CODES above. */
+    universityId: z
+      .string()
+      .trim()
+      .refine((v) => UNIVERSITY_CODES.has(v), 'errors.validationFailed'),
     facultyId: z.string().cuid().optional(),
+    /**
+     * Faculty, from the catalogue in src/lib/faculties.ts.
+     *
+     * Validated against the known slug set rather than as a free string. That
+     * is what stops the column becoming a junk drawer of "CS", "comp sci" and
+     * "Computer  Science", which would make it useless for the filtering and
+     * mentor-matching it exists to support.
+     *
+     * `facultyId` above is a different thing and is left alone: it is the FK
+     * to the per-university Faculty table, which has never been populated. See
+     * the note on the User model for why both columns exist.
+     */
+    facultySlug: z
+      .string()
+      .trim()
+      .refine((v) => FACULTY_SLUGS.has(v), 'errors.validationFailed')
+      .optional(),
+    /** The typed value when the catalogue choice is 'other'. */
+    facultyOther: z.string().trim().min(2).max(120).optional(),
     graduationYear: z
       .number()
       .int()
@@ -74,6 +112,20 @@ export const registerSchema = z
   .refine((d) => d.password === d.passwordConfirm, {
     path: ['passwordConfirm'],
     message: 'auth.errors.passwordMismatch',
+  })
+  /**
+   * The two faculty columns are only coherent together, and the same pairing
+   * is enforced by a CHECK constraint in the migration. Validating it here as
+   * well means the user gets a field-level message instead of a 500 from a
+   * constraint violation - the constraint is the guarantee, this is the UX.
+   */
+  .refine((d) => d.facultySlug !== FACULTY_OTHER || Boolean(d.facultyOther?.trim()), {
+    path: ['facultyOther'],
+    message: 'auth.errors.facultyOtherRequired',
+  })
+  .refine((d) => !d.facultyOther || d.facultySlug === FACULTY_OTHER, {
+    path: ['facultyOther'],
+    message: 'errors.validationFailed',
   });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

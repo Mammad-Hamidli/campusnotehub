@@ -66,7 +66,7 @@ See [SECURITY.md](SECURITY.md).
 ```
 prisma/
   schema.prisma                 # 34 models; zero-retention rules in the header
-  migrations/manual/
+  manual/
     0001_invariants.sql         # ledger, booking-overlap, FTS
     0002_zero_retention.sql     # DDL trigger + CHECKs that ENFORCE the policy
   seed.ts                       # 18 AZ universities, tags, ledger accounts

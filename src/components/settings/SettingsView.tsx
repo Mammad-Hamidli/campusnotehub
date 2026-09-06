@@ -60,16 +60,25 @@ export type SettingsData = {
  * Changing `nickname` needs a uniqueness check — the DB has a case-insensitive
  * unique index, so a 409 here is expected and must map to the right field.
  */
-const SEED: SettingsData = {
-  nickname: 'aysel_m',
-  fullName: 'Aysel Məmmədova',
-  email: 'aysel@ada.edu.az',
-  phone: '+994501234567',
-  headline: 'Computer Science, 3rd year',
+/**
+ * An EMPTY record, not sample content.
+ *
+ * This was a literal profile for "aysel_m" - a name, an email and a phone
+ * number that belonged to nobody, shown identically to every signed-in user
+ * until they typed over it. The blank shape below exists only to hold the form
+ * for the moment before GET /api/me resolves; nothing here is ever displayed
+ * as if it were the viewer's data.
+ */
+const EMPTY: SettingsData = {
+  nickname: '',
+  fullName: '',
+  email: '',
+  phone: '',
+  headline: '',
   bio: '',
-  universityId: 'ADA',
-  graduationYear: '2026',
-  graduationMonth: '5',
+  universityId: '',
+  graduationYear: '',
+  graduationMonth: '',
   isVerified: false,
   privacy: {
     showRealName: 'VERIFIED_ONLY',
@@ -91,10 +100,52 @@ const SECTIONS: { id: Section; icon: typeof User }[] = [
 export function SettingsView() {
   const t = useT();
   const [section, setSection] = useState<Section>('profile');
-  const [data, setData] = useState<SettingsData>(SEED);
-  const [baseline, setBaseline] = useState<SettingsData>(SEED);
+  const [data, setData] = useState<SettingsData>(EMPTY);
+  const [baseline, setBaseline] = useState<SettingsData>(EMPTY);
+  const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  /**
+   * The real account, from GET /api/me. Both `data` and `baseline` are set
+   * from it so the dirty check compares against what is actually stored rather
+   * than against a placeholder, which would have marked an untouched form as
+   * having unsaved changes the moment it loaded.
+   */
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/me', { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => {
+        if (!body?.user) return;
+        const u = body.user;
+        const next: SettingsData = {
+          nickname: u.nickname ?? '',
+          fullName: u.fullName ?? '',
+          email: u.email ?? '',
+          phone: u.phone ?? '',
+          headline: u.headline ?? '',
+          bio: u.bio ?? '',
+          universityId: u.university?.code ?? '',
+          graduationYear: u.graduationYear ? String(u.graduationYear) : '',
+          graduationMonth: u.graduationMonth ? String(u.graduationMonth) : '',
+          isVerified: Boolean(u.isVerified),
+          privacy: {
+            showRealName: u.showRealName,
+            showEmail: u.showEmail,
+            showPhone: u.showPhone,
+            showUniversity: u.showUniversity,
+            showFaculty: u.showFaculty,
+            showGraduationYear: u.showGraduationYear,
+          },
+        };
+        setData(next);
+        setBaseline(next);
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+    return () => controller.abort();
+  }, []);
 
   const dirty = useMemo(
     () => JSON.stringify(data) !== JSON.stringify(baseline),

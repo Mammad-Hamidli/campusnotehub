@@ -1,15 +1,22 @@
 import type { Metadata } from 'next';
-import { StubPage } from '@/components/ui/UnderConstruction';
+import { ProfileView } from '@/components/profile/ProfileView';
 
-export const metadata: Metadata = { title: 'Profile' };
+export const metadata: Metadata = {
+  title: 'Profile',
+  robots: { index: false, follow: false },
+};
 
 /**
- * Stub route. Returns 200 with an honest "not built yet" state.
+ * Replaces the previous StubPage.
  *
- * Every link in the navigation resolves to a real page, so a 404 in the logs
- * is always a genuine bug rather than a known gap. See
- * src/components/ui/UnderConstruction.tsx for the reasoning.
+ * The account menu in the sidebar was never broken - it has a trigger, open
+ * state, outside-click handling and real <Link>s. It just pointed here, and
+ * here was a "not built yet" placeholder, so the click looked like a no-op.
  */
-export default function Page() {
-  return <StubPage titleKey="nav.profile" />;
+export default function ProfilePage() {
+  return (
+    <main id="main" className="min-h-dvh bg-surface-muted">
+      <ProfileView />
+    </main>
+  );
 }

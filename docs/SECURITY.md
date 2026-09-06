@@ -130,7 +130,7 @@ subject's erasure request. Not storing the document is simpler and stronger.
 ### Enforced, not promised
 
 A policy that relies on every future developer remembering it is not a policy.
-[`0002_zero_retention.sql`](../prisma/migrations/manual/0002_zero_retention.sql)
+[`0002_zero_retention.sql`](../prisma/manual/0002_zero_retention.sql)
 makes the database refuse:
 
 - `checkScores` accepts **numeric values only** — a JSONB type check rejects any

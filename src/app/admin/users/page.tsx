@@ -1,15 +1,18 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { StubPage } from '@/components/ui/UnderConstruction';
+import { UsersTable } from '@/components/admin/UsersTable';
 
 export const metadata: Metadata = { title: 'Users' };
 
 /**
- * Stub route. Returns 200 with an honest "not built yet" state.
- *
- * Every link in the navigation resolves to a real page, so a 404 in the logs
- * is always a genuine bug rather than a known gap. See
- * src/components/ui/UnderConstruction.tsx for the reasoning.
+ * Replaces the previous StubPage. The Suspense boundary is required because
+ * UsersTable reads useSearchParams - filter state lives in the URL so a view
+ * can be linked and the back button steps through filters.
  */
 export default function Page() {
-  return <StubPage titleKey="admin.title" />;
+  return (
+    <Suspense fallback={null}>
+      <UsersTable />
+    </Suspense>
+  );
 }

@@ -119,6 +119,90 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /*
+   * NATIVE CONTROLS - the actual source of "black text on a dark background".
+   *
+   * The token system already handles the app's own markup: `.input` sets
+   * `bg-surface text-fg`, so a <select>'s CLOSED state is themed correctly and
+   * looks fine. The unreadable part is everything the browser draws ITSELF,
+   * where our classes do not reach:
+   *
+   *   - the <option> list that drops open. On Windows, Chrome paints that
+   *     popup from the UA stylesheet, and an <option> does not inherit `color`
+   *     from its <select>. Result: our dark background, the UA's near-black
+   *     text.
+   *   - <optgroup> labels, same story.
+   *   - the calendar / clock panels on date and time inputs.
+   *   - the search input's clear (x) affordance.
+   *
+   * `color-scheme` is what tells the browser which palette to draw those in,
+   * and it is set on :root above - but it is only honoured on a control that
+   * has not had its own background overridden, which is exactly what `.input`
+   * does. So the option colours are stated explicitly here.
+   *
+   * These are element selectors rather than a utility class on purpose: the
+   * bug is in markup that already exists across thirteen <select> elements in
+   * the admin panel, the settings form and the registration wizard, and a
+   * class would have to be remembered at every one of them - including the
+   * next one somebody adds.
+   */
+  select option,
+  select optgroup {
+    background-color: rgb(var(--surface));
+    color: rgb(var(--fg));
+  }
+
+  /* The disabled/placeholder first option ("All", "Select a faculty") should
+     read as secondary rather than as an equal choice. */
+  select option:disabled {
+    color: rgb(var(--fg-subtle));
+  }
+
+  /*
+   * Date, time and colour pickers, and the number spinner, are drawn by the
+   * browser in its own palette. Inverting the indicator in dark mode is the
+   * supported way to make them legible; without it they render as a black
+   * glyph on a near-black field.
+   */
+  [data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator,
+  [data-theme='dark'] input[type='datetime-local']::-webkit-calendar-picker-indicator,
+  [data-theme='dark'] input[type='time']::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.65);
+  }
+
+  /*
+   * Autofill.
+   *
+   * Chrome forces its own near-white background and near-black text on an
+   * autofilled field, overriding ours - so a saved email on the dark login
+   * form renders as a bright band. The background cannot be set directly on an
+   * autofilled input, but a long inset shadow covers it, which is the
+   * long-standing workaround.
+   */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-text-fill-color: rgb(var(--fg));
+    -webkit-box-shadow: 0 0 0 1000px rgb(var(--surface)) inset;
+    caret-color: rgb(var(--fg));
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  /*
+   * Placeholders.
+   *
+   * `placeholder:text-fg-subtle` is applied by `.input`, but only there - a
+   * bare <input> or <textarea> written without that class (the composer, the
+   * message box) falls back to the UA's grey, which is too dark to read on the
+   * dark canvas. This is the floor for everything.
+   */
+  ::placeholder {
+    color: rgb(var(--fg-subtle));
+    opacity: 1; /* Firefox dims placeholders by default on top of the colour */
+  }
+
   /* Themed scrollbars — the default light scrollbar on a #0B0F19 page is a
      bright stripe that undoes the whole dark mode. */
   * {

@@ -20,7 +20,9 @@
     "saveChanges": "Dəyişiklikləri saxla",
     "saved": "Saxlanıldı",
     "discard": "Ləğv et",
-    "comingSoon": "Tezliklə"
+    "comingSoon": "Tezliklə",
+    "dismiss": "Bağla",
+    "confirm": "Təsdiqlə"
   },
   "nav": {
     "feed": "Lent",
@@ -39,7 +41,9 @@
     "help": "Kömək",
     "messages": "Mesajlar",
     "bookmarks": "Yadda saxlanılanlar",
-    "explore": "Kəşf et"
+    "explore": "Kəşf et",
+    "admin": "Admin",
+    "messagesPage": "Mesajlar"
   },
   "auth": {
     "register": {
@@ -77,7 +81,11 @@
         "good": "Yaxşı",
         "strong": "Güclü"
       },
-      "universityAutoDetected": "E-poçt domeninə görə avtomatik seçildi"
+      "universityAutoDetected": "E-poçt domeninə görə avtomatik seçildi",
+      "facultyPlaceholder": "Fakültənizi axtarın…",
+      "facultyNoMatch": "Uyğun fakültə tapılmadı. Öz variantınızı yazmaq üçün “Digər” seçin.",
+      "facultyOther": "Fakültəniz",
+      "facultyOtherPlaceholder": "Fakültə və ya ixtisasınızı yazın"
     },
     "login": {
       "title": "Xoş gəlmisiniz",
@@ -104,7 +112,8 @@
       "phoneInvalid": "Düzgün Azərbaycan nömrəsi daxil edin (+994 5X XXX XX XX)",
       "phoneTaken": "Bu nömrə artıq istifadə olunur",
       "consentRequired": "Sənədlərin emalına razılıq verməlisiniz",
-      "credentialsUnavailable": "Bu məlumatlarla hesab yaratmaq mümkün deyil. Başqa e-poçt və ya nömrə yoxlayın."
+      "credentialsUnavailable": "Bu məlumatlarla hesab yaratmaq mümkün deyil. Başqa e-poçt və ya nömrə yoxlayın.",
+      "facultyOtherRequired": "Zəhmət olmasa fakültənizi yazın"
     }
   },
   "verification": {
@@ -214,7 +223,29 @@
     "empty": "Hələ paylaşım yoxdur. İlk sən ol.",
     "loadNew": "{count} yeni paylaşım",
     "deleted": "Bu paylaşım silinib",
-    "characterCount": "{remaining} simvol qalıb"
+    "characterCount": "{remaining} simvol qalıb",
+    "comments": "Şərhlər",
+    "commentPlaceholder": "Şərh yazın…",
+    "commentSubmit": "Şərhi paylaş",
+    "commentEmpty": "Hələ şərh yoxdur. İlk siz olun.",
+    "commentLoading": "Şərhlər yüklənir…",
+    "commentFailed": "Şərhiniz paylaşılmadı. Yenidən cəhd edin.",
+    "commentDeleted": "Şərh silinib",
+    "showComments": "Şərhləri göstər",
+    "hideComments": "Şərhləri gizlət",
+    "image": {
+      "maxSize": "{mb} MB-a qədər şəkil",
+      "errors": {
+        "missing": "Əvvəlcə şəkil seçin",
+        "empty": "Bu fayl boşdur",
+        "tooLarge": "Bu şəkil çox böyükdür",
+        "typeNotAllowed": "Yalnız JPEG, PNG, WebP və ya GIF şəkillər qəbul olunur",
+        "tooSmall": "Bu şəkil çox kiçikdir",
+        "decodeFailed": "Şəkil oxuna bilmədi. Başqa fayl sınayın.",
+        "uploadFailed": "Şəkil yüklənmədi. Yenidən cəhd edin.",
+        "invalidKey": "Bu şəkil artıq mövcud deyil. Yenidən əlavə edin."
+      }
+    }
   },
   "notes": {
     "title": "UniNotes",
@@ -258,14 +289,58 @@
       "price": "Qiymət (AZN)",
       "priceHint": "0 yazsanız pulsuz olacaq. Maksimum 50 AZN.",
       "processing": "Fayl emal olunur: önizləmə yaradılır...",
-      "pendingReview": "Konspekt moderasiyada. Təsdiqdən sonra dərc olunacaq."
+      "pendingReview": "Konspekt moderasiyada. Təsdiqdən sonra dərc olunacaq.",
+      "subtitle": "PDF, Word, Excel, PowerPoint və ya şəkil ixracı. Maksimum 50 MB.",
+      "choose": "Fayl seçin",
+      "accepted": "PDF · DOC/DOCX · XLS/XLSX · PPT/PPTX · PNG/JPG — 50 MB-a qədər",
+      "remove": "Faylı sil",
+      "submit": "Yüklə",
+      "draftNote": "Siyahıya düşməzdən əvvəl baxış üçün qaralama kimi saxlanılır.",
+      "fields": {
+        "title": "Başlıq",
+        "description": "Təsvir",
+        "subject": "Fənn",
+        "courseCode": "Kurs kodu",
+        "university": "Universitet",
+        "price": "Qiymət (qəpik, 0 = pulsuz)"
+      },
+      "errors": {
+        "missing": "Yükləmək üçün fayl seçin.",
+        "empty": "Bu fayl boşdur.",
+        "tooSmall": "Bu fayl sənəd olmaq üçün çox kiçikdir.",
+        "tooLarge": "Bu fayl 50 MB-dan böyükdür.",
+        "typeNotAllowed": "Bu fayl tipi qəbul edilmir. PDF, Word, Excel, PowerPoint, PNG və ya JPG istifadə edin.",
+        "mimeMismatch": "Faylın məzmunu tipinə uyğun gəlmir. Yenidən ixrac edib cəhd edin.",
+        "extensionMismatch": "Fayl uzantısı əsl məzmuna uyğun gəlmir.",
+        "executable": "İcra olunan və skript faylları qəbul edilmir.",
+        "archiveNotOffice": "Bu arxiv Word, Excel və ya PowerPoint faylı deyil.",
+        "pdfUnsafe": "Bu PDF aktiv məzmun (skript və ya quraşdırılmış fayl) daşıyır və rədd edildi.",
+        "duplicate": "Bu faylı artıq yükləmisiniz.",
+        "txtOnly": "Bu fayl növü dəstəklənmir.",
+        "cancelled": "Yükləmə dayandırıldı.",
+        "network": "Yükləmə alınmadı. Bağlantınızı yoxlayıb yenidən cəhd edin."
+      },
+      "progress": "Yüklənir… {percent}%",
+      "cancel": "Yükləməni dayandır",
+      "retry": "Yenidən cəhd et",
+      "success": "Konspekt yükləndi",
+      "maxSize": "{mb} MB-a qədər. PDF, Word, PowerPoint, Excel, mətn və ya şəkil.",
+      "selected": "{name} ({size})"
     },
     "errors": {
       "notVerified": "Konspekt satmaq üçün hesabınız doğrulanmalıdır",
       "insufficientFunds": "Balansınız kifayət etmir",
       "duplicate": "Eyni fayl artıq platformada mövcuddur",
       "encrypted": "Şifrələnmiş PDF qəbul edilmir"
-    }
+    },
+    "free": "Pulsuz",
+    "download": "Yüklə",
+    "stats": {
+      "downloads": "{n} yükləmə",
+      "purchases": "{n} alış"
+    },
+    "empty": "Hələ heç bir konspekt yüklənməyib.",
+    "addNote": "Konspekt əlavə et"
   },
   "mentors": {
     "title": "PocketMentor",
@@ -315,7 +390,37 @@
       "slotTaken": "Bu vaxt artıq tutulub. Başqa vaxt seçin.",
       "tooSoon": "Görüş ən azı {hours} saat sonraya təyin edilməlidir",
       "selfBooking": "Özünüzə görüş təyin edə bilməzsiniz"
-    }
+    },
+    "browse": "Mentor tap",
+    "empty": "Hələ mentor yoxdur",
+    "emptyHint": "Təsdiqlənmiş tələbələr və məzunlar mentorluq edə bilər. Sonra yenidən baxın.",
+    "loading": "Mentorlar yüklənir…",
+    "book": "Sessiya istə",
+    "message": "Mesaj",
+    "viewProfile": "Profilə bax",
+    "sessions": "{count} sessiya",
+    "rate": "{price} / sessiya",
+    "free": "Pulsuz",
+    "industry": "Sahə",
+    "allIndustries": "Bütün sahələr",
+    "searchPlaceholder": "Ad və ya mövzu üzrə mentor axtar",
+    "loadFailed": "Mentorlar yüklənmədi.",
+    "verifiedOnly": "Sessiya sifariş etmək üçün hesabınızı təsdiqləyin.",
+    "notFound": "Mentor tapılmadı",
+    "notFoundHint": "Bu profil silinib və ya hələ təsdiqlənməyib.",
+    "backToList": "Bütün mentorlar",
+    "about": "Haqqında",
+    "reviews": "Rəylər",
+    "noReviews": "Hələ rəy yoxdur.",
+    "specialties": "İxtisaslar",
+    "languages": "Dillər",
+    "availability": "Cədvəl",
+    "noAvailability": "Hələ saat dərc olunmayıb.",
+    "minNotice": "{hours} saat əvvəl",
+    "sessionLength": "{minutes} dəq",
+    "years": "{count} il",
+    "editProfile": "Mentor profilimi redaktə et",
+    "notAccepting": "Sifariş qəbul etmir"
   },
   "wallet": {
     "title": "Balans",
@@ -360,6 +465,33 @@
       "WALLET_CREDIT": "Balansınıza {amount} əlavə olundu",
       "VERIFICATION_NEEDS_REVIEW": "Əlavə yoxlama tələb olunur",
       "VERIFICATION_RESUBMIT_REQUIRED": "Sənədləri yenidən yükləyin"
+    },
+    "subtitle": "Hesabınızda baş verən hər şey",
+    "loading": "Bildirişlər yüklənir…",
+    "emptyHint": "Bəyənmələr, cavablar və hesab yenilikləri burada görünəcək.",
+    "markRead": "Oxunmuş kimi işarələ",
+    "unreadOnly": "Yalnız oxunmamış",
+    "all": "Hamısı",
+    "unreadCount": "{count} oxunmamış",
+    "postReply": {
+      "title": "Yeni şərh",
+      "body": "@{nickname} paylaşımınıza şərh yazdı"
+    },
+    "postLike": {
+      "title": "Yeni bəyənmə",
+      "body": "Paylaşımınız bəyənildi"
+    },
+    "roleChanged": {
+      "title": "Rolunuz dəyişdi",
+      "body": "Administrator rolunuzu {role} olaraq təyin etdi"
+    },
+    "accountFrozen": {
+      "title": "Hesab donduruldu",
+      "body": "Hesabınız müvəqqəti dondurulub"
+    },
+    "accountUnfrozen": {
+      "title": "Hesab bərpa olundu",
+      "body": "Hesabınızdakı dondurma götürüldü"
     }
   },
   "errors": {
@@ -377,7 +509,8 @@
     "summaryTitle": "Formada {count} xəta var",
     "methodNotAllowed": "Bu sorğu üsulu dəstəklənmir",
     "unsupportedMediaType": "Sorğunun formatı dəstəklənmir",
-    "credentialsInQueryString": "Təhlükəsizlik səbəbindən sorğu ləğv edildi. Səhifəni yeniləyin və yenidən cəhd edin."
+    "credentialsInQueryString": "Təhlükəsizlik səbəbindən sorğu ləğv edildi. Səhifəni yeniləyin və yenidən cəhd edin.",
+    "verificationRequired": "Konspekt satmazdan əvvəl şəxsiyyətinizi təsdiqləyin."
   },
   "a11y": {
     "openMenu": "Menyunu aç",
@@ -557,6 +690,301 @@
       "bufferExpired": "Şəkillərin saxlanma müddəti bitib. İstifadəçidən yenidən yükləmə tələb edin.",
       "confirmBan": "Bu hesab birdəfəlik bloklanacaq. Davam edilsin?",
       "noteAutoBan": "Sistem avtomatik bloklamır — qərarı siz verirsiniz."
+    },
+    "nav": {
+      "label": "Admin naviqasiyası",
+      "section": "Administrasiya",
+      "dashboard": "İdarə paneli",
+      "users": "İstifadəçilər",
+      "verifications": "Doğrulama",
+      "universities": "Universitetlər",
+      "auditLogs": "Audit jurnalı",
+      "backToApp": "Tətbiqə qayıt",
+      "skipToContent": "Məzmuna keç"
+    },
+    "common": {
+      "all": "Hamısı",
+      "actions": "Əməliyyatlar",
+      "cancel": "Ləğv et",
+      "retry": "Yenidən cəhd et",
+      "clearFilters": "Filtrləri təmizlə",
+      "previous": "Əvvəlki səhifə",
+      "next": "Növbəti səhifə",
+      "pagination": "Səhifələmə",
+      "pageOf": "{pageCount} səhifədən {page} · {total} sətir",
+      "reason": "Səbəb",
+      "reasonHint": "Audit jurnalına yazılır. Ən azı 10 simvol.",
+      "reasonTooShort": "Ən azı 10 simvol.",
+      "typeToConfirm": "Təsdiq üçün {value} yazın",
+      "done": "Hazırdır"
+    },
+    "dashboard": {
+      "title": "İdarə paneli",
+      "subtitle": "Bazadan canlı göstəricilər. Hər kart uyğun filtrə keçid edir.",
+      "queueTitle": "Doğrulama növbəsi",
+      "openQueue": "Növbəni aç",
+      "queueNote": "İşarələnmiş sənədlər sərt TTL ilə şifrələnmiş buferdə saxlanılır. Müddət bitdikdə iş baxıla bilmir və namizəd yenidən göndərməlidir."
+    },
+    "stats": {
+      "total": "Ümumi istifadəçi",
+      "verified": "Təsdiqlənmiş",
+      "unverified": "Təsdiqlənməmiş",
+      "needsReview": "Baxış tələb edir",
+      "processing": "Emalda",
+      "rejected": "Rədd edilmiş",
+      "suspended": "Dayandırılmış",
+      "banned": "Bloklanmış",
+      "newToday": "Bu gün yeni",
+      "newThisWeek": "7 gündə yeni",
+      "queueWaiting": "Baxış gözləyir",
+      "queueExpiringSoon": "4 saat ərzində bitir"
+    },
+    "users": {
+      "title": "İstifadəçilər",
+      "subtitle": "Bütün qeydiyyatdan keçmiş hesablar. Tam qeyd üçün ada klikləyin.",
+      "countLabel": "{total} hesab",
+      "searchLabel": "İstifadəçi axtar",
+      "searchPlaceholder": "Ad, ləqəb, e-poçt və ya ID",
+      "emptyTitle": "İstifadəçi tapılmadı",
+      "emptyHint": "Hesablar qeydiyyatdan dərhal sonra burada görünür.",
+      "emptyFiltered": "Bu filtrlərə uyğun hesab yoxdur.",
+      "deletedMark": "silinib",
+      "columns": {
+        "name": "Tam ad",
+        "nickname": "Ləqəb",
+        "email": "E-poçt",
+        "phone": "Telefon",
+        "university": "Universitet",
+        "faculty": "Fakültə",
+        "graduation": "Məzuniyyət",
+        "userId": "İstifadəçi ID",
+        "role": "Rol",
+        "account": "Hesab",
+        "verification": "Doğrulama",
+        "created": "Qeydiyyat",
+        "lastLogin": "Son giriş",
+        "updated": "Yeniləndi"
+      },
+      "filters": {
+        "university": "Universitet",
+        "verification": "Doğrulama",
+        "account": "Hesab statusu",
+        "role": "Rol",
+        "from": "Tarixdən",
+        "to": "Tarixə"
+      },
+      "detail": {
+        "title": "İstifadəçi",
+        "back": "İstifadəçilərə qayıt",
+        "profile": "Profil",
+        "verification": "Doğrulama",
+        "activity": "Son fəaliyyət",
+        "blocklist": "Blok siyahısı",
+        "devices": "Cihazlar",
+        "sessions": "Sessiyalar",
+        "notes": "Moderasiya qeydləri",
+        "emailVerified": "E-poçt təsdiqi",
+        "locale": "Dil",
+        "failedLogins": "Uğursuz girişlər",
+        "lockedUntil": "{date} tarixinədək kilidli",
+        "attempt": "Cəhd",
+        "confirmedFlags": "Təsdiqlənib",
+        "checkScores": "Yoxlama balları",
+        "noCases": "Hələ doğrulama işi yoxdur",
+        "openQueue": "Baxış konsolunu aç",
+        "noBlocks": "Blok siyahısında deyil",
+        "blockExpires": "{date} tarixində bitir",
+        "blockPermanent": "daimi",
+        "blockHits": "{n} dəfə",
+        "noDevices": "Cihaz qeydə alınmayıb",
+        "noSessions": "Sessiya yoxdur",
+        "noNotes": "Moderasiya qeydi yoxdur",
+        "live": "aktiv",
+        "revoked": "ləğv edilib",
+        "deletedBanner": "Bu hesab {date} tarixində yumşaq silinib. Tarixçə və audit izi oxunaqlı qalsın deyə qeyd saxlanılır."
+      },
+      "actions": {
+        "title": "Əməliyyatlar",
+        "accountStatus": "Hesab statusu",
+        "role": "Rol",
+        "choose": "Seçin…",
+        "apply": "Tətbiq et",
+        "done": "Tamamlandı",
+        "revokeSessions": "Məcburi çıxış",
+        "delete": "İstifadəçini sil",
+        "moderatorReadOnly": "Moderatorlar bu paneli oxuya və doğrulama növbəsində işləyə bilər. Hesab dəyişiklikləri administrator tələb edir.",
+        "banNote": "Sənəd saxtakarlığına görə bloklama baxış konsolunda aparılır ki, blok siyahısı qeydləri də yazılsın.",
+        "confirmStatusTitle": "Hesab statusu dəyişdirilsin?",
+        "confirmStatusBody": "ACTIVE olmayan hər status üçün aktiv sessiyalar ləğv edilir.",
+        "confirmRoleTitle": "Rol dəyişdirilsin?",
+        "confirmRoleBody": "Bu, admin panelinə girişi verir və ya ləğv edir.",
+        "confirmRevokeTitle": "Məcburi çıxış edilsin?",
+        "confirmRevokeBody": "Bütün sessiyalar dərhal ləğv edilir. Giriş tokenləri hər sorğuda sessiya qeydi ilə yoxlanır, ona görə bu dərhal qüvvəyə minir.",
+        "confirmDeleteTitle": "Bu istifadəçi silinsin?",
+        "confirmDeleteBody": "Bu yumşaq silmədir: hesab siyahılardan çıxarılır və daxil ola bilmir, lakin qeyd, audit izi və pul kisəsi tarixçəsi saxlanılır."
+      },
+      "errors": {
+        "bannedImmutable": "Bloklanmış hesab burada bərpa oluna bilməz. Əvvəlcə blok siyahısı qeydləri götürülməlidir.",
+        "cannotActOnSelf": "Bu əməliyyatı öz hesabınızda edə bilməzsiniz.",
+        "lastAdmin": "Bu, sonuncu administratordur. Əvvəlcə başqa hesabı yüksəldin.",
+        "confirmMismatch": "Yazdığınız ləqəb uyğun gəlmir.",
+        "notFrozen": "Bu hesab dondurulmayıb.",
+        "freezeUntilPast": "Gələcək bir tarix seçin.",
+        "freezeTooLong": "Dondurma bir ildən çox ola bilməz. Daha uzunu üçün ban istifadə edin.",
+        "confirmPrivilegedRequired": "Əvvəlcə səlahiyyətli rolu təsdiqləyin."
+      },
+      "freeze": "Müvəqqəti dondur",
+      "unfreeze": "Dondurmanı götür",
+      "frozen": "Dondurulub",
+      "frozenUntil": "{date} tarixinədək dondurulub",
+      "frozenIndefinitely": "Müddətsiz dondurulub",
+      "freezeTitle": "Bu hesabı müvəqqəti dondur",
+      "freezeBody": "Hesab yalnız oxuma imkanı saxlayır və hər yerdən çıxarılır. Paylaşım, alqı-satqı və mesajlaşma dayandırılır.",
+      "freezeDuration": "Müddət",
+      "freezeReason": "Səbəb (istifadəçiyə göstərilir)",
+      "freezeConfirm": "Hesabı dondur",
+      "unfreezeTitle": "Dondurma götürülsün?",
+      "unfreezeBody": "Tam giriş dərhal bərpa olunur və istifadəçiyə bildiriş gedir.",
+      "unfreezeConfirm": "Dondurmanı götür",
+      "durations": {
+        "h24": "24 saat",
+        "d7": "7 gün",
+        "d30": "30 gün",
+        "indefinite": "Əl ilə götürülənədək"
+      },
+      "assignRole": "Rol təyin et",
+      "assignRoleTitle": "Rol təyin et",
+      "assignRoleBody": "Bu, hesabın nə edə biləcəyini dəyişir.",
+      "privilegedWarning": "Bu, başqalarının hesabları üzərində səlahiyyət verir. İstifadəçi sistemdən çıxarılacaq və yenidən daxil olmalıdır.",
+      "privilegedConfirm": "Başa düşdüm, rolu ver",
+      "approve": "Təsdiqlə",
+      "approveTitle": "Bu hesabı təsdiqlə",
+      "approveBody": "Təsdiqdən sonra bu hesabın rolunu seçin.",
+      "reject": "Rədd et",
+      "rejectTitle": "Təsdiqi rədd et",
+      "rejectBody": "İstifadəçiyə sənədlərinin təsdiqlənmədiyi bildirilir və yenidən cəhd edə bilər."
+    },
+    "verifications": {
+      "title": "Doğrulama",
+      "subtitle": "Bütün işlər, bütün vəziyyətlərdə. Qərarlar sənədləri göstərə bilən yeganə səhifə olan baxış konsolunda verilir.",
+      "openConsole": "Baxış konsolu",
+      "review": "Bax",
+      "expired": "bufer bitib",
+      "empty": "Doğrulama işi yoxdur",
+      "emptyHint": "İstifadəçi sənəd göndərdikdə işlər burada görünür.",
+      "searchLabel": "İşləri axtar",
+      "searchPlaceholder": "Ad, ləqəb, istifadəçi ID və ya iş ID",
+      "columns": {
+        "user": "İstifadəçi",
+        "university": "Universitet",
+        "submitted": "Göndərilib",
+        "status": "Status",
+        "verdict": "Qərar",
+        "confidence": "Etibarlılıq",
+        "codes": "Xəta kodları",
+        "priority": "Prioritet",
+        "reviewer": "Baxan",
+        "decided": "Qərar tarixi"
+      },
+      "dismiss": "Siyahıdan çıxar",
+      "dismissTitle": "Bu sətir siyahıdan çıxarılsın?",
+      "dismissBody": "Bu yalnız sətri bu görünüşdən gizlədir. İş, qərarı və hesab silinmir və yenidən göstərilə bilər.",
+      "dismissConfirm": "Siyahıdan çıxar",
+      "restore": "Siyahıya qaytar",
+      "showDismissed": "Çıxarılanları göstər",
+      "hideDismissed": "Çıxarılanları gizlət",
+      "dismissed": "Çıxarılıb",
+      "errors": {
+        "undecided": "Bu iş hələ qərar gözləyir və siyahıdan çıxarıla bilməz."
+      }
+    },
+    "universities": {
+      "title": "Universitetlər",
+      "subtitle": "Tələbələrin qeydiyyatdan keçə biləcəyi qurumlar.",
+      "add": "Universitet əlavə et",
+      "save": "Yadda saxla",
+      "created": "Universitet yaradıldı",
+      "toggled": "Universitet yeniləndi",
+      "empty": "Universitet yoxdur",
+      "active": "aktiv",
+      "inactive": "qeyri-aktiv",
+      "activate": "Aktivləşdir",
+      "deactivate": "Deaktiv et",
+      "faculties": "{n} fakültə",
+      "dropdownNote": "Burada əlavə edilən universitet qeydiyyat API-si üçün dərhal istifadə oluna bilər, lakin qeydiyyat siyahısı hələ də src/lib/universities.ts faylındakı statik siyahıdan qurulur və həmin fayl sorğu ilə əvəzlənənədək onu göstərməyəcək.",
+      "confirmActivate": "Universitet aktivləşdirilsin?",
+      "confirmActivateBody": "{code} yenidən qeydiyyatda seçilə bilən olacaq.",
+      "confirmDeactivate": "Universitet deaktiv edilsin?",
+      "confirmDeactivateBody": "{code} qeydiyyatdan yox olacaq. Mövcud hesablar əlaqəsini saxlayır.",
+      "codeInvalid": "Yalnız böyük hərflər və rəqəmlər.",
+      "domainInvalid": "Düzgün domen daxil edin, məsələn ada.edu.az",
+      "fields": {
+        "code": "Kod",
+        "nameAz": "Ad (AZ)",
+        "nameEn": "Ad (EN)",
+        "nameRu": "Ad (RU)",
+        "city": "Şəhər",
+        "domains": "E-poçt domenləri (vergüllə)"
+      },
+      "columns": {
+        "name": "Universitet",
+        "id": "ID",
+        "domains": "E-poçt domenləri",
+        "status": "Status",
+        "users": "İstifadəçilər"
+      },
+      "errors": {
+        "codeTaken": "Bu kod artıq istifadə olunur."
+      }
+    },
+    "auditLogs": {
+      "title": "Audit jurnalı",
+      "subtitle": "Yalnız əlavə edilir. Tətbiq rolu bu cədvəldə yalnız INSERT və SELECT hüququna malikdir.",
+      "readOnly": "yalnız oxu",
+      "empty": "Audit hadisəsi yoxdur",
+      "emptyHint": "Admin və sistem əməliyyatları baş verdikcə burada qeyd olunur.",
+      "show": "göstər",
+      "hide": "gizlət",
+      "actorGone": "aktor silinib",
+      "searchLabel": "Audit jurnalını axtar",
+      "searchPlaceholder": "Əməliyyat, obyekt tipi, obyekt ID və ya aktor",
+      "columns": {
+        "timestamp": "Vaxt",
+        "actor": "Aktor",
+        "action": "Əməliyyat",
+        "entityType": "Obyekt tipi",
+        "entityId": "Obyekt ID",
+        "metadata": "Metadata",
+        "ip": "IP ünvanı",
+        "device": "Cihaz",
+        "status": "Status"
+      },
+      "export": "Excel-ə köçür",
+      "exporting": "Fayl hazırlanır…",
+      "exportFailed": "Fayl yaradıla bilmədi.",
+      "exportTruncated": "Köçürmə kəsildi. Tam siyahı üçün tarix aralığını daraldın."
+    },
+    "profile": {
+      "title": "Profilim",
+      "subtitle": "Öz administrator hesabınız",
+      "account": "Hesab",
+      "signedInAs": "Daxil olub",
+      "tier": "Səlahiyyət səviyyəsi",
+      "lastLogin": "Son giriş",
+      "memberSince": "Qeydiyyat tarixi",
+      "save": "Dəyişiklikləri saxla",
+      "saved": "Saxlanıldı",
+      "saveFailed": "Dəyişikliklər saxlanılmadı."
+    },
+    "settings": {
+      "title": "Tənzimləmələrim",
+      "subtitle": "Öz hesabınız üçün seçimlər",
+      "appearance": "Görünüş",
+      "language": "Dil",
+      "sessions": "Aktiv sessiyalar",
+      "sessionsHint": "Buradan çıxış bu sessiyanı hər yerdə bitirir.",
+      "dangerZone": "Sessiya",
+      "signOutAll": "Çıxış"
     }
   },
   "settings": {
@@ -636,5 +1064,52 @@
   "notFound": {
     "title": "Səhifə tapılmadı",
     "body": "Axtardığınız səhifə mövcud deyil və ya köçürülüb."
+  },
+  "profile": {
+    "verified": "Təsdiqlənmiş",
+    "edit": "Profili redaktə et",
+    "unverified": "Şəxsiyyətiniz hələ təsdiqlənməyib. Cari status:",
+    "details": "Məlumatlar",
+    "visibility": "Kim nəyi görə bilər",
+    "visibilityHint": "Bunlar digər tələbələrin public profilinizdə nə gördüyünü müəyyən edir. Parametrlərdən dəyişin.",
+    "stats": {
+      "posts": "Paylaşımlar",
+      "notes": "Konspektlər",
+      "followers": "İzləyicilər",
+      "following": "İzlədikləri"
+    },
+    "fields": {
+      "fullName": "Tam ad",
+      "email": "E-poçt",
+      "phone": "Telefon",
+      "university": "Universitet",
+      "faculty": "Fakültə",
+      "graduation": "Məzuniyyət",
+      "role": "Rol",
+      "joined": "Qoşulub"
+    },
+    "headline": "Başlıq",
+    "bio": "Haqqınızda"
+  },
+  "messages": {
+    "title": "Mesajlar",
+    "subtitle": "Söhbətləriniz",
+    "empty": "Hələ söhbət yoxdur",
+    "emptyHint": "Söhbətə kiminsə profilindən başlayın.",
+    "selectPrompt": "Oxumaq üçün söhbət seçin",
+    "placeholder": "Mesaj yazın…",
+    "send": "Göndər",
+    "sending": "Göndərilir…",
+    "loading": "Yüklənir…",
+    "loadOlder": "Köhnə mesajları yüklə",
+    "you": "Siz",
+    "deleted": "Mesaj silinib",
+    "newConversation": "Yeni söhbət",
+    "backToList": "Söhbətlərə qayıt",
+    "errors": {
+      "cannotMessageSelf": "Özünüzə mesaj göndərə bilməzsiniz",
+      "sendFailed": "Mesaj göndərilmədi. Yenidən cəhd edin.",
+      "loadFailed": "Söhbətlər yüklənmədi."
+    }
   }
 }

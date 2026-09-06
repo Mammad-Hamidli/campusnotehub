@@ -43,20 +43,47 @@ ALTER TABLE verification_cases
 -- Same reasoning: a code is a category ('NAME_MISMATCH'), never a value
 -- ('mismatch: ELVIN SEFEROV vs E. SEFEROV'). Upper snake case, 64 chars max.
 -- ---------------------------------------------------------------
+-- The predicate lives in a function for the same reason as the one above:
+-- PostgreSQL forbids a sub-SELECT directly inside a CHECK, and `unnest` over
+-- the array is a sub-SELECT however it is written. An IMMUTABLE function is
+-- the supported way to express it.
+--
+-- bool_and over an empty array returns NULL rather than true, so the empty
+-- case is coalesced explicitly. A NULL would pass the CHECK anyway, but
+-- relying on that is a trap for whoever edits this next.
+CREATE OR REPLACE FUNCTION failure_codes_are_codes(codes text[])
+RETURNS boolean AS $$
+BEGIN
+  IF codes IS NULL THEN
+    RETURN true;
+  END IF;
+  RETURN COALESCE(
+    (SELECT bool_and(code ~ '^[A-Z][A-Z0-9_]{2,63}$') FROM unnest(codes) AS code),
+    true
+  );
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
 ALTER TABLE verification_cases
   ADD CONSTRAINT verification_failure_codes_are_codes
-  CHECK (
-    "failureCodes" IS NULL
-    OR (
-      SELECT bool_and(code ~ '^[A-Z][A-Z0-9_]{2,63}$')
-      FROM unnest("failureCodes") AS code
-    )
-  );
+  CHECK (failure_codes_are_codes("failureCodes"));
 
 -- ---------------------------------------------------------------
 -- 3. A review buffer must always carry an expiry, and that expiry must be
---    short. Without this, a NULL reviewExpiresAt would mean "keep forever" -
+--    bounded. Without this, a NULL reviewExpiresAt would mean "keep forever" -
 --    exactly the failure mode this whole design exists to prevent.
+--
+--    The ceiling is 7 DAYS, raised from 72 hours. The load-bearing half of
+--    this constraint is "an expiry exists at all", and that is unchanged; only
+--    the bound moved. 72 hours was expiring flagged submissions faster than a
+--    human moderator rota could reach them, which converted an ambiguous case
+--    into a forced resubmit and pushed an honest student back to the start of
+--    the funnel - a retention rule that produces that outcome is mis-tuned,
+--    not strict.
+--
+--    Note what did NOT change: Redis still owns the actual deletion via its
+--    own TTL, so expiry does not depend on our cron running, and auto-approved
+--    and auto-rejected cases still never reach the buffer at all.
 -- ---------------------------------------------------------------
 ALTER TABLE verification_cases
   ADD CONSTRAINT verification_review_buffer_requires_expiry
@@ -65,7 +92,7 @@ ALTER TABLE verification_cases
     OR (
       "reviewBufferKey" IS NOT NULL
       AND "reviewExpiresAt" IS NOT NULL
-      AND "reviewExpiresAt" <= "submittedAt" + interval '72 hours'
+      AND "reviewExpiresAt" <= "submittedAt" + interval '7 days'
     )
   );
 

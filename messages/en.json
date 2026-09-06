@@ -20,7 +20,9 @@
     "saveChanges": "Save changes",
     "saved": "Saved",
     "discard": "Discard",
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "dismiss": "Dismiss",
+    "confirm": "Confirm"
   },
   "nav": {
     "feed": "Feed",
@@ -39,7 +41,9 @@
     "help": "Help",
     "messages": "Messages",
     "bookmarks": "Bookmarks",
-    "explore": "Explore"
+    "explore": "Explore",
+    "admin": "Admin",
+    "messagesPage": "Messages"
   },
   "auth": {
     "register": {
@@ -77,7 +81,11 @@
         "good": "Good",
         "strong": "Strong"
       },
-      "universityAutoDetected": "Selected automatically from your email domain"
+      "universityAutoDetected": "Selected automatically from your email domain",
+      "facultyPlaceholder": "Search for your faculty…",
+      "facultyNoMatch": "No faculty matches that search. Choose “Other” to type your own.",
+      "facultyOther": "Your faculty",
+      "facultyOtherPlaceholder": "Type your faculty or field of study"
     },
     "login": {
       "title": "Welcome back",
@@ -104,7 +112,8 @@
       "phoneInvalid": "Enter a valid Azerbaijani number (+994 5X XXX XX XX)",
       "phoneTaken": "That number is already in use",
       "consentRequired": "You must consent to document processing",
-      "credentialsUnavailable": "An account cannot be created with these details. Try a different email or phone number."
+      "credentialsUnavailable": "An account cannot be created with these details. Try a different email or phone number.",
+      "facultyOtherRequired": "Please type your faculty"
     }
   },
   "verification": {
@@ -214,7 +223,29 @@
     "empty": "No posts yet. Be the first.",
     "loadNew": "{count} new posts",
     "deleted": "This post was deleted",
-    "characterCount": "{remaining} characters left"
+    "characterCount": "{remaining} characters left",
+    "comments": "Comments",
+    "commentPlaceholder": "Write a comment…",
+    "commentSubmit": "Post comment",
+    "commentEmpty": "No comments yet. Be the first.",
+    "commentLoading": "Loading comments…",
+    "commentFailed": "Your comment could not be posted. Try again.",
+    "commentDeleted": "Comment deleted",
+    "showComments": "Show comments",
+    "hideComments": "Hide comments",
+    "image": {
+      "maxSize": "Images up to {mb} MB",
+      "errors": {
+        "missing": "Choose an image first",
+        "empty": "That file is empty",
+        "tooLarge": "That image is too large",
+        "typeNotAllowed": "Only JPEG, PNG, WebP or GIF images are accepted",
+        "tooSmall": "That image is too small",
+        "decodeFailed": "That image could not be read. Try a different file.",
+        "uploadFailed": "The image could not be uploaded. Try again.",
+        "invalidKey": "That image is no longer available. Attach it again."
+      }
+    }
   },
   "notes": {
     "title": "UniNotes",
@@ -258,14 +289,58 @@
       "price": "Price (AZN)",
       "priceHint": "Enter 0 to publish it for free. Maximum 50 AZN.",
       "processing": "Processing file: generating preview...",
-      "pendingReview": "Your note is in moderation and will be published once approved."
+      "pendingReview": "Your note is in moderation and will be published once approved.",
+      "subtitle": "PDF, Word, Excel, PowerPoint or an image export. Max 50 MB.",
+      "choose": "Choose a file",
+      "accepted": "PDF · DOC/DOCX · XLS/XLSX · PPT/PPTX · PNG/JPG — up to 50 MB",
+      "remove": "Remove file",
+      "submit": "Upload",
+      "draftNote": "Saved as a draft for review before it is listed.",
+      "fields": {
+        "title": "Title",
+        "description": "Description",
+        "subject": "Subject",
+        "courseCode": "Course code",
+        "university": "University",
+        "price": "Price (qepik, 0 = free)"
+      },
+      "errors": {
+        "missing": "Choose a file to upload.",
+        "empty": "That file is empty.",
+        "tooSmall": "That file is too small to be a document.",
+        "tooLarge": "That file is larger than 50 MB.",
+        "typeNotAllowed": "That file type is not accepted. Use PDF, Word, Excel, PowerPoint, PNG or JPG.",
+        "mimeMismatch": "The file contents do not match its type. Re-export and try again.",
+        "extensionMismatch": "The file extension does not match its actual contents.",
+        "executable": "Executable and script files are not accepted.",
+        "archiveNotOffice": "That archive is not a Word, Excel or PowerPoint file.",
+        "pdfUnsafe": "That PDF contains active content (scripts or embedded files) and was rejected.",
+        "duplicate": "You have already uploaded this exact file.",
+        "txtOnly": "That file type is not supported.",
+        "cancelled": "Upload cancelled.",
+        "network": "The upload failed. Check your connection and try again."
+      },
+      "progress": "Uploading… {percent}%",
+      "cancel": "Cancel upload",
+      "retry": "Try again",
+      "success": "Note uploaded",
+      "maxSize": "Up to {mb} MB. PDF, Word, PowerPoint, Excel, text or image.",
+      "selected": "{name} ({size})"
     },
     "errors": {
       "notVerified": "Your account must be verified before you can sell notes",
       "insufficientFunds": "Your balance is not enough",
       "duplicate": "This exact file is already on the platform",
       "encrypted": "Password-protected PDFs are not accepted"
-    }
+    },
+    "free": "Free",
+    "download": "Download",
+    "stats": {
+      "downloads": "{n} downloads",
+      "purchases": "{n} purchases"
+    },
+    "empty": "No notes have been uploaded yet.",
+    "addNote": "Add note"
   },
   "mentors": {
     "title": "PocketMentor",
@@ -315,7 +390,37 @@
       "slotTaken": "That slot was just taken. Please pick another.",
       "tooSoon": "Sessions must start at least {hours} hours from now",
       "selfBooking": "You cannot book a session with yourself"
-    }
+    },
+    "browse": "Find a mentor",
+    "empty": "No mentors yet",
+    "emptyHint": "Verified students and alumni can offer mentoring. Check back soon.",
+    "loading": "Loading mentors…",
+    "book": "Request a session",
+    "message": "Message",
+    "viewProfile": "View profile",
+    "sessions": "{count} sessions",
+    "rate": "{price} / session",
+    "free": "Free",
+    "industry": "Industry",
+    "allIndustries": "All industries",
+    "searchPlaceholder": "Search mentors by name or topic",
+    "loadFailed": "Mentors could not be loaded.",
+    "verifiedOnly": "Verify your account to book a session.",
+    "notFound": "Mentor not found",
+    "notFoundHint": "This profile may have been removed or is not yet approved.",
+    "backToList": "All mentors",
+    "about": "About",
+    "reviews": "Reviews",
+    "noReviews": "No reviews yet.",
+    "specialties": "Specialties",
+    "languages": "Languages",
+    "availability": "Availability",
+    "noAvailability": "No hours published yet.",
+    "minNotice": "{hours}h notice",
+    "sessionLength": "{minutes} min",
+    "years": "{count} yrs",
+    "editProfile": "Edit my mentor profile",
+    "notAccepting": "Not accepting bookings"
   },
   "wallet": {
     "title": "Wallet",
@@ -360,6 +465,33 @@
       "WALLET_CREDIT": "{amount} was added to your balance",
       "VERIFICATION_NEEDS_REVIEW": "Your documents need a closer look",
       "VERIFICATION_RESUBMIT_REQUIRED": "Please upload your documents again"
+    },
+    "subtitle": "Everything that happened on your account",
+    "loading": "Loading notifications…",
+    "emptyHint": "Likes, replies and account updates will show up here.",
+    "markRead": "Mark as read",
+    "unreadOnly": "Unread only",
+    "all": "All",
+    "unreadCount": "{count} unread",
+    "postReply": {
+      "title": "New comment",
+      "body": "@{nickname} commented on your post"
+    },
+    "postLike": {
+      "title": "New like",
+      "body": "Someone liked your post"
+    },
+    "roleChanged": {
+      "title": "Your role changed",
+      "body": "An administrator set your role to {role}"
+    },
+    "accountFrozen": {
+      "title": "Account frozen",
+      "body": "Your account has been temporarily frozen"
+    },
+    "accountUnfrozen": {
+      "title": "Account restored",
+      "body": "The freeze on your account was lifted"
     }
   },
   "errors": {
@@ -377,7 +509,8 @@
     "summaryTitle": "There are {count} problems with this form",
     "methodNotAllowed": "That request method is not supported",
     "unsupportedMediaType": "That request format is not supported",
-    "credentialsInQueryString": "Request blocked for your security. Reload the page and try again."
+    "credentialsInQueryString": "Request blocked for your security. Reload the page and try again.",
+    "verificationRequired": "Verify your identity before selling notes."
   },
   "a11y": {
     "openMenu": "Open menu",
@@ -557,6 +690,301 @@
       "bufferExpired": "The images have expired. Ask the applicant to submit again.",
       "confirmBan": "This permanently bans the account. Continue?",
       "noteAutoBan": "The system never bans automatically — this decision is yours."
+    },
+    "nav": {
+      "label": "Admin navigation",
+      "section": "Administration",
+      "dashboard": "Dashboard",
+      "users": "Users",
+      "verifications": "Verification",
+      "universities": "Universities",
+      "auditLogs": "Audit logs",
+      "backToApp": "Back to app",
+      "skipToContent": "Skip to content"
+    },
+    "common": {
+      "all": "All",
+      "actions": "Actions",
+      "cancel": "Cancel",
+      "retry": "Try again",
+      "clearFilters": "Clear filters",
+      "previous": "Previous page",
+      "next": "Next page",
+      "pagination": "Pagination",
+      "pageOf": "Page {page} of {pageCount} · {total} rows",
+      "reason": "Reason",
+      "reasonHint": "Recorded in the audit log. At least 10 characters.",
+      "reasonTooShort": "At least 10 characters.",
+      "typeToConfirm": "Type {value} to confirm",
+      "done": "Done"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "subtitle": "Live counts from the database. Every tile links to the matching filter.",
+      "queueTitle": "Verification queue",
+      "openQueue": "Open queue",
+      "queueNote": "Flagged documents are held in an encrypted buffer with a hard TTL. When it lapses the case can no longer be reviewed and the applicant must resubmit."
+    },
+    "stats": {
+      "total": "Total users",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "needsReview": "Needs review",
+      "processing": "Processing",
+      "rejected": "Rejected",
+      "suspended": "Suspended",
+      "banned": "Banned",
+      "newToday": "New today",
+      "newThisWeek": "New in 7 days",
+      "queueWaiting": "Waiting for review",
+      "queueExpiringSoon": "Expiring within 4h"
+    },
+    "users": {
+      "title": "Users",
+      "subtitle": "Every registered account. Click a name to open the full record.",
+      "countLabel": "{total} accounts",
+      "searchLabel": "Search users",
+      "searchPlaceholder": "Name, nickname, email or ID",
+      "emptyTitle": "No users found",
+      "emptyHint": "Accounts appear here as soon as they register.",
+      "emptyFiltered": "No account matches these filters.",
+      "deletedMark": "deleted",
+      "columns": {
+        "name": "Full name",
+        "nickname": "Nickname",
+        "email": "Email",
+        "phone": "Phone",
+        "university": "University",
+        "faculty": "Faculty",
+        "graduation": "Graduation",
+        "userId": "User ID",
+        "role": "Role",
+        "account": "Account",
+        "verification": "Verification",
+        "created": "Registered",
+        "lastLogin": "Last login",
+        "updated": "Updated"
+      },
+      "filters": {
+        "university": "University",
+        "verification": "Verification",
+        "account": "Account status",
+        "role": "Role",
+        "from": "From",
+        "to": "To"
+      },
+      "detail": {
+        "title": "User",
+        "back": "Back to users",
+        "profile": "Profile",
+        "verification": "Verification",
+        "activity": "Recent activity",
+        "blocklist": "Blocklist",
+        "devices": "Devices",
+        "sessions": "Sessions",
+        "notes": "Moderation notes",
+        "emailVerified": "Email verified",
+        "locale": "Locale",
+        "failedLogins": "Failed logins",
+        "lockedUntil": "locked until {date}",
+        "attempt": "Attempt",
+        "confirmedFlags": "Confirmed",
+        "checkScores": "Check scores",
+        "noCases": "No verification case yet",
+        "openQueue": "Open review console",
+        "noBlocks": "Not on the blocklist",
+        "blockExpires": "expires {date}",
+        "blockPermanent": "permanent",
+        "blockHits": "{n} hits",
+        "noDevices": "No devices recorded",
+        "noSessions": "No sessions",
+        "noNotes": "No moderation notes",
+        "live": "live",
+        "revoked": "revoked",
+        "deletedBanner": "This account was soft-deleted on {date}. The row is retained so its history and audit trail stay readable."
+      },
+      "actions": {
+        "title": "Actions",
+        "accountStatus": "Account status",
+        "role": "Role",
+        "choose": "Choose…",
+        "apply": "Apply",
+        "done": "Done",
+        "revokeSessions": "Force logout",
+        "delete": "Delete user",
+        "moderatorReadOnly": "Moderators can read this panel and work the verification queue. Account changes require an administrator.",
+        "banNote": "Banning for document fraud happens in the review console so the blocklist entries are written with it.",
+        "confirmStatusTitle": "Change account status?",
+        "confirmStatusBody": "Live sessions are revoked for any status other than ACTIVE.",
+        "confirmRoleTitle": "Change role?",
+        "confirmRoleBody": "This grants or removes access to the admin panel.",
+        "confirmRevokeTitle": "Force logout?",
+        "confirmRevokeBody": "Every session is revoked immediately. Access tokens are checked against the session record on each request, so this takes effect at once.",
+        "confirmDeleteTitle": "Delete this user?",
+        "confirmDeleteBody": "This is a soft delete: the account is excluded from listings and can no longer sign in, but the row, its audit trail and its wallet history are kept."
+      },
+      "errors": {
+        "bannedImmutable": "A banned account cannot be reactivated here. Blocklist entries must be lifted first.",
+        "cannotActOnSelf": "You cannot perform this action on your own account.",
+        "lastAdmin": "This is the last administrator. Promote another account first.",
+        "confirmMismatch": "The nickname you typed does not match.",
+        "notFrozen": "That account is not frozen.",
+        "freezeUntilPast": "Choose a date in the future.",
+        "freezeTooLong": "A freeze cannot exceed one year. Use a ban for anything longer.",
+        "confirmPrivilegedRequired": "Confirm the privileged role grant first."
+      },
+      "freeze": "Temporarily freeze",
+      "unfreeze": "Lift freeze",
+      "frozen": "Frozen",
+      "frozenUntil": "Frozen until {date}",
+      "frozenIndefinitely": "Frozen indefinitely",
+      "freezeTitle": "Temporarily freeze this account",
+      "freezeBody": "The account keeps read-only access and is signed out everywhere. Posting, buying, selling and messaging are paused.",
+      "freezeDuration": "Duration",
+      "freezeReason": "Reason (shown to the user)",
+      "freezeConfirm": "Freeze account",
+      "unfreezeTitle": "Lift the freeze?",
+      "unfreezeBody": "Full access is restored immediately and the user is notified.",
+      "unfreezeConfirm": "Lift freeze",
+      "durations": {
+        "h24": "24 hours",
+        "d7": "7 days",
+        "d30": "30 days",
+        "indefinite": "Until lifted manually"
+      },
+      "assignRole": "Assign role",
+      "assignRoleTitle": "Assign a role",
+      "assignRoleBody": "This changes what the account is allowed to do.",
+      "privilegedWarning": "This grants power over other people’s accounts. The user will be signed out and must sign in again.",
+      "privilegedConfirm": "I understand, grant this role",
+      "approve": "Verify",
+      "approveTitle": "Verify this account",
+      "approveBody": "Choose the role this account should have once verified.",
+      "reject": "Reject",
+      "rejectTitle": "Reject verification",
+      "rejectBody": "The user is told their documents could not be verified and may try again."
+    },
+    "verifications": {
+      "title": "Verification",
+      "subtitle": "Every case, in every state. Decisions are made in the review console, which is the only surface that can show documents.",
+      "openConsole": "Review console",
+      "review": "Review",
+      "expired": "buffer expired",
+      "empty": "No verification cases",
+      "emptyHint": "Cases appear here when a user submits documents.",
+      "searchLabel": "Search cases",
+      "searchPlaceholder": "Name, nickname, user ID or case ID",
+      "columns": {
+        "user": "User",
+        "university": "University",
+        "submitted": "Submitted",
+        "status": "Status",
+        "verdict": "Verdict",
+        "confidence": "Confidence",
+        "codes": "Failure codes",
+        "priority": "Priority",
+        "reviewer": "Reviewer",
+        "decided": "Decided"
+      },
+      "dismiss": "Clear from list",
+      "dismissTitle": "Clear this row from the list?",
+      "dismissBody": "This only hides the row from this view. The case, its decision and the account are not deleted and can be shown again.",
+      "dismissConfirm": "Clear from list",
+      "restore": "Restore to list",
+      "showDismissed": "Show cleared",
+      "hideDismissed": "Hide cleared",
+      "dismissed": "Cleared",
+      "errors": {
+        "undecided": "This case is still awaiting a decision and cannot be cleared."
+      }
+    },
+    "universities": {
+      "title": "Universities",
+      "subtitle": "Institutions students can register against.",
+      "add": "Add university",
+      "save": "Save",
+      "created": "University created",
+      "toggled": "University updated",
+      "empty": "No universities",
+      "active": "active",
+      "inactive": "inactive",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "faculties": "{n} faculties",
+      "dropdownNote": "A university added here is usable by the registration API immediately, but the signup dropdown is still built from the static list in src/lib/universities.ts and will not show it until that file is replaced by a fetch.",
+      "confirmActivate": "Activate university?",
+      "confirmActivateBody": "{code} will become selectable at registration again.",
+      "confirmDeactivate": "Deactivate university?",
+      "confirmDeactivateBody": "{code} will disappear from registration. Existing accounts keep their affiliation.",
+      "codeInvalid": "Use uppercase letters and digits only.",
+      "domainInvalid": "Enter a valid domain, e.g. ada.edu.az",
+      "fields": {
+        "code": "Code",
+        "nameAz": "Name (AZ)",
+        "nameEn": "Name (EN)",
+        "nameRu": "Name (RU)",
+        "city": "City",
+        "domains": "Email domains (comma separated)"
+      },
+      "columns": {
+        "name": "University",
+        "id": "ID",
+        "domains": "Email domains",
+        "status": "Status",
+        "users": "Users"
+      },
+      "errors": {
+        "codeTaken": "That code is already in use."
+      }
+    },
+    "auditLogs": {
+      "title": "Audit logs",
+      "subtitle": "Append-only. The application role holds INSERT and SELECT on this table and nothing else.",
+      "readOnly": "read-only",
+      "empty": "No audit events",
+      "emptyHint": "Admin and system actions are recorded here as they happen.",
+      "show": "show",
+      "hide": "hide",
+      "actorGone": "actor removed",
+      "searchLabel": "Search audit log",
+      "searchPlaceholder": "Action, entity type, entity ID or actor",
+      "columns": {
+        "timestamp": "Timestamp",
+        "actor": "Actor",
+        "action": "Action",
+        "entityType": "Entity type",
+        "entityId": "Entity ID",
+        "metadata": "Metadata",
+        "ip": "IP address",
+        "device": "Device",
+        "status": "Status"
+      },
+      "export": "Export to Excel",
+      "exporting": "Preparing file…",
+      "exportFailed": "The export could not be created.",
+      "exportTruncated": "Export truncated. Narrow the date range for the full set."
+    },
+    "profile": {
+      "title": "My profile",
+      "subtitle": "Your own administrator account",
+      "account": "Account",
+      "signedInAs": "Signed in as",
+      "tier": "Access tier",
+      "lastLogin": "Last sign-in",
+      "memberSince": "Member since",
+      "save": "Save changes",
+      "saved": "Saved",
+      "saveFailed": "Changes could not be saved."
+    },
+    "settings": {
+      "title": "My settings",
+      "subtitle": "Preferences for your own account",
+      "appearance": "Appearance",
+      "language": "Language",
+      "sessions": "Active sessions",
+      "sessionsHint": "Signing out here ends this session everywhere it is open.",
+      "dangerZone": "Session",
+      "signOutAll": "Sign out"
     }
   },
   "settings": {
@@ -636,5 +1064,52 @@
   "notFound": {
     "title": "Page not found",
     "body": "The page you are looking for does not exist or has moved."
+  },
+  "profile": {
+    "verified": "Verified",
+    "edit": "Edit profile",
+    "unverified": "Your identity is not verified yet. Current status:",
+    "details": "Details",
+    "visibility": "Who can see what",
+    "visibilityHint": "These control what other students see on your public profile. Change them in Settings.",
+    "stats": {
+      "posts": "Posts",
+      "notes": "Notes",
+      "followers": "Followers",
+      "following": "Following"
+    },
+    "fields": {
+      "fullName": "Full name",
+      "email": "Email",
+      "phone": "Phone",
+      "university": "University",
+      "faculty": "Faculty",
+      "graduation": "Graduation",
+      "role": "Role",
+      "joined": "Joined"
+    },
+    "headline": "Headline",
+    "bio": "About you"
+  },
+  "messages": {
+    "title": "Messages",
+    "subtitle": "Your conversations",
+    "empty": "No conversations yet",
+    "emptyHint": "Start a conversation from someone’s profile.",
+    "selectPrompt": "Select a conversation to start reading",
+    "placeholder": "Write a message…",
+    "send": "Send",
+    "sending": "Sending…",
+    "loading": "Loading…",
+    "loadOlder": "Load older messages",
+    "you": "You",
+    "deleted": "Message deleted",
+    "newConversation": "New conversation",
+    "backToList": "Back to conversations",
+    "errors": {
+      "cannotMessageSelf": "You cannot message yourself",
+      "sendFailed": "Message could not be sent. Try again.",
+      "loadFailed": "Conversations could not be loaded."
+    }
   }
 }

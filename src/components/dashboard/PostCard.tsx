@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Heart, MessageCircle, MoreHorizontal, Repeat2, Share2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { VerifiedBadge } from './VerificationBanner';
+import { CommentThread } from './CommentThread';
 
 export type Post = {
   id: string;
@@ -24,6 +25,8 @@ export type Post = {
   };
   body: string;
   tags: string[];
+  /** Already resolved to a servable URL by the feed mapper. */
+  media: { id: string; url: string; width: number | null; height: number | null; alt: string | null }[];
   createdAt: string;
   likeCount: number;
   commentCount: number;
@@ -35,32 +38,51 @@ export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
   const t = useT();
   const [liked, setLiked] = useState(post.likedByViewer);
   const [likeCount, setLikeCount] = useState(post.likeCount);
+  const [commentCount, setCommentCount] = useState(post.commentCount);
+  const [showComments, setShowComments] = useState(false);
 
   /**
-   * BACKEND INTEGRATION
-   * -------------------
-   *   POST   /api/feed/:postId/like    -> 204
-   *   DELETE /api/feed/:postId/like    -> 204
+   * Likes.
+   *
+   *   POST   /api/feed/:postId/like
+   *   DELETE /api/feed/:postId/like
    *
    * Both are idempotent: the like table uses a composite (postId, userId)
    * primary key, so a double-tap or a retried request cannot double-count.
    *
-   * The optimistic update below flips state before the request and rolls back
-   * on failure. Waiting for the round trip makes the button feel broken on
-   * campus wifi, and a like is cheap enough to be wrong for 300ms.
+   * The optimistic update flips state before the request and rolls back on
+   * failure. Waiting for the round trip makes the button feel broken on campus
+   * wifi, and a like is cheap enough to be wrong for 300ms.
+   *
+   * This call used to be COMMENTED OUT, which is why a like survived until the
+   * next render and then vanished - the icon filled in, nothing was written,
+   * and the count reset on reload.
    */
   async function toggleLike() {
     const next = !liked;
     setLiked(next);
     setLikeCount((c) => c + (next ? 1 : -1));
 
-    // const res = await fetch(`/api/feed/${post.id}/like`, {
-    //   method: next ? 'POST' : 'DELETE',
-    // });
-    // if (!res.ok) {                      // roll back
-    //   setLiked(!next);
-    //   setLikeCount((c) => c + (next ? -1 : 1));
-    // }
+    try {
+      const response = await fetch(`/api/feed/${post.id}/like`, {
+        method: next ? 'POST' : 'DELETE',
+      });
+      if (!response.ok) {
+        setLiked(!next);
+        setLikeCount((c) => c + (next ? -1 : 1));
+        return;
+      }
+      // Trust the server's total over the local guess: two tabs, or a like
+      // that arrived while this one was in flight, would otherwise drift.
+      const payload = await response.json().catch(() => null);
+      if (payload && typeof payload.likeCount === 'number') {
+        setLikeCount(payload.likeCount);
+        setLiked(Boolean(payload.liked));
+      }
+    } catch {
+      setLiked(!next);
+      setLikeCount((c) => c + (next ? -1 : 1));
+    }
   }
 
   return (
@@ -71,7 +93,7 @@ export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
       <header className="flex items-start gap-3">
         <span
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full
- bg-surface-inset text-xs font-bold text-accent-fg"
+ bg-surface-inset text-xs font-bold text-accent"
           aria-hidden="true"
         >
           {post.author.initials}
@@ -107,6 +129,52 @@ export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
         {post.body}
       </p>
 
+      {/*
+        Images.
+
+        `aspect-ratio` is set from the stored dimensions so the browser
+        reserves the right box BEFORE the bytes arrive. Without it every image
+        loads at zero height and then shoves the rest of the feed down - the
+        layout shift that makes a timeline unusable while scrolling.
+
+        Dimensions come from the server, which read them off the re-encoded
+        file, so they are measurements rather than client claims.
+      */}
+      {post.media.length > 0 && (
+        <div
+          className={`mt-3 grid gap-1.5 ${post.media.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+        >
+          {post.media.map((image) => (
+            <a
+              key={image.id}
+              href={image.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block overflow-hidden rounded-xl border border-edge bg-surface-inset"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- next/image
+                  would proxy through the optimiser, which needs a configured
+                  loader and buys nothing here: these are already re-encoded,
+                  bounded WebP served with an immutable cache header. */}
+              <img
+                src={image.url}
+                alt={image.alt ?? ''}
+                width={image.width ?? undefined}
+                height={image.height ?? undefined}
+                loading="lazy"
+                decoding="async"
+                className="h-auto w-full object-cover"
+                style={
+                  image.width && image.height
+                    ? { aspectRatio: `${image.width} / ${image.height}` }
+                    : undefined
+                }
+              />
+            </a>
+          ))}
+        </div>
+      )}
+
       {post.tags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {post.tags.map((tag) => (
@@ -134,9 +202,11 @@ export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
         />
         <ActionButton
           icon={MessageCircle}
-          label={t('feed.comment')}
-          count={post.commentCount}
+          label={showComments ? t('feed.hideComments') : t('feed.showComments')}
+          count={commentCount}
+          active={showComments}
           activeClass="text-accent"
+          onClick={() => setShowComments((v) => !v)}
         />
         <ActionButton
           icon={Repeat2}
@@ -153,6 +223,10 @@ export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
           <Share2 className="h-4 w-4" />
         </button>
       </footer>
+
+      {/* Mounted only when expanded, so the thread's fetch happens on demand
+          rather than twenty times per feed page. */}
+      {showComments && <CommentThread postId={post.id} onCountChange={setCommentCount} />}
     </article>
   );
 }

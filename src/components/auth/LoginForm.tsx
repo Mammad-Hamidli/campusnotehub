@@ -40,10 +40,33 @@ export function LoginForm() {
       });
 
       if (res.ok) {
-        // `next` is validated as a same-origin path before use: an open
-        // redirect here would let a phishing link bounce through our domain.
-        const next = params.get('next');
-        router.push(next?.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
+        const payload = await res.json().catch(() => ({}));
+
+        /**
+         * Two sources, in priority order.
+         *
+         * 1. An explicit `?next=` - someone who was bounced to the login screen
+         *    from a page should land back on that page.
+         * 2. Otherwise the destination the SERVER chose from the live role.
+         *    This is the fix for staff being dropped on the student feed: the
+         *    client cannot read a role (the access token carries none by
+         *    design), so it previously had nothing to branch on and hardcoded
+         *    /dashboard for everyone.
+         *
+         * Both are validated as same-origin paths before use. An open redirect
+         * here would let a phishing link bounce through our own domain, and
+         * that check has to apply to the server's value too - it arrives over
+         * the network like any other response body.
+         */
+        const samePath = (value: unknown): value is string =>
+          typeof value === 'string' && value.startsWith('/') && !value.startsWith('//');
+
+        const requested = params.get('next');
+        const suggested = payload?.next?.href;
+
+        router.push(
+          samePath(requested) ? requested : samePath(suggested) ? suggested : '/dashboard',
+        );
         router.refresh();
         return;
       }

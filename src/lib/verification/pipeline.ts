@@ -41,6 +41,7 @@ export type PipelineOutcome = {
  * them, which is why there is no code path that has to remember to delete them.
  */
 export async function runVerification(input: PipelineInput): Promise<PipelineOutcome> {
+  let escalating = false;
   try {
     // ---- 1. Automated analysis (stateless, in-memory both sides) ----------
     const analysis = await analyse(input);
@@ -160,10 +161,22 @@ export async function runVerification(input: PipelineInput): Promise<PipelineOut
       messageKey,
       reviewSecret: handle.secret,
     };
+  } catch (error) {
+    // The caller escalates a pipeline outage, and escalateOnFailure still needs
+    // these bytes to stash into the review buffer. Wiping them here would hand
+    // the moderator an empty buffer - a NEEDS_REVIEW case with nothing to
+    // review, which is the one thing the review buffer exists to prevent.
+    escalating = error instanceof PipelineUnavailableError;
+    throw error;
   } finally {
-    // Runs on success, on rejection, and on an unhandled throw.
-    for (const doc of input.documents) wipe(doc.bytes);
-    input.documents.length = 0;
+    // Runs on success, on rejection, and on an unhandled throw - EXCEPT when
+    // the caller is about to escalate. In that one case the submit route's own
+    // finally does the wipe, immediately after escalateOnFailure has copied the
+    // bytes into the encrypted buffer, so they still never outlive the request.
+    if (!escalating) {
+      for (const doc of input.documents) wipe(doc.bytes);
+      input.documents.length = 0;
+    }
   }
 }
 
@@ -197,12 +210,30 @@ async function analyse(input: PipelineInput): Promise<{
     );
   }
 
-  const response = await fetch(`${process.env.DOC_VERIFIER_URL}/verify`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${process.env.DOC_VERIFIER_TOKEN}` },
-    body: form,
-    signal: AbortSignal.timeout(45_000),
-  });
+  /**
+   * A connection-level failure is an outage, not a verdict.
+   *
+   * `fetch` only RESOLVES for an HTTP response; DNS failure, connection
+   * refused, TLS error and the 45s AbortSignal all REJECT instead - as a bare
+   * TypeError/DOMException. Without this catch that error propagates past the
+   * `instanceof PipelineUnavailableError` guard in the submit route and the
+   * user gets a 500, which is precisely the "our outage reads as your fraud"
+   * outcome the escalation path below exists to prevent. An unreachable
+   * verifier is the single most likely failure here, so it must take the same
+   * NEEDS_REVIEW route as a 503 from a verifier that did answer.
+   */
+  let response: Response;
+  try {
+    response = await fetch(`${process.env.DOC_VERIFIER_URL}/verify`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${process.env.DOC_VERIFIER_TOKEN}` },
+      body: form,
+      signal: AbortSignal.timeout(45_000),
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    throw new PipelineUnavailableError(`doc-verifier unreachable (${reason})`);
+  }
 
   if (!response.ok) {
     // A pipeline failure must never look like a fraud outcome. Escalating to a

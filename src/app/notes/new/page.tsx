@@ -1,15 +1,37 @@
 import type { Metadata } from 'next';
-import { StubPage } from '@/components/ui/UnderConstruction';
+import { redirect } from 'next/navigation';
+import { db } from '@/lib/db';
+import { getViewer } from '@/lib/auth/session';
+import { NoteUploadForm } from '@/components/notes/NoteUploadForm';
 
-export const metadata: Metadata = { title: 'New note' };
+export const metadata: Metadata = {
+  title: 'Upload note',
+  robots: { index: false, follow: false },
+};
+
+export const dynamic = 'force-dynamic';
 
 /**
- * Stub route. Returns 200 with an honest "not built yet" state.
+ * Replaces the previous StubPage.
  *
- * Every link in the navigation resolves to a real page, so a 404 in the logs
- * is always a genuine bug rather than a known gap. See
- * src/components/ui/UnderConstruction.tsx for the reasoning.
+ * The university list is loaded server-side because it is reference data every
+ * visitor may see. The upload itself is authorized in POST /api/notes, which
+ * re-checks the session and the `notes:sell` capability - this page's redirect
+ * is convenience, not the control.
  */
-export default function Page() {
-  return <StubPage titleKey="notes.upload.title" />;
+export default async function NewNotePage() {
+  const viewer = await getViewer();
+  if (!viewer) redirect('/login?next=/notes/new');
+
+  const universities = await db.university.findMany({
+    where: { isActive: true },
+    orderBy: { code: 'asc' },
+    select: { id: true, code: true },
+  });
+
+  return (
+    <main id="main" className="min-h-dvh bg-surface-muted">
+      <NoteUploadForm universities={universities} />
+    </main>
+  );
 }

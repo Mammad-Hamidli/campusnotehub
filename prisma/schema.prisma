@@ -246,8 +246,8 @@ model Faculty {
 }
 
 model User {
-  id    String @id @default(cuid())
-  email String @unique
+  id           String  @id @default(cuid())
+  email        String  @unique
   /// HMAC-SHA256(pepper, email). Survives account deletion so a banned address
   /// cannot be recycled without our retaining the address itself.
   emailHash    String  @unique
@@ -271,31 +271,67 @@ model User {
   role          UserRole      @default(STUDENT)
   accountStatus AccountStatus @default(ACTIVE)
 
+  // ---- Temporary freeze ---------------------------------------------------
+  // A freeze is AccountStatus.SUSPENDED plus an expiry. It is modelled as an
+  // expiry rather than as a new enum member because SUSPENDED already means
+  // exactly this ("temporary") in AccountStatus, and permissions.ts already
+  // routes SUSPENDED to the read-only capability set. Adding a FROZEN member
+  // would mean auditing every existing status comparison in the codebase for
+  // a case it had never seen.
+  //
+  // NULL frozenUntil with SUSPENDED = an indefinite suspension, which is the
+  // pre-existing behaviour and still reachable. A non-NULL value is what makes
+  // the freeze self-expiring: unfreezeIfElapsed() in src/lib/auth/freeze.ts
+  // lifts it on the next request, so an admin forgetting to unfreeze does not
+  // strand an account forever.
+  frozenUntil  DateTime?
+  frozenReason String?   @db.VarChar(1000)
+  frozenById   String?
+  frozenBy     User?     @relation("AccountFreezer", fields: [frozenById], references: [id], onDelete: SetNull)
+  frozenAt     DateTime?
+
   universityId String?
   university   University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
   facultyId    String?
   faculty      Faculty?    @relation(fields: [facultyId], references: [id], onDelete: SetNull)
 
+  // ---- Faculty as chosen at registration ---------------------------------
+  // The `faculty` relation above is scoped to ONE university and has never
+  // been populated - there is no seed for it and nothing writes facultyId.
+  // Registration needs a cross-institution catalogue ("Computer Science" means
+  // the same thing at every university), so the choice is stored as a stable
+  // catalogue slug from src/lib/faculties.ts instead of a per-university FK.
+  //
+  // The relation is deliberately left in place rather than dropped: it is the
+  // right model for a university publishing its OWN faculty list later, and
+  // removing it would be a destructive migration for zero benefit.
+  //
+  // facultyOther holds the typed value when the user picks "Other", and is
+  // meaningful ONLY then - a CHECK constraint in 0003 enforces the pairing so
+  // the two columns cannot drift into a state no reader expects.
+  facultySlug  String? @db.VarChar(64)
+  facultyOther String? @db.VarChar(120)
+
   // ---- Verification: FLAGS ONLY -------------------------------------------
   // This is the complete set of what survives a verification. There is no
   // document, no extracted name, no ID number, no image hash. A subject access
   // request against this table returns exactly what you see here.
-  verificationStatus VerificationStatus @default(UNVERIFIED)
-  isVerified         Boolean            @default(false)
-  verifiedAt         DateTime?
+  verificationStatus     VerificationStatus @default(UNVERIFIED)
+  isVerified             Boolean            @default(false)
+  verifiedAt             DateTime?
   /// Which document types the pipeline confirmed. Booleans, not content.
-  studentStatusConfirmed Boolean @default(false)
-  identityConfirmed      Boolean @default(false)
+  studentStatusConfirmed Boolean            @default(false)
+  identityConfirmed      Boolean            @default(false)
 
   // ---- Graduation lifecycle (drives the 1 May cron) -----------------------
   /// 1-12. Both fields must be set for the annual sweep to target the user.
-  graduationYear         Int?
-  graduationMonth        Int? @db.SmallInt
+  graduationYear       Int?
+  graduationMonth      Int?      @db.SmallInt
   /// Set when the user answers the alumni prompt, so the cron skips them.
-  alumniTransitionedAt   DateTime?
+  alumniTransitionedAt DateTime?
   /// Last time the annual sweep prompted this user; makes the job idempotent
   /// within a year without a separate task table.
-  graduationPromptedAt   DateTime?
+  graduationPromptedAt DateTime?
 
   // ---- Per-field privacy -------------------------------------------------
   // Defaults are the conservative reading of "share as little as possible
@@ -338,6 +374,11 @@ model User {
   moderationActions ModerationAction[]       @relation("Moderator")
   reviewedCases     VerificationCase[]       @relation("CaseModerator")
   auditLogs         AuditLog[]
+  frozenAccounts    User[]                   @relation("AccountFreezer")
+  conversations     ConversationMember[]
+  messagesSent      Message[]                @relation("MessageSender")
+  dismissedCases    VerificationCase[]       @relation("CaseDismisser")
+  mediaAssets       MediaAsset[]
 
   @@index([nickname])
   @@index([universityId, verificationStatus])
@@ -379,9 +420,9 @@ model Session {
 /// in about a minute with a fresh browser profile. It raises cost; it is not
 /// a wall. Its value is catching the lazy majority and correlating rings.
 model UserDevice {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String  @id @default(cuid())
+  userId      String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// HMAC of the combined client + TLS signal set.
   fingerprint String
   /// Coarse, non-identifying descriptor for the "your devices" screen:
@@ -412,27 +453,27 @@ model UserDevice {
 /// The images that produced this row lived in process memory for a few seconds
 /// and were overwritten before the HTTP response was sent.
 model VerificationCase {
-  id     String             @id @default(cuid())
-  userId String
-  user   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status VerificationStatus @default(PROCESSING)
+  id      String             @id @default(cuid())
+  userId  String
+  user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status  VerificationStatus @default(PROCESSING)
   /// 1-based; capped by VERIFICATION_MAX_ATTEMPTS.
-  attempt Int @default(1)
+  attempt Int                @default(1)
 
   submittedAt DateTime  @default(now())
   decidedAt   DateTime?
 
-  verdict FraudVerdict?
+  verdict          FraudVerdict?
   /// 0.000-1.000 confidence that the submission is genuine.
-  confidence Decimal? @db.Decimal(4, 3)
+  confidence       Decimal?      @db.Decimal(4, 3)
   /// Machine-readable reasons, e.g. ["SCREEN_RECAPTURE","NAME_MISMATCH"].
   /// Codes only. A code is a category, never a quoted value from the document.
-  failureCodes String[]
+  failureCodes     String[]
   /// Per-check numeric scores for moderator context and model monitoring,
   /// e.g. {"blur":0.82,"moire":0.13,"ela":0.44}. Numbers only - a CHECK
   /// constraint in 0002_zero_retention.sql rejects any string value, so this
   /// column cannot become a back door for retaining extracted text.
-  checkScores Json?
+  checkScores      Json?
   /// Locale key shown to the user. Generic for fraud outcomes.
   publicMessageKey String?
 
@@ -453,9 +494,25 @@ model VerificationCase {
   decidedByModerator   User?   @relation("CaseModerator", fields: [decidedByModeratorId], references: [id], onDelete: SetNull)
   moderatorNote        String? @db.VarChar(2000)
 
+  // ---- Queue housekeeping -------------------------------------------------
+  // "Clear this row off my screen", and nothing more.
+  //
+  // This is deliberately NOT a delete and NOT a status change. A decided case
+  // is the evidence that a decision was made, so the row, its verdict, its
+  // moderator and its audit trail all survive untouched; only the queue view
+  // filters on this column. Setting it on an UNDECIDED case is refused by the
+  // handler - dismissing work that was never done is how a queue silently
+  // loses people, which is the exact failure this column must not enable.
+  //
+  // Reversible: clearing it puts the row back in the list.
+  dismissedAt   DateTime?
+  dismissedById String?
+  dismissedBy   User?     @relation("CaseDismisser", fields: [dismissedById], references: [id], onDelete: SetNull)
+
   @@index([status, reviewPriority(sort: Desc), submittedAt])
   @@index([userId, attempt])
   @@index([reviewExpiresAt])
+  @@index([dismissedAt])
   @@map("verification_cases")
 }
 
@@ -470,10 +527,10 @@ model VerificationCase {
 /// Also note this table never references a verification case. Nothing about
 /// identity documents is ever deferred; that pipeline is synchronous by design.
 model ScheduledTask {
-  id      String   @id @default(cuid())
-  kind    String   @db.VarChar(48) // ESCROW_RELEASE | BOOKING_REMINDER_24H | BOOKING_REMINDER_1H
-  runAt   DateTime
-  payload Json?
+  id         String    @id @default(cuid())
+  kind       String    @db.VarChar(48) // ESCROW_RELEASE | BOOKING_REMINDER_24H | BOOKING_REMINDER_1H
+  runAt      DateTime
+  payload    Json?
   /// Prevents duplicate scheduling, e.g. "clear:order:<id>".
   dedupeKey  String    @unique
   executedAt DateTime?
@@ -486,20 +543,20 @@ model ScheduledTask {
 
 /// Ban list. Account-level and device-level only - see BlocklistType.
 model Blocklist {
-  id   String        @id @default(cuid())
-  type BlocklistType
+  id     String        @id @default(cuid())
+  type   BlocklistType
   /// Hashed for every PII type. Never a readable email, phone, or address.
   value  String
-  reason String @db.VarChar(500)
+  reason String        @db.VarChar(500)
 
   sourceCaseId String?
   createdById  String?
   /// NULL = permanent. Device blocks default to an expiry because a
   /// fingerprint can be inherited by a second-hand phone or a shared lab
   /// machine; account-identifier blocks are permanent.
-  expiresAt DateTime?
-  hitCount  Int       @default(0)
-  createdAt DateTime  @default(now())
+  expiresAt    DateTime?
+  hitCount     Int       @default(0)
+  createdAt    DateTime  @default(now())
 
   @@unique([type, value])
   @@index([type, expiresAt])
@@ -524,21 +581,50 @@ model ModerationAction {
 
 /// Append-only. The app role holds no UPDATE/DELETE grant.
 model AuditLog {
-  id         String   @id @default(cuid())
-  actorId    String?
-  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  action     String   @db.VarChar(64)
-  entityType String   @db.VarChar(32)
-  entityId   String?
-  /// Device, not IP. Nothing in this schema logs a network address.
+  id                String  @id @default(cuid())
+  actorId           String?
+  actor             User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action            String  @db.VarChar(64)
+  entityType        String  @db.VarChar(32)
+  entityId          String?
   deviceFingerprint String?
   userAgent         String? @db.VarChar(512)
-  before            Json?
-  after             Json?
-  createdAt         DateTime @default(now())
+
+  /// Client address of the ADMIN who took the action. See the note below.
+  ///
+  /// ---------------------------------------------------------------------
+  /// WHY AN IP COLUMN EXISTS HERE AND NOWHERE ELSE
+  /// ---------------------------------------------------------------------
+  /// The file header states "NO IP-BASED BANNING" and that rule is intact:
+  /// BlocklistType still has no IP member and 0002 still refuses one at the
+  /// database level. That rule exists because an IP identifies a NAT'd
+  /// dormitory, not a person, so punishing it is collective punishment.
+  ///
+  /// This column is the opposite case. It records the address of a STAFF
+  /// member exercising privilege over someone else's account, which is an
+  /// accountability record about a small, named, consenting set of operators -
+  /// not a sanction applied to a student. "Which admin deleted this account,
+  /// from where" is the question an audit log exists to answer.
+  ///
+  /// It is therefore written only by adminAudit() and only for admin actions,
+  /// never for ordinary user traffic, and nothing may join it to a blocklist.
+  /// VarChar(45) fits an IPv6 address in its longest textual form.
+  ip String? @db.VarChar(45)
+
+  /// SUCCESS | FAILURE | DENIED. Free-form so a handler can record an outcome
+  /// the enum author did not anticipate; NULL on the historical rows written
+  /// before this column existed, which is why readers must treat it as
+  /// optional rather than defaulting it to SUCCESS and inventing a fact.
+  result String? @db.VarChar(24)
+
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
 
   @@index([entityType, entityId, createdAt])
   @@index([actorId, createdAt])
+  @@index([createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
   @@map("audit_logs")
 }
 
@@ -728,15 +814,55 @@ model Note {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  orders  Order[]
-  reviews NoteReview[]
-  reports ContentReport[]
+  orders     Order[]
+  reviews    NoteReview[]
+  reports    ContentReport[]
+  /// The uploaded file itself. Separate table so listing notes never drags
+  /// megabytes of bytea through the query planner - see NoteAttachment.
+  attachment NoteAttachment?
 
   @@index([status, publishedAt(sort: Desc)])
   @@index([universityId, subject, status])
   @@index([sellerId, status])
   @@index([fileSha256])
   @@map("notes")
+}
+
+/// The uploaded study-note file.
+///
+/// WHY THE BYTES LIVE IN POSTGRES
+/// This is a deliberate deployment choice, not an oversight. The alternative -
+/// S3 via src/lib/storage/s3.ts - is already scaffolded but has no credentials
+/// configured, so nothing could be uploaded or read back locally.
+///
+/// The cost is real and worth stating: a 50 MB bytea row is 50 MB of database,
+/// it lands in every pg_dump, and it is read through the same connection pool
+/// as everything else. That is why this is its OWN TABLE rather than a column
+/// on notes: `SELECT ... FROM notes` for a listing never touches it, and
+/// Postgres TOASTs the column out of the main heap. Moving to object storage
+/// later means writing bytes to S3 and replacing this table with a key - the
+/// surrounding code already talks in terms of fileKey/sha256/sizeBytes.
+///
+/// NOT for identity documents. KYC material never reaches durable storage at
+/// all; see docs/SECURITY.md section 3 and src/lib/verification/reviewBuffer.ts.
+model NoteAttachment {
+  id     String @id @default(cuid())
+  noteId String @unique
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  /// Original name, for the download filename only. Never used as a path.
+  fileName  String @db.VarChar(255)
+  /// The MIME sniffed from the BYTES on the server, never the client's claim.
+  mime      String @db.VarChar(120)
+  sizeBytes Int
+  sha256    String @db.Char(64)
+
+  bytes Bytes
+
+  createdAt DateTime @default(now())
+
+  @@index([sha256])
+  @@map("note_attachments")
 }
 
 model Order {
@@ -926,8 +1052,14 @@ model Booking {
   menteeId String
   mentee   User          @relation("BookingMentee", fields: [menteeId], references: [id], onDelete: Restrict)
 
-  startsAt DateTime
-  endsAt   DateTime
+  /// Timestamptz, not Prisma's default `timestamp(3)`. The bookings_no_overlap
+  /// exclusion constraint in prisma/manual/0001_invariants.sql builds a
+  /// tstzrange over these two columns; over a timestamp WITHOUT time zone the
+  /// implicit cast is STABLE rather than IMMUTABLE, and Postgres refuses to
+  /// build the index. A slot is an instant, so timestamptz is also the correct
+  /// type on its own merits.
+  startsAt DateTime      @db.Timestamptz(3)
+  endsAt   DateTime      @db.Timestamptz(3)
   timezone String        @default("Asia/Baku")
   status   BookingStatus @default(REQUESTED)
 
@@ -1016,4 +1148,130 @@ model NotificationPreference {
 
   @@id([userId, type, channel])
   @@map("notification_preferences")
+}
+
+// =============================================================
+// DIRECT MESSAGES
+// =============================================================
+
+/// A conversation between exactly two accounts.
+///
+/// ---------------------------------------------------------------------------
+/// WHY `pairKey` EXISTS
+/// ---------------------------------------------------------------------------
+/// "Open the conversation with this person" must be idempotent: two people who
+/// both press Message at the same moment have to land in ONE thread, not two.
+/// Doing that with a query over the member table is a read-then-write race that
+/// loses under exactly the concurrency it needs to survive.
+///
+/// pairKey is the two user ids sorted and joined, so it is identical whichever
+/// side starts the thread, and it is UNIQUE - so the database itself resolves
+/// the race. The loser of the race gets a P2002 and reads the winner's row.
+///
+/// The sorting is what makes it symmetric; without it "a:b" and "b:a" would be
+/// two different keys and the constraint would protect nothing.
+model Conversation {
+  id      String @id @default(cuid())
+  /// `${min(idA,idB)}:${max(idA,idB)}`. See above.
+  pairKey String @unique @db.VarChar(64)
+
+  createdAt     DateTime @default(now())
+  /// Denormalised so the conversation LIST can sort without touching messages.
+  /// A list query that aggregates over every message in every thread is the
+  /// classic N+1 that makes an inbox slow at exactly the point it gets used.
+  lastMessageAt DateTime @default(now())
+
+  members  ConversationMember[]
+  messages Message[]
+
+  @@index([lastMessageAt(sort: Desc)])
+  @@map("conversations")
+}
+
+/// Membership, and the per-side read cursor.
+model ConversationMember {
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Everything created after this instant is unread for this member.
+  ///
+  /// A timestamp cursor rather than a per-message read flag: the unread count
+  /// is then one indexed COUNT against (conversationId, createdAt) instead of
+  /// a row per message per participant, and marking a thread read is one UPDATE
+  /// rather than a bulk write proportional to the backlog.
+  lastReadAt DateTime?
+  /// Lets a member hide a thread without destroying the other side's copy.
+  archivedAt DateTime?
+  joinedAt   DateTime  @default(now())
+
+  @@id([conversationId, userId])
+  @@index([userId, conversationId])
+  @@map("conversation_members")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  body      String    @db.VarChar(4000)
+  isDeleted Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  editedAt  DateTime?
+
+  /// Ascending: a thread is read oldest-first, and the unread COUNT uses the
+  /// same index from the other direction.
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+/// An uploaded image, stored in Postgres.
+///
+/// ---------------------------------------------------------------------------
+/// WHY POSTGRES AND NOT S3
+/// ---------------------------------------------------------------------------
+/// This follows the pattern NoteAttachment already establishes rather than
+/// inventing a second one. The S3 helpers exist (src/lib/storage/s3.ts) and the
+/// bucket names are configured, but there are no credentials in any
+/// environment here, so a direct-to-S3 flow would be a feature that cannot run.
+/// `storageKey` stays the logical locator the rest of the code talks in - today
+/// it addresses a row in this table as `db://media/<id>`; if this moves to S3
+/// it becomes an object key and nothing above it has to change. That is the
+/// same sentence written on Note.fileKey, deliberately.
+///
+/// Images are re-encoded to WebP on upload before they reach this table, which
+/// is what strips EXIF - including the GPS coordinates a phone camera writes
+/// into every photo. Storing the original bytes would publish the home address
+/// of anyone who posts a picture from their desk.
+model MediaAsset {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  /// Sniffed from the BYTES after re-encoding, never the client's claim.
+  mime      String  @db.VarChar(64)
+  width     Int
+  height    Int
+  sizeBytes Int
+  sha256    String  @db.Char(64)
+  /// Author-supplied description. Optional, capped, escaped at render.
+  altText   String? @db.VarChar(300)
+
+  bytes Bytes
+
+  /// Set when the asset is attached to a post. An asset that is still NULL
+  /// after the sweep window is an abandoned upload and is collectable - a user
+  /// who picks an image and then closes the tab must not leave a permanent
+  /// orphan blob.
+  attachedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([ownerId, createdAt])
+  @@index([attachedAt])
+  @@index([sha256])
+  @@map("media_assets")
 }

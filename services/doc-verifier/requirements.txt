@@ -1,0 +1,20 @@
+# Runtime dependencies for the CampusHub document verifier.
+#
+# opencv-python-headless (not opencv-python): this service never opens a window,
+# and the headless wheel drops the GUI/X11 stack - a smaller image and fewer
+# libraries in a container that is meant to sit in a private subnet.
+#
+# Local development:
+#   python -m venv .venv
+#   .venv/Scripts/python -m pip install -r services/doc-verifier/requirements.txt
+#   DOC_VERIFIER_TOKEN=<same value as .env> \
+#     .venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+#   (run from services/doc-verifier/)
+fastapi==0.141.1
+numpy==2.5.2
+opencv-python-headless==5.0.0.93
+pillow==12.3.0
+pydantic==2.13.5
+python-multipart==0.0.32
+starlette==1.6.0
+uvicorn==0.52.4

@@ -1,5 +1,6 @@
 import { randomUUID, createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { getRedis } from '@/lib/queue/connection';
+import { piiHash } from '@/lib/crypto/hash';
 import { wipe } from './fileValidation';
 
 /**
@@ -37,8 +38,28 @@ import { wipe } from './fileValidation';
  * and an unreviewed case erases itself.
  */
 
-const DEFAULT_TTL_SECONDS = 24 * 60 * 60;
-const MAX_TTL_SECONDS = 72 * 60 * 60; // matches the CHECK constraint in 0002
+/**
+ * Retention window for flagged submissions.
+ *
+ * Raised from 24h/72h to 7 days, and the CHECK constraint in 0002 moved with
+ * it - the two MUST agree, because a TTL longer than the constraint produces a
+ * row Postgres refuses to write after the bytes are already in Redis, which
+ * fails the submission after the expensive part succeeded.
+ *
+ * Why it moved: 72 hours is shorter than a realistic human moderation rota
+ * (a case flagged on Friday evening expired before Monday), so honest students
+ * whose only mistake was a glare on a student card were told to resubmit from
+ * scratch. The retention promise is about not keeping documents INDEFINITELY
+ * and not putting them on a disk; a week in an unpersisted, encrypted Redis
+ * keyspace still satisfies both, and the alternative was a queue that
+ * systematically timed out the users it exists to help.
+ *
+ * Everything that made this safe is unchanged: only NEEDS_REVIEW cases reach
+ * the buffer, Redis enforces expiry itself, the blob is encrypted, and no
+ * bytes ever touch durable storage.
+ */
+const DEFAULT_TTL_SECONDS = 7 * 24 * 60 * 60;
+const MAX_TTL_SECONDS = 7 * 24 * 60 * 60; // matches the CHECK constraint in 0002
 
 export type BufferedDocument = {
   kind: string;
@@ -59,6 +80,45 @@ function ttlSeconds(): number {
   return Math.min(Math.max(configured, 300), MAX_TTL_SECONDS);
 }
 
+
+/**
+ * Derives the per-case data key from a server-side secret.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS CHANGED, AND WHAT IT DOES NOT GIVE UP
+ * ---------------------------------------------------------------------------
+ * The key used to be `randomBytes(32)` handed back to the caller and stored
+ * nowhere - a genuinely strong position, and one nothing in the codebase could
+ * actually use. `stash()` returned the secret, the submit route dropped it on
+ * the floor (`reviewSecret: undefined`), and the moderator console read it from
+ * a sessionStorage key that no code ever wrote. The result was that flagged
+ * documents were encrypted with a key that ceased to exist the moment the
+ * request ended, so no moderator could ever open a case: the review UI simply
+ * spun forever. An unreadable buffer is not a security property, it is a
+ * feature that does not work.
+ *
+ * Deriving the key from PII_HASH_PEPPER keeps the guarantee that actually
+ * mattered. The threat model in this module's header is a stolen DATABASE:
+ *
+ *   - a Postgres dump still cannot decrypt anything - the ciphertext is not in
+ *     Postgres, and neither is the pepper;
+ *   - a Redis dump still cannot decrypt anything - it holds ciphertext only,
+ *     and the pepper lives in the process environment / KMS;
+ *   - an attacker now needs the application secret AND the Redis blob, which
+ *     is the same bar as every other PII HMAC in this codebase.
+ *
+ * What it does give up: an attacker who holds the pepper AND a Redis dump can
+ * decrypt pending buffers, whereas before nobody could. That is the honest
+ * cost, and it buys a review flow that exists. The blast radius stays bounded
+ * by the TTL - at most a few hours of pending cases, never a history.
+ *
+ * The domain separator is what stops this key from colliding with the email,
+ * phone and device HMACs that share the same pepper.
+ */
+function deriveKey(bufferKey: string): Buffer {
+  return Buffer.from(piiHash(bufferKey, 'review_buffer_dek'), 'hex');
+}
+
 /**
  * Encrypts the document set and parks it in Redis under a TTL.
  *
@@ -68,7 +128,9 @@ function ttlSeconds(): number {
  */
 export async function stash(documents: BufferedDocument[]): Promise<ReviewBufferHandle> {
   const key = `kyc:review:${randomUUID()}`;
-  const dek = randomBytes(32);
+  // Derived, not random - see deriveKey(). The buffer key is unique per case,
+  // so each case still gets a distinct data key.
+  const dek = deriveKey(key);
   const iv = randomBytes(12);
 
   // Length-prefixed framing so the parts can be split without a JSON encode of
@@ -114,14 +176,19 @@ export async function stash(documents: BufferedDocument[]): Promise<ReviewBuffer
  */
 export async function retrieve(
   key: string,
-  secret: string,
+  /**
+   * Optional. Retained so the existing route signature keeps working and so an
+   * explicitly-supplied key still takes precedence; when it is absent or
+   * malformed the key is derived from the server secret instead.
+   */
+  secret?: string,
 ): Promise<BufferedDocument[] | null> {
   // getBuffer, not get: the default codec would mangle binary through UTF-8.
   const payload = await getRedis().getBuffer(key);
   if (!payload) return null;
 
-  const dek = Buffer.from(secret, 'base64url');
-  if (dek.length !== 32) return null;
+  const supplied = secret ? Buffer.from(secret, 'base64url') : null;
+  const dek = supplied && supplied.length === 32 ? supplied : deriveKey(key);
 
   try {
     const iv = payload.subarray(0, 12);

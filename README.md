@@ -176,7 +176,7 @@ The database keeps flags (`isVerified`, `verifiedAt`), a confidence number, and
 category codes. See [docs/SECURITY.md §3](docs/SECURITY.md#3-zero-retention).
 
 The policy is **enforced by the database**, not by convention.
-[`0002_zero_retention.sql`](prisma/migrations/manual/0002_zero_retention.sql)
+[`0002_zero_retention.sql`](prisma/manual/0002_zero_retention.sql)
 adds a JSONB type check so score columns accept numbers only, a regex check so
 failure codes stay categories rather than quoted values, and a DDL event
 trigger that refuses any new column named like `%ocr%`, `%national_id%` or

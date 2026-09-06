@@ -112,6 +112,14 @@ export function Sidebar({
       label={t('a11y.userMenu')}
       align="start"
       width="w-56"
+      /**
+       * This trigger is the last element of a full-height sidebar, so the
+       * default downward panel opened below the viewport and the button looked
+       * dead. Stated explicitly rather than left to the auto heuristic,
+       * because this is the case the heuristic exists for and a reader should
+       * not have to infer it from the button's position.
+       */
+      placement="top"
       trigger={({ open, toggle, id }) => (
         <button
           type="button"
@@ -146,21 +154,24 @@ export function Sidebar({
     >
       {({ close }) => (
         <>
-          <MenuItem icon={<Settings className="h-4 w-4" />} onSelect={close}>
-            <Link href="/settings" className="block">
-              {t('nav.settings')}
-            </Link>
+          {/* Rows are links via `href` rather than a <Link> nested inside the
+              row's <button>. The nested form is invalid HTML and broke
+              cmd-click / middle-click, which on an account menu is exactly how
+              people open Settings in a new tab. */}
+          <MenuItem href="/profile" icon={<UserRoundSearch className="h-4 w-4" />} onSelect={close}>
+            {t('nav.profile')}
           </MenuItem>
-          <MenuItem icon={<UserRoundSearch className="h-4 w-4" />} onSelect={close}>
-            <Link href="/profile" className="block">
-              {t('nav.profile')}
-            </Link>
+          <MenuItem href="/settings" icon={<Settings className="h-4 w-4" />} onSelect={close}>
+            {t('nav.settings')}
           </MenuItem>
           <MenuSeparator />
-          <MenuItem icon={<LogOut className="h-4 w-4" />} onSelect={close}>
-            <Link href="/logout" className="block">
-              {t('nav.logout')}
-            </Link>
+          <MenuItem
+            href="/logout"
+            icon={<LogOut className="h-4 w-4" />}
+            onSelect={close}
+            tone="danger"
+          >
+            {t('nav.logout')}
           </MenuItem>
         </>
       )}

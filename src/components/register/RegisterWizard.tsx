@@ -224,6 +224,12 @@ export function RegisterWizard() {
           password: account.password,
           passwordConfirm: account.password,
           universityId: account.universityId,
+          facultySlug: account.facultySlug || undefined,
+          // Sent only for 'other'. The server clears it otherwise anyway, but
+          // sending a stale value would trip the schema's pairing refinement
+          // and turn a valid form into a 400.
+          facultyOther:
+            account.facultySlug === 'other' ? account.facultyOther.trim() || undefined : undefined,
           graduationYear: Number(account.graduationYear),
           graduationMonth: Number(account.graduationMonth),
           locale: document.documentElement.lang || 'az',

@@ -12,6 +12,7 @@ export type Capability =
   | 'mentors:offer'
   | 'wallet:topup'
   | 'wallet:withdraw'
+  | 'messages:send'
   | 'moderation:review';
 
 export type Viewer = {
@@ -19,6 +20,15 @@ export type Viewer = {
   role: UserRole;
   accountStatus: AccountStatus;
   verificationStatus: VerificationStatus;
+  /**
+   * Set while a temporary freeze is in force. Carried on the viewer so the UI
+   * can say WHEN access returns instead of only that it is gone - "frozen
+   * until Friday" is a support ticket avoided.
+   *
+   * Optional because several callers build a Viewer from a narrower select.
+   * It is never the authorisation input; accountStatus is. See can().
+   */
+  frozenUntil?: Date | null;
 };
 
 /**
@@ -38,7 +48,14 @@ const REQUIRES_VERIFICATION: ReadonlySet<Capability> = new Set([
   'wallet:withdraw',
 ]);
 
-/** Capabilities that survive even a suspended account (read-only escape hatch). */
+/**
+ * Capabilities that survive even a suspended (frozen) account.
+ *
+ * A freeze is a pause, not a ban, so it deliberately leaves a read-only
+ * escape hatch: the account can still sign in and read, which is what lets
+ * someone actually read the notice explaining why they were frozen and appeal
+ * it. Everything that writes, earns, spends, or reaches another person is off.
+ */
 const ALWAYS_ALLOWED: ReadonlySet<Capability> = new Set(['feed:read', 'notes:browse', 'mentors:browse']);
 
 export function can(viewer: Viewer | null, capability: Capability): boolean {
@@ -53,6 +70,12 @@ export function can(viewer: Viewer | null, capability: Capability): boolean {
 
   if (capability === 'moderation:review') {
     return viewer.role === UserRole.MODERATOR || viewer.role === UserRole.ADMIN;
+  }
+  // Messaging needs a live account but not a verified identity: a first-year
+  // asking a question is the point of the product. Frozen accounts are already
+  // excluded above, because 'messages:send' is not in ALWAYS_ALLOWED.
+  if (capability === 'messages:send') {
+    return true;
   }
   if (capability === 'mentors:offer') {
     return (

@@ -1,15 +1,13 @@
 import type { Metadata } from 'next';
-import { StubPage } from '@/components/ui/UnderConstruction';
+import { NotesList } from '@/components/notes/NotesList';
 
 export const metadata: Metadata = { title: 'UniNotes' };
 
-/**
- * Stub route. Returns 200 with an honest "not built yet" state.
- *
- * Every link in the navigation resolves to a real page, so a 404 in the logs
- * is always a genuine bug rather than a known gap. See
- * src/components/ui/UnderConstruction.tsx for the reasoning.
- */
-export default function Page() {
-  return <StubPage titleKey="notes.title" />;
+/** Replaces the previous StubPage. Every row comes from the database. */
+export default function NotesPage() {
+  return (
+    <main id="main" className="min-h-dvh bg-surface-muted">
+      <NotesList />
+    </main>
+  );
 }

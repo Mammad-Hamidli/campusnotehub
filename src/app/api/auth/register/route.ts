@@ -7,6 +7,8 @@ import { checkSignupBlocked, recordDevice } from '@/lib/security/blocklist';
 import { deviceLabel } from '@/lib/security/fingerprint';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { issueSession } from '@/lib/auth/session';
+import { sendEmailAsync } from '@/lib/email/send';
+import { FACULTY_OTHER, facultyLabel } from '@/lib/faculties';
 
 export const runtime = 'nodejs';
 
@@ -117,9 +119,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'verification.failure.generic' }, { status: 403 });
   }
 
+  // Looked up by `code`, which is what the form submits; `university.id` below
+  // is the cuid the relation actually stores.
   const university = await db.university.findFirst({
-    where: { id: input.universityId, isActive: true },
-    select: { id: true, emailDomains: true },
+    where: { code: input.universityId, isActive: true },
+    select: { id: true, code: true, nameEn: true, emailDomains: true },
   });
   if (!university) {
     return NextResponse.json({ error: 'errors.validationFailed' }, { status: 400 });
@@ -139,13 +143,26 @@ export async function POST(request: NextRequest) {
           locale: input.locale,
           universityId: university.id,
           facultyId: input.facultyId,
+          facultySlug: input.facultySlug,
+          // Cleared unless the choice was 'other', matching the CHECK
+          // constraint. Writing a stale value here would be a 500, not a bug
+          // the user could see and correct.
+          facultyOther: input.facultySlug === FACULTY_OTHER ? input.facultyOther : null,
           graduationYear: input.graduationYear,
           graduationMonth: input.graduationMonth,
           verificationStatus: VerificationStatus.UNVERIFIED,
           phone: input.phone,
           phoneHash: input.phone ? hashPhone(input.phone) : null,
         },
-        select: { id: true, email: true, role: true, locale: true, verificationStatus: true, accountStatus: true },
+        select: {
+          id: true,
+          email: true,
+          nickname: true,
+          role: true,
+          locale: true,
+          verificationStatus: true,
+          accountStatus: true,
+        },
       });
 
       // Wallet exists from minute one so a purchase never has to create it
@@ -181,6 +198,24 @@ export async function POST(request: NextRequest) {
       user,
       userAgent: request.headers.get('user-agent') ?? '',
       deviceId,
+    });
+
+    /**
+     * The welcome email, sent AFTER the transaction has committed.
+     *
+     * Fire-and-forget by design: sendEmail never throws and never rejects (see
+     * src/lib/email/send.ts), so a provider outage cannot turn a successful
+     * registration into a 500. Mailing from inside the transaction would be
+     * the classic version of this bug - the message goes out, the transaction
+     * then rolls back, and the user holds a welcome for an account that does
+     * not exist.
+     *
+     * The message contains no password and no credential of any kind.
+     */
+    sendEmailAsync(user.email, 'welcome', {
+      nickname: user.nickname,
+      university: university.nameEn,
+      faculty: facultyLabel(input.facultySlug ?? null, input.facultyOther ?? null),
     });
 
     // 201 with the next step spelled out, so the client does not have to

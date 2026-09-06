@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { AlertCircle, AtSign, Eye, EyeOff } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import type { AccountForm, FieldErrors } from './types';
+import { FacultySelect } from './FacultySelect';
 import { UNIVERSITIES as UNI_LIST } from '@/lib/universities';
 
 // Re-exported so existing imports keep working; the list itself now lives in
@@ -85,7 +86,7 @@ export function StepAccount({
             maxLength={24}
             value={value.nickname}
             onChange={(e) => onChange({ nickname: e.target.value.replace(/\s/g, '') })}
-            placeholder="aysel_m"
+            placeholder="nickname"
             className={`${inputClass(!!errors.nickname)} pl-8`}
           />
         </div>
@@ -210,6 +211,20 @@ export function StepAccount({
             ))}
           </select>
         </Field>
+
+        {/* Faculty sits beside university because the two are read together:
+            "ADA / Computer Science" is one fact about the student, and
+            splitting them across the form makes the second look optional. */}
+        <div className="sm:col-span-2">
+          <FacultySelect
+            value={value.facultySlug}
+            otherValue={value.facultyOther}
+            onChange={(facultySlug) => onChange({ facultySlug })}
+            onOtherChange={(facultyOther) => onChange({ facultyOther })}
+            error={errors.facultySlug && t(errors.facultySlug)}
+            otherError={errors.facultyOther && t(errors.facultyOther)}
+          />
+        </div>
 
         <Field
           id="gradYear"

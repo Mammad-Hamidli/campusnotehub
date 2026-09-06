@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { requireSession } from '@/lib/auth/session';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { isUserBlocked } from '@/lib/security/blocklist';
+import { sendEmailAsync } from '@/lib/email/send';
 import {
   MAX_UPLOAD_BYTES,
   MAX_TOTAL_BYTES,
@@ -89,6 +90,8 @@ export async function POST(request: NextRequest) {
       verificationStatus: true,
       accountStatus: true,
       fullName: true,
+      email: true,
+      nickname: true,
       university: { select: { code: true } },
     },
   });
@@ -188,6 +191,18 @@ export async function POST(request: NextRequest) {
         throw error;
       }
     }
+
+    /**
+     * "We have your documents" - sent for every outcome, including the ones
+     * decided in the same second.
+     *
+     * The message says the submission was received and that the documents are
+     * not stored, and deliberately does NOT state the verdict: an approval or
+     * a rejection gets its own email from the decision path, so announcing the
+     * result twice from two places would be the way those two messages
+     * eventually start disagreeing.
+     */
+    sendEmailAsync(user.email, 'verificationSubmitted', { nickname: user.nickname });
 
     return NextResponse.json(
       {

@@ -58,6 +58,14 @@ type CaseDetail = {
  *     a wrong approval is a later moderation ticket, a wrong ban costs a
  *     student their account and wallet balance with no self-service recovery.
  */
+/**
+ * Rows written before the de-duplication in decide() still carry repeated
+ * codes, so every render path that keys on a code has to collapse them.
+ */
+function uniqueCodes(codes: string[]): string[] {
+  return [...new Set(codes)];
+}
+
 export function ModerationConsole() {
   const t = useT();
   const [queue, setQueue] = useState<QueueItem[] | null>(null);
@@ -133,8 +141,17 @@ export function ModerationConsole() {
                     )}
                   </div>
 
+                  {/*
+                    De-duplicated before slicing. The code string is a stable,
+                    meaningful key once the list is a true set - appending an
+                    index instead would silence React while still rendering the
+                    same chip three times, which is the actual defect a reader
+                    of this queue would notice. Historic rows written before the
+                    fix in decide() still contain repeats, so this cannot rely
+                    on the source alone.
+                  */}
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    {item.codes.slice(0, 3).map((code) => (
+                    {uniqueCodes(item.codes).slice(0, 3).map((code) => (
                       <span
                         key={code}
                         className="rounded bg-surface-inset px-1.5 py-0.5 text-2xs font-medium text-fg-muted"
@@ -142,8 +159,10 @@ export function ModerationConsole() {
                         {code}
                       </span>
                     ))}
-                    {item.codes.length > 3 && (
-                      <span className="text-2xs text-fg-subtle">+{item.codes.length - 3}</span>
+                    {uniqueCodes(item.codes).length > 3 && (
+                      <span className="text-2xs text-fg-subtle">
+                        +{uniqueCodes(item.codes).length - 3}
+                      </span>
                     )}
                   </div>
 
@@ -197,17 +216,17 @@ function ReviewPanel({ caseId, onDecided }: { caseId: string; onDecided: () => v
     setConfirmingBan(false);
 
     /**
-     * The decryption secret is NOT in the queue payload - it never touches
-     * Postgres. In production it is handed to the moderator out of band (the
-     * queue entry in the ops channel carries it), which is what makes a
-     * database compromise insufficient to read pending review documents.
+     * No secret is sent. The data key is derived server-side from the
+     * application secret (deriveKey in reviewBuffer.ts).
      *
-     * For local development the secret is echoed by the dev seed; wire your
-     * real secret distribution here.
+     * This previously read `review-secret:${caseId}` out of sessionStorage,
+     * which NOTHING in the codebase ever wrote - the pipeline generated a
+     * secret, the submit route discarded it, and no distribution mechanism was
+     * ever built. So the value was always '', the API answered 400, and this
+     * panel sat on its spinner forever. That was the whole of the "verification
+     * images do not display" bug.
      */
-    const secret = sessionStorage.getItem(`review-secret:${caseId}`) ?? '';
-
-    void fetch(`/api/admin/verification/${caseId}?secret=${encodeURIComponent(secret)}`)
+    void fetch(`/api/admin/verification/${caseId}`)
       .then(async (res) => {
         if (res.status === 410) {
           setExpired(true);
@@ -237,10 +256,7 @@ function ReviewPanel({ caseId, onDecided }: { caseId: string; onDecided: () => v
       }),
     });
     setPending(null);
-    if (res.ok) {
-      sessionStorage.removeItem(`review-secret:${caseId}`);
-      onDecided();
-    }
+    if (res.ok) onDecided();
   }
 
   if (expired) {
@@ -306,7 +322,7 @@ function ReviewPanel({ caseId, onDecided }: { caseId: string; onDecided: () => v
             {t('admin.review.signals')}
           </h3>
           <ul className="flex flex-wrap gap-1.5">
-            {detail.case.failureCodes.map((code) => (
+            {uniqueCodes(detail.case.failureCodes).map((code) => (
               <li
                 key={code}
                 className="rounded-md bg-warn-soft px-2 py-1 text-xs font-medium text-warn-fg"

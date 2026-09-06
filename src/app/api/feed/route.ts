@@ -2,9 +2,11 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { Prisma, PostVisibility } from '@prisma/client';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { getViewer, requireSession } from '@/lib/auth/session';
-import { assertCan } from '@/lib/permissions';
+import { getViewer, requireSession, UnauthorizedError } from '@/lib/auth/session';
+import { can, ForbiddenError } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
+import { POST_INCLUDE, serializePost } from '@/lib/feed/serialize';
+import { mediaIdFromKey } from '@/lib/media/images';
 
 export const runtime = 'nodejs';
 
@@ -98,15 +100,11 @@ export async function GET(request: NextRequest) {
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1, // one extra row tells us whether another page exists
     include: {
-      author: {
-        select: {
-          id: true, fullName: true, avatarUrl: true, role: true,
-          isVerified: true, headline: true,
-          university: { select: { code: true, nameAz: true, nameEn: true, nameRu: true } },
-        },
-      },
-      media: { orderBy: { position: 'asc' } },
-      tags: { include: { tag: { select: { slug: true, label: true } } } },
+      ...POST_INCLUDE,
+      // Reposts are counted, not listed: the client shows a number, and
+      // loading the rows to call .length on them would pull every repost of
+      // every post on the page.
+      _count: { select: { reposts: true } },
       ...(viewer ? { likes: { where: { userId: viewer.id }, select: { userId: true } } } : {}),
     },
   });
@@ -115,14 +113,16 @@ export async function GET(request: NextRequest) {
   const page = hasMore ? posts.slice(0, limit) : posts;
   const last = page.at(-1);
 
-  return NextResponse.json({
-    posts: page.map((p) => ({
-      ...p,
-      likedByViewer: 'likes' in p ? (p.likes as unknown[]).length > 0 : false,
-      likes: undefined,
-    })),
-    nextCursor: hasMore && last ? `${last.createdAt.toISOString()}_${last.id}` : null,
-  });
+  return NextResponse.json(
+    {
+      // One serialiser for both routes - see src/lib/feed/serialize.ts for why
+      // hand-spreading the row here was the source of the `tags is undefined`
+      // crash on newly created posts.
+      posts: page.map((p) => serializePost(p, { viewerId: viewer?.id, shareCount: p._count.reposts })),
+      nextCursor: hasMore && last ? `${last.createdAt.toISOString()}_${last.id}` : null,
+    },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
 }
 
 const createSchema = z.object({
@@ -130,16 +130,57 @@ const createSchema = z.object({
   visibility: z.nativeEnum(PostVisibility).default(PostVisibility.PUBLIC),
   universityId: z.string().cuid().optional(),
   tags: z.array(z.string().regex(/^[\p{L}\p{N}_]{2,40}$/u)).max(5).default([]),
+  /**
+   * Images, as keys returned by POST /api/media.
+   *
+   * The client sends only a KEY - never bytes, never a URL it chose. The
+   * dimensions it sends are ignored in favour of the ones recorded when the
+   * asset was processed, because a client that can set width/height can set
+   * them to values that break every layout on the page.
+   */
   media: z
-    .array(z.object({ storageKey: z.string(), width: z.number().int(), height: z.number().int(), altText: z.string().max(300).optional() }))
+    .array(
+      z.object({
+        storageKey: z.string().max(200),
+        width: z.number().int().optional(),
+        height: z.number().int().optional(),
+        altText: z.string().max(300).optional(),
+      }),
+    )
     .max(4)
     .default([]),
 });
 
 /** POST /api/feed - unverified users may post; only earning is gated. */
 export async function POST(request: NextRequest) {
-  const { userId, viewer } = await requireSession(request);
-  assertCan(viewer, 'feed:post');
+  let userId: string;
+  let viewer;
+  try {
+    ({ userId, viewer } = await requireSession(request));
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
+    }
+    throw error;
+  }
+
+  /**
+   * `can`, not `assertCan`.
+   *
+   * assertCan THROWS a ForbiddenError, and nothing in this handler caught it -
+   * so a frozen account trying to post got a 500 with a stack trace instead of
+   * a clean 403 with a message it could act on. The capability table is
+   * unchanged; only the way the answer is delivered is.
+   *
+   * This is the check that stops a frozen or suspended account from posting:
+   * 'feed:post' is absent from ALWAYS_ALLOWED, so a SUSPENDED viewer fails it.
+   */
+  if (!can(viewer, 'feed:post')) {
+    return NextResponse.json(
+      { error: new ForbiddenError('feed:post').messageKey },
+      { status: 403 },
+    );
+  }
 
   const rate = await rateLimit('feed:post', { userId, ip: clientIp(request.headers) });
   if (!rate.ok) {
@@ -162,6 +203,55 @@ export async function POST(request: NextRequest) {
     select: { universityId: true },
   });
 
+  /**
+   * The tags are attached INSIDE the transaction, then the finished row is
+   * re-read with the shared include before returning.
+   *
+   * Re-reading is deliberate. The `create` cannot include relations that its
+   * own subsequent statements are still writing, so its result would carry an
+   * empty tag list even for a post that has tags - which is a subtler version
+   * of the bug this change fixes. One extra indexed read by primary key is a
+   * fair price for the response being the truth about what was stored.
+   */
+  /**
+   * Every referenced asset must exist, belong to THIS user, and not already be
+   * attached to another post.
+   *
+   * All three matter and none can be skipped:
+   *  - existence, or a post carries a key that 404s as a broken image;
+   *  - ownership, or anyone can attach a stranger's image to their own post
+   *    simply by quoting its key, which is both theft and a way to put someone
+   *    else's photo under text they never wrote;
+   *  - unattached, so one upload cannot be fanned out across many posts and a
+   *    later deletion has one place to clean up.
+   *
+   * The dimensions come from the ASSET, not from the request body.
+   */
+  const requestedIds = input.media
+    .map((m) => mediaIdFromKey(m.storageKey))
+    .filter((id): id is string => id !== null);
+
+  if (requestedIds.length !== input.media.length) {
+    return NextResponse.json({ error: 'feed.image.errors.invalidKey' }, { status: 400 });
+  }
+
+  const assets = requestedIds.length
+    ? await db.mediaAsset.findMany({
+        where: { id: { in: requestedIds }, ownerId: userId, attachedAt: null },
+        select: { id: true, mime: true, width: true, height: true, altText: true },
+      })
+    : [];
+
+  if (assets.length !== requestedIds.length) {
+    // Deliberately one message for "no such asset", "not yours" and "already
+    // used". Distinguishing them tells a caller which keys exist.
+    return NextResponse.json({ error: 'feed.image.errors.invalidKey' }, { status: 400 });
+  }
+
+  // Preserve the order the user arranged them in, which findMany does not.
+  const assetById = new Map(assets.map((a) => [a.id, a]));
+  const orderedAssets = requestedIds.map((id) => assetById.get(id)!);
+
   const post = await db.$transaction(async (tx) => {
     const created = await tx.post.create({
       data: {
@@ -170,10 +260,36 @@ export async function POST(request: NextRequest) {
         visibility: input.visibility,
         universityId:
           input.visibility === PostVisibility.UNIVERSITY_ONLY ? author.universityId : null,
-        media: { createMany: { data: input.media.map((m, i) => ({ ...m, mimeType: 'image/webp', position: i })) } },
+        media: {
+          createMany: {
+            data: orderedAssets.map((asset, i) => ({
+              storageKey: `db://media/${asset.id}`,
+              // The encoder's own values, not the client's claim.
+              mimeType: asset.mime,
+              width: asset.width,
+              height: asset.height,
+              altText: input.media[i]?.altText ?? asset.altText,
+              position: i,
+            })),
+          },
+        },
       },
-      include: { author: { select: { id: true, fullName: true, avatarUrl: true, isVerified: true } } },
+      select: { id: true },
     });
+
+    /**
+     * Claim the assets in the SAME transaction.
+     *
+     * Marking them attached afterwards would leave a window where a second
+     * request could attach the same asset to a second post, and a rolled-back
+     * post would strand assets marked as used.
+     */
+    if (orderedAssets.length > 0) {
+      await tx.mediaAsset.updateMany({
+        where: { id: { in: orderedAssets.map((a) => a.id) } },
+        data: { attachedAt: new Date() },
+      });
+    }
 
     for (const raw of input.tags) {
       const slug = raw.toLocaleLowerCase('az');
@@ -187,8 +303,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return created;
+    return tx.post.findUniqueOrThrow({
+      where: { id: created.id },
+      include: POST_INCLUDE,
+    });
   });
 
-  return NextResponse.json({ post }, { status: 201 });
+  /**
+   * Serialised through the SAME function the feed listing uses, so a created
+   * post and a listed post are indistinguishable to the client: `tags` and
+   * `media` are always arrays, the author always carries a nickname, and
+   * shareCount is 0 rather than undefined. A brand-new post has no reposts,
+   * hence the literal.
+   */
+  return NextResponse.json(
+    { post: serializePost(post, { viewerId: userId, shareCount: 0 }) },
+    { status: 201, headers: { 'Cache-Control': 'no-store' } },
+  );
 }

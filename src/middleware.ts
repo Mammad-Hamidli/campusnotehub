@@ -11,11 +11,44 @@ import { jwtVerify, importSPKI } from 'jose';
 
 /** Routes that require a session. */
 const PROTECTED = [
-  /^\/(dashboard|wallet|settings|notifications)/,
+  /^\/(dashboard|wallet|settings|notifications|messages|profile|bookmarks)/,
   /^\/notes\/(new|purchases)/,
-  // Role is re-checked against live DB state in every /api/admin handler; the
-  // middleware only guarantees "signed in", because it has no DB access.
+  /^\/mentors\/apply/,
+  // Role is re-checked against live DB state in the /admin layout and in every
+  // /api/admin handler; the middleware only guarantees "signed in", because it
+  // has no DB access.
   /^\/admin/,
+];
+
+/**
+ * Routes whose HTML must never be reusable by the browser.
+ *
+ * ---------------------------------------------------------------------------
+ * THIS IS THE FIX FOR "LOG OUT, PRESS BACK, THE ADMIN PANEL IS STILL THERE"
+ * ---------------------------------------------------------------------------
+ * The server-side authorization was never the problem: the /admin layout
+ * checks the role against live database state, and every /api/admin handler
+ * re-checks independently. The problem was that pressing Back does not
+ * necessarily make a request AT ALL.
+ *
+ * Browsers keep a back/forward cache (bfcache) - a snapshot of the fully
+ * rendered, still-alive page. Restoring from it runs no server code, so a
+ * panel rendered while signed in is re-displayed verbatim after signing out,
+ * with the real account data still painted on it. No amount of route
+ * protection can intercept that, because nothing is being routed.
+ *
+ * `Cache-Control: no-store` is the documented way out: Chrome and Firefox both
+ * refuse to bfcache a document served with it, and it simultaneously stops the
+ * ordinary disk cache from re-serving the HTML. So Back becomes a real
+ * request, which reaches the layout, which finds no session and redirects.
+ *
+ * It is applied to every authenticated route rather than only /admin, because
+ * a student's dashboard restored on a shared library machine after sign-out is
+ * the same disclosure with a smaller blast radius.
+ */
+const NO_STORE = [
+  /^\/(admin|dashboard|wallet|settings|notifications|messages|profile|bookmarks)/,
+  /^\/notes\/(new|purchases)/,
 ];
 /** Routes a signed-in user should be bounced away from. */
 const GUEST_ONLY = [/^\/(login|register)$/];
@@ -147,14 +180,28 @@ export async function middleware(request: NextRequest) {
   const devBypass =
     process.env.NODE_ENV !== 'production' && process.env.CAMPUSHUB_DEV_BYPASS_AUTH === '1';
 
+  /**
+   * Applied to the redirect responses as well as the rendered page, because a
+   * redirect is itself cacheable and a cached 307 to /dashboard would be just
+   * as wrong once the session state changed.
+   */
+  const noStore = NO_STORE.some((r) => r.test(pathname));
+  const harden = (res: NextResponse) => {
+    if (!noStore) return res;
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.headers.set('Pragma', 'no-cache');
+    res.headers.set('Expires', '0');
+    return res;
+  };
+
   if (!session && !devBypass && PROTECTED.some((r) => r.test(pathname))) {
     const url = new URL('/login', request.url);
     url.searchParams.set('next', pathname);
-    return NextResponse.redirect(url);
+    return harden(NextResponse.redirect(url));
   }
 
   if (session && GUEST_ONLY.some((r) => r.test(pathname))) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return harden(NextResponse.redirect(new URL('/dashboard', request.url)));
   }
 
   // Belt and braces alongside the server-side check: a stolen token must not
@@ -165,10 +212,10 @@ export async function middleware(request: NextRequest) {
     const redirect = NextResponse.redirect(url);
     redirect.cookies.delete('CH_AT');
     redirect.cookies.delete('CH_RT');
-    return redirect;
+    return harden(redirect);
   }
 
-  return response;
+  return harden(response);
 }
 
 export const config = {

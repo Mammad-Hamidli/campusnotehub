@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { UserRole, VerificationStatus } from '@prisma/client';
+import { VerificationStatus } from '@prisma/client';
 import { db } from '@/lib/db';
-import { requireSession } from '@/lib/auth/session';
+import { withAdmin } from '@/lib/auth/admin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,63 +19,60 @@ export const dynamic = 'force-dynamic';
  * an individual case (which writes an audit row) to see anything sensitive.
  */
 export async function GET(request: NextRequest) {
-  const { viewer } = await requireSession(request);
-  if (viewer.role !== UserRole.MODERATOR && viewer.role !== UserRole.ADMIN) {
-    return NextResponse.json({ error: 'errors.forbidden' }, { status: 403 });
-  }
-
-  const cases = await db.verificationCase.findMany({
-    where: {
-      status: VerificationStatus.NEEDS_REVIEW,
-      reviewBufferKey: { not: null },
-      // Cases whose buffer already lapsed are not reviewable; the scheduler
-      // closes them out. Showing them would only produce dead clicks.
-      reviewExpiresAt: { gt: new Date() },
-    },
-    orderBy: [{ reviewPriority: 'desc' }, { submittedAt: 'asc' }],
-    take: 50,
-    select: {
-      id: true,
-      submittedAt: true,
-      reviewExpiresAt: true,
-      reviewPriority: true,
-      confidence: true,
-      failureCodes: true,
-      verdict: true,
-      attempt: true,
-      user: {
-        select: {
-          id: true,
-          fullName: true,
-          createdAt: true,
-          university: { select: { code: true } },
+  return withAdmin(request, 'MODERATOR', async () => {
+    const cases = await db.verificationCase.findMany({
+      where: {
+        status: VerificationStatus.NEEDS_REVIEW,
+        reviewBufferKey: { not: null },
+        // Cases whose buffer already lapsed are not reviewable; the scheduler
+        // closes them out. Showing them would only produce dead clicks.
+        reviewExpiresAt: { gt: new Date() },
+      },
+      orderBy: [{ reviewPriority: 'desc' }, { submittedAt: 'asc' }],
+      take: 50,
+      select: {
+        id: true,
+        submittedAt: true,
+        reviewExpiresAt: true,
+        reviewPriority: true,
+        confidence: true,
+        failureCodes: true,
+        verdict: true,
+        attempt: true,
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            createdAt: true,
+            university: { select: { code: true } },
+          },
         },
       },
-    },
-  });
+    });
 
-  return NextResponse.json(
-    {
-      cases: cases.map((c) => ({
-        id: c.id,
-        submittedAt: c.submittedAt,
-        expiresAt: c.reviewExpiresAt,
-        minutesLeft: c.reviewExpiresAt
-          ? Math.max(0, Math.round((c.reviewExpiresAt.getTime() - Date.now()) / 60_000))
-          : 0,
-        priority: c.reviewPriority,
-        confidence: c.confidence ? Number(c.confidence) : null,
-        codes: c.failureCodes,
-        verdict: c.verdict,
-        attempt: c.attempt,
-        applicant: {
-          id: c.user.id,
-          fullName: c.user.fullName,
-          memberSince: c.user.createdAt,
-          university: c.user.university?.code ?? null,
-        },
-      })),
-    },
-    { headers: { 'Cache-Control': 'no-store' } },
-  );
+    return NextResponse.json(
+      {
+        cases: cases.map((c) => ({
+          id: c.id,
+          submittedAt: c.submittedAt,
+          expiresAt: c.reviewExpiresAt,
+          minutesLeft: c.reviewExpiresAt
+            ? Math.max(0, Math.round((c.reviewExpiresAt.getTime() - Date.now()) / 60_000))
+            : 0,
+          priority: c.reviewPriority,
+          confidence: c.confidence ? Number(c.confidence) : null,
+          codes: c.failureCodes,
+          verdict: c.verdict,
+          attempt: c.attempt,
+          applicant: {
+            id: c.user.id,
+            fullName: c.user.fullName,
+            memberSince: c.user.createdAt,
+            university: c.user.university?.code ?? null,
+          },
+        })),
+      },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  });
 }
