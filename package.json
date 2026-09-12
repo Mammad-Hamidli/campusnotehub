@@ -27,14 +27,13 @@
   },
   "dependencies": {
     "argon2": "^0.41.1",
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
     "cloudinary": "^2.11.0",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "exceljs": "^4.4.0",
     "firebase": "^12.18.0",
     "firebase-admin": "^14.3.0",
-    "jose": "^5.9.6",
     "lucide-react": "^0.469.0",
     "next": "^15.1.0",
     "nodemailer": "^10.0.0",
@@ -64,6 +63,11 @@
     "vitest": "^2.1.8"
   },
   "overrides": {
-      "jose": "^5.9.6"
+    "jose": "4.15.9",
+    "jwks-rsa": "^3.1.0"
+  },
+  "resolutions": {
+    "jose": "4.15.9",
+    "jwks-rsa": "^3.1.0"
   }
 }
