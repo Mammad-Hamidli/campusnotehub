@@ -11,9 +11,21 @@ import { jwtVerify, importSPKI } from 'jose';
 
 /** Routes that require a session. */
 const PROTECTED = [
-  /^\/(dashboard|wallet|settings|notifications|messages|profile|bookmarks)/,
+  /^\/(dashboard|wallet|settings|notifications|profile|bookmarks|bookings|verify)/,
   /^\/notes\/(new|purchases)/,
-  /^\/mentors\/apply/,
+  /**
+   * /mentors/apply is deliberately NOT here.
+   *
+   * It used to be, and that is what made "apply as a mentor" impossible for
+   * anyone without an account: a signed-out visitor clicking "Become a mentor"
+   * was bounced to /api/auth/refresh and on to /login, which offers no way to
+   * create the mentor account they came for. The page now renders its own
+   * signed-out state pointing at /register?type=MENTOR.
+   *
+   * This removes NO authorization. Submitting an application is POST
+   * /api/mentors/apply, which independently requires a session, an active
+   * account and a VERIFIED identity - the middleware never was the control.
+   */
   // Role is re-checked against live DB state in the /admin layout and in every
   // /api/admin handler; the middleware only guarantees "signed in", because it
   // has no DB access.
@@ -47,11 +59,50 @@ const PROTECTED = [
  * the same disclosure with a smaller blast radius.
  */
 const NO_STORE = [
-  /^\/(admin|dashboard|wallet|settings|notifications|messages|profile|bookmarks)/,
+  /^\/(admin|dashboard|wallet|settings|notifications|profile|bookmarks|bookings|verify)/,
   /^\/notes\/(new|purchases)/,
+  /**
+   * The auth screens are here too, and that is not cosmetic.
+   *
+   * /login decides whether to show the form or send an already-signed-in user
+   * on to their dashboard, so its response depends entirely on session state -
+   * exactly the thing that must never be served from a cache. A stored copy of
+   * either answer is wrong for the other visitor, and a stored REDIRECT is
+   * worse: it sends someone who just signed out straight back to a signed-in
+   * route without ever asking the server.
+   */
+  /^\/(login|register)$/,
+  /^\/logout$/,
 ];
-/** Routes a signed-in user should be bounced away from. */
-const GUEST_ONLY = [/^\/(login|register)$/];
+
+/**
+ * Expires every auth cookie on a response.
+ *
+ * Deliberately a local copy of clearSessionCookies() rather than an import of
+ * it: this file runs on the edge runtime, and src/lib/auth/session.ts pulls in
+ * firebase-admin, which cannot be bundled there. The duplication is four cookie
+ * names; importing the real one would not compile.
+ */
+function clearAuthCookies(response: NextResponse): NextResponse {
+  const expire = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge: 0,
+    expires: new Date(0),
+  };
+  response.cookies.set('CH_AT', '', { ...expire, path: '/' });
+  response.cookies.set('CH_RT', '', { ...expire, path: '/api/auth' });
+  response.cookies.set('CH_RF', '', { ...expire, path: '/' });
+  // Raw header, because cookies.set() keys by name and would REPLACE the
+  // /api/auth expiry above rather than add to it - see clearSessionCookies().
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  response.headers.append(
+    'set-cookie',
+    `CH_RT=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax${secure}`,
+  );
+  return response;
+}
 
 let publicKeyPromise: Promise<CryptoKey> | null = null;
 const getPublicKey = () => {
@@ -195,23 +246,60 @@ export async function middleware(request: NextRequest) {
   };
 
   if (!session && !devBypass && PROTECTED.some((r) => r.test(pathname))) {
+    /**
+     * No valid access token. It may simply have expired (its cookie lives as
+     * long as the 15-minute token), and the 30-day refresh token is scoped to
+     * /api/auth so this middleware cannot see it. Hand the navigation to the
+     * refresh route, which can: it comes back here with fresh cookies or goes
+     * on to /login. CH_RF, set for a few seconds after a successful refresh,
+     * breaks any loop if a fresh token still fails verification here.
+     */
+    if (process.env.JWT_PUBLIC_KEY_PEM && !request.cookies.get('CH_RF')) {
+      const url = new URL('/api/auth/refresh', request.url);
+      url.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
+      return harden(NextResponse.redirect(url));
+    }
     const url = new URL('/login', request.url);
     url.searchParams.set('next', pathname);
     return harden(NextResponse.redirect(url));
   }
 
-  if (session && GUEST_ONLY.some((r) => r.test(pathname))) {
-    return harden(NextResponse.redirect(new URL('/dashboard', request.url)));
-  }
+  /**
+   * -------------------------------------------------------------------------
+   * WHY /login IS NO LONGER REDIRECTED AWAY FROM HERE
+   * -------------------------------------------------------------------------
+   * This used to bounce any request for /login or /register to /dashboard
+   * whenever `session` was non-null - and `session` here means nothing more
+   * than "the CH_AT cookie holds a signature we minted that has not expired
+   * yet". The edge has no database, so it cannot see `revokedAt`.
+   *
+   * That is what made signing out look undone. Logging out revokes the row and
+   * clears the cookies, but any browser still holding a copy of CH_AT - a
+   * restored tab, a synced profile, a second window, a token inside its TTL -
+   * would ask for /login and be sent to /dashboard without one credential
+   * being checked against live data. From the user's side that is precisely
+   * "I opened the login page and it logged me straight back in".
+   *
+   * The bounce itself is worth keeping, so it moved to the login page, which
+   * runs in Node with database access and calls getViewer(): a genuinely live
+   * session is still forwarded, a revoked one is sent through /logout to have
+   * its cookies cleared, and everyone else gets the form. Same behaviour when
+   * the session is real, correct behaviour when it is not.
+   */
 
   // Belt and braces alongside the server-side check: a stolen token must not
   // outlive the ban that revoked its session.
   if (session?.ver === 'BANNED') {
     const url = new URL('/login', request.url);
     url.searchParams.set('reason', 'suspended');
-    const redirect = NextResponse.redirect(url);
-    redirect.cookies.delete('CH_AT');
-    redirect.cookies.delete('CH_RT');
+    /**
+     * `cookies.delete(name)` expires the cookie at path `/`, which matches
+     * CH_AT but NOT CH_RT - that one is stored at /api/auth, so the delete
+     * above it was a no-op and left the banned account holding a live refresh
+     * token it could spend at /api/auth/refresh. Expired explicitly at the
+     * path it was actually written to.
+     */
+    const redirect = clearAuthCookies(NextResponse.redirect(url));
     return harden(redirect);
   }
 

@@ -1,5 +1,25 @@
-import { BlocklistType, type Prisma } from '@prisma/client';
-import { db } from '@/lib/db';
+import { BlocklistType } from '@/lib/enums';
+import { adminDb } from '@/lib/firebase/admin.core';
+import { COLLECTIONS } from '@/lib/firebase/collections';
+import { docsToObjects, forFirestore } from '@/lib/firebase/convert';
+import { findUsersByIds } from '@/lib/firebase/repositories/users';
+import { upsertDevice, listUserDevices, revokeUserSessions } from '@/lib/firebase/repositories/sessions';
+import { getCredentials } from '@/lib/firebase/repositories/users';
+import { FieldValue } from 'firebase-admin/firestore';
+
+/**
+ * `type` + `value` was a UNIQUE pair in SQL, so it becomes the document id.
+ *
+ * That turns every blocklist check into a direct read instead of a query, and
+ * makes a repeated ban idempotent for free. The value is hashed for every PII
+ * type before it reaches here, so the id encodes no readable identifier - but
+ * it is still encoded, because a raw HMAC can contain characters Firestore
+ * forbids in a document id (notably '/').
+ */
+function blocklistDoc(type: string, value: string) {
+  const id = `${type}__${Buffer.from(value).toString('base64url')}`;
+  return adminDb().collection(COLLECTIONS.blocklist).doc(id);
+}
 import { hashEmail, hashPhone, piiHash } from '@/lib/crypto/hash';
 
 /**
@@ -52,7 +72,7 @@ export async function checkSignupBlocked(input: {
   phone?: string;
   deviceFingerprint?: string;
 }): Promise<BlockCheck> {
-  const candidates: Prisma.BlocklistWhereInput[] = [
+  const candidates: { type: BlocklistType; value: string }[] = [
     { type: BlocklistType.EMAIL_HASH, value: hashEmail(input.email) },
   ];
 
@@ -66,26 +86,47 @@ export async function checkSignupBlocked(input: {
     });
   }
 
-  const hit = await db.blocklist.findFirst({
-    where: {
-      // Two independent conditions: the identifier matches one of ours AND the
-      // block is still live. Nesting the expiry under its own AND keeps it from
-      // being swallowed into the identifier OR, which would match every
-      // unexpired row in the table.
-      AND: [
-        { OR: candidates },
-        { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
-      ],
-    },
-    select: { id: true, type: true },
-  });
+  /**
+   * One lookup per candidate, by DETERMINISTIC DOCUMENT ID.
+   *
+   * The SQL version was a single query with an OR over the candidate list.
+   * Firestore has no OR across different field values, but it does not need
+   * one here: `type` + `value` was already a UNIQUE pair, so it becomes the
+   * document id and each check is a direct read rather than a query. That is
+   * strictly cheaper than the OR it replaces.
+   *
+   * The expiry is evaluated after the read, not in the query, because a null
+   * expiry means "permanent" and Firestore cannot express "null OR greater
+   * than now" in one filter.
+   */
+  const now = new Date();
+  const refs = candidates.map((c) => blocklistDoc(c.type, c.value));
+  const snaps = await adminDb().getAll(...refs);
+
+  type BlockRow = { id: string; type: BlocklistType; expiresAt?: { toDate(): Date } | Date | null };
+
+  const hit = snaps
+    .map((snap) =>
+      snap.exists
+        ? ({ id: snap.id, ...(snap.data() as Record<string, unknown>) } as unknown as BlockRow)
+        : null,
+    )
+    .find((row): row is BlockRow => {
+      if (!row) return false;
+      const expiresAt = row.expiresAt;
+      if (!expiresAt) return true; // permanent
+      const asDate = expiresAt instanceof Date ? expiresAt : expiresAt.toDate();
+      return asDate > now;
+    });
 
   if (!hit) return { blocked: false };
 
   // Hit counts drive the false-positive review dashboard: a device block with
   // 40 hits is almost certainly a shared lab machine and should be lifted.
-  void db.blocklist
-    .update({ where: { id: hit.id }, data: { hitCount: { increment: 1 } } })
+  void adminDb()
+    .collection(COLLECTIONS.blocklist)
+    .doc(hit.id)
+    .update({ hitCount: FieldValue.increment(1) })
     .catch(() => {});
 
   return { blocked: true, matchedType: hit.type };
@@ -96,65 +137,83 @@ export async function checkSignupBlocked(input: {
  * see the note on `decide()` in src/lib/verification/policy.ts.
  */
 export async function applyBan(params: {
-  tx?: Prisma.TransactionClient;
   userId: string;
   moderatorId: string;
   reason: string;
   sourceCaseId?: string;
 }): Promise<void> {
-  const client = params.tx ?? db;
+  /**
+   * A BATCH, not a transaction.
+   *
+   * The SQL version ran inside the caller's transaction so the blocklist rows,
+   * the status change and the session revocation committed together. Firestore
+   * batches are also atomic, and this needs no read-modify-write - every write
+   * is an unconditional set - so a batch gives the same all-or-nothing
+   * guarantee without a transaction's retry semantics.
+   *
+   * The `tx` parameter is gone: Firestore transactions cannot be nested and
+   * cannot be passed across module boundaries the way a Prisma client can.
+   * Callers that used to pass one now call this directly, and the atomicity
+   * they wanted is provided here.
+   */
+  const [credential, devices] = await Promise.all([
+    getCredentials(params.userId),
+    listUserDevices(params.userId),
+  ]);
 
-  const user = await client.user.findUniqueOrThrow({
-    where: { id: params.userId },
-    select: {
-      emailHash: true,
-      phoneHash: true,
-      devices: { select: { fingerprint: true } },
-    },
-  });
+  if (!credential) throw new Error(`no credentials for user ${params.userId}`);
 
   const deviceExpiry = new Date(Date.now() + DEVICE_BLOCK_DAYS * 86_400_000);
 
   const rows = [
-    { type: BlocklistType.USER_ID, value: params.userId, expiresAt: null },
-    { type: BlocklistType.EMAIL_HASH, value: user.emailHash, expiresAt: null },
-    ...(user.phoneHash
-      ? [{ type: BlocklistType.PHONE_HASH, value: user.phoneHash, expiresAt: null }]
+    { type: BlocklistType.USER_ID, value: params.userId, expiresAt: null as Date | null },
+    { type: BlocklistType.EMAIL_HASH, value: credential.emailHash, expiresAt: null as Date | null },
+    ...(credential.phoneHash
+      ? [{ type: BlocklistType.PHONE_HASH, value: credential.phoneHash, expiresAt: null as Date | null }]
       : []),
     // Only devices this account actually used. Never a device merely seen on
     // the same network - that is the IP-ban mistake wearing a different hat.
-    ...user.devices.map((device) => ({
+    ...devices.map((device) => ({
       type: BlocklistType.DEVICE_FINGERPRINT,
       value: device.fingerprint,
       expiresAt: deviceExpiry,
     })),
   ];
 
-  await client.blocklist.createMany({
-    data: rows.map((row) => ({
-      ...row,
-      reason: params.reason.slice(0, 500),
-      sourceCaseId: params.sourceCaseId,
-      createdById: params.moderatorId,
-    })),
-    skipDuplicates: true,
+  const batch = adminDb().batch();
+
+  for (const row of rows) {
+    // `type` + `value` was UNIQUE in SQL, so it becomes the document id.
+    // A repeated ban therefore overwrites its own row instead of duplicating,
+    // which is what `skipDuplicates` bought before.
+    batch.set(
+      blocklistDoc(row.type, row.value),
+      forFirestore({
+        type: row.type,
+        value: row.value,
+        expiresAt: row.expiresAt,
+        reason: params.reason.slice(0, 500),
+        sourceCaseId: params.sourceCaseId ?? null,
+        createdById: params.moderatorId,
+        hitCount: 0,
+        createdAt: new Date(),
+      }),
+    );
+  }
+
+  batch.update(adminDb().collection(COLLECTIONS.users).doc(params.userId), {
+    accountStatus: 'BANNED',
+    verificationStatus: 'BANNED',
+    isVerified: false,
+    updatedAt: new Date(),
   });
 
-  await client.user.update({
-    where: { id: params.userId },
-    data: {
-      accountStatus: 'BANNED',
-      verificationStatus: 'BANNED',
-      isVerified: false,
-    },
-  });
+  await batch.commit();
 
-  // Revoke live sessions so the ban takes effect now, not when the 15-minute
-  // access token expires.
-  await client.session.updateMany({
-    where: { userId: params.userId, revokedAt: null },
-    data: { revokedAt: new Date() },
-  });
+  // Revoke live sessions so the ban takes effect now, not when the access
+  // token expires. Outside the batch because the session count is unbounded
+  // and would blow the 500-write ceiling on a long-lived account.
+  await revokeUserSessions(params.userId);
 }
 
 /**
@@ -167,73 +226,83 @@ export async function liftBan(params: {
   moderatorId: string;
   reason: string;
 }): Promise<void> {
-  await db.$transaction(async (tx) => {
-    const user = await tx.user.findUniqueOrThrow({
-      where: { id: params.userId },
-      select: { emailHash: true, phoneHash: true, devices: { select: { fingerprint: true } } },
-    });
+  const [credential, devices] = await Promise.all([
+    getCredentials(params.userId),
+    listUserDevices(params.userId),
+  ]);
+  if (!credential) throw new Error(`no credentials for user ${params.userId}`);
 
-    await tx.blocklist.deleteMany({
-      where: {
-        OR: [
-          { type: BlocklistType.USER_ID, value: params.userId },
-          { type: BlocklistType.EMAIL_HASH, value: user.emailHash },
-          ...(user.phoneHash
-            ? [{ type: BlocklistType.PHONE_HASH, value: user.phoneHash }]
-            : []),
-          {
-            type: BlocklistType.DEVICE_FINGERPRINT,
-            value: { in: user.devices.map((d) => d.fingerprint) },
-          },
-        ],
-      },
-    });
+  const batch = adminDb().batch();
 
-    await tx.user.update({
-      where: { id: params.userId },
-      data: { accountStatus: 'ACTIVE', verificationStatus: 'UNVERIFIED' },
-    });
+  // Deleting by deterministic id needs no query - the same ids applyBan wrote.
+  batch.delete(blocklistDoc(BlocklistType.USER_ID, params.userId));
+  batch.delete(blocklistDoc(BlocklistType.EMAIL_HASH, credential.emailHash));
+  if (credential.phoneHash) {
+    batch.delete(blocklistDoc(BlocklistType.PHONE_HASH, credential.phoneHash));
+  }
+  for (const device of devices) {
+    batch.delete(blocklistDoc(BlocklistType.DEVICE_FINGERPRINT, device.fingerprint));
+  }
 
-    await tx.moderationAction.create({
-      data: {
-        moderatorId: params.moderatorId,
-        targetType: 'user',
-        targetId: params.userId,
-        action: 'unban',
-        reason: params.reason,
-      },
-    });
+  batch.update(adminDb().collection(COLLECTIONS.users).doc(params.userId), {
+    accountStatus: 'ACTIVE',
+    verificationStatus: 'UNVERIFIED',
+    updatedAt: new Date(),
   });
+
+  // The ModerationAction row is NOT deleted: an unban must stay as reviewable
+  // as the ban was.
+  batch.set(
+    adminDb().collection(COLLECTIONS.moderationActions).doc(),
+    forFirestore({
+      moderatorId: params.moderatorId,
+      targetType: 'user',
+      targetId: params.userId,
+      action: 'unban',
+      reason: params.reason,
+      createdAt: new Date(),
+    }),
+  );
+
+  await batch.commit();
 }
 
-/**
- * Ring detection for the moderator dashboard.
- *
- * Answers "how many other accounts has this device been used by". A high count
- * is a signal worth a human look, never an automatic sanction: a university
- * computer lab legitimately produces dozens of accounts on one fingerprint,
- * and that is the exact false positive that makes automated device banning
- * unsafe.
- */
 export async function relatedAccounts(fingerprint: string) {
-  return db.userDevice.findMany({
-    where: { fingerprint },
-    select: {
-      firstSeenAt: true,
-      lastSeenAt: true,
-      user: {
-        select: {
-          id: true,
-          fullName: true,
-          accountStatus: true,
-          verificationStatus: true,
-          createdAt: true,
-        },
-      },
-    },
-    orderBy: { firstSeenAt: 'asc' },
-    take: 50,
-  });
+  const snap = await adminDb()
+    .collection(COLLECTIONS.userDevices)
+    .where('fingerprint', '==', fingerprint)
+    .limit(50)
+    .get();
+
+  const devices = docsToObjects<{
+    id: string;
+    userId: string;
+    firstSeenAt: Date;
+    lastSeenAt: Date;
+  }>(snap.docs);
+
+  // The user decoration that Prisma did with a relation include becomes one
+  // batched read here, not a query per device.
+  const users = await findUsersByIds(devices.map((d) => d.userId));
+
+  return devices
+    .sort((a, b) => a.firstSeenAt.getTime() - b.firstSeenAt.getTime())
+    .map((device) => {
+      const user = users.get(device.userId);
+      return {
+        firstSeenAt: device.firstSeenAt,
+        lastSeenAt: device.lastSeenAt,
+        user: user
+          ? {
+              id: user.id,
+              fullName: user.fullName,
+              accountStatus: user.accountStatus,
+              verificationStatus: user.verificationStatus,
+              createdAt: user.createdAt,
+            }
+          : null,
+      };
+    });
 }
 
 /** Records or refreshes a device against an account. */
@@ -242,26 +311,30 @@ export async function recordDevice(params: {
   fingerprint: string;
   label: string;
 }): Promise<string> {
-  const device = await db.userDevice.upsert({
-    where: { userId_fingerprint: { userId: params.userId, fingerprint: params.fingerprint } },
-    create: { userId: params.userId, fingerprint: params.fingerprint, label: params.label },
-    update: { lastSeenAt: new Date() },
-    select: { id: true },
+  return (await recordDeviceDetailed(params)).id;
+}
+
+/** Same, and also says whether this device was seen for the first time. */
+export async function recordDeviceDetailed(params: {
+  userId: string;
+  fingerprint: string;
+  label: string;
+}): Promise<{ id: string; created: boolean }> {
+  return upsertDevice({
+    userId: params.userId,
+    fingerprint: params.fingerprint,
+    label: params.label,
   });
-  return device.id;
 }
 
 /** Used by the account-status middleware on every authenticated request. */
 export async function isUserBlocked(userId: string): Promise<boolean> {
-  const hit = await db.blocklist.findFirst({
-    where: {
-      type: BlocklistType.USER_ID,
-      value: userId,
-      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-    },
-    select: { id: true },
-  });
-  return hit !== null;
+  const snap = await blocklistDoc(BlocklistType.USER_ID, userId).get();
+  if (!snap.exists) return false;
+  const expiresAt = snap.data()?.expiresAt as { toDate(): Date } | Date | null | undefined;
+  if (!expiresAt) return true;
+  const asDate = expiresAt instanceof Date ? expiresAt : expiresAt.toDate();
+  return asDate > new Date();
 }
 
 export const hashDeviceValue = (raw: string) => piiHash(raw, 'device');

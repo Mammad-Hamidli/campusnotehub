@@ -1,0 +1,102 @@
+rules_version = '2';
+
+// CampusHub Cloud Storage security rules.
+//
+// =============================================================================
+// THE ONE RULE THAT MATTERS MOST
+// =============================================================================
+// Identity documents DO now reach this bucket, and that statement replaces an
+// earlier one saying they never could. Read this before touching kyc-review/.
+//
+// The encrypted review buffer used to live in a Redis instance configured with
+// persistence disabled, so the ciphertext never touched a disk. Removing Redis
+// removed that option: the buffer is now encrypted objects under kyc-review/,
+// and what protects them is (a) AES-256-GCM under a key derived from the
+// server pepper, which is not stored anywhere near the bucket, (b) an expiry
+// enforced on the read path, and (c) the total client denial below.
+//
+// TWO DEPLOYMENT REQUIREMENTS follow from that, and neither is expressible in
+// this file:
+//   - a LIFECYCLE RULE on the kyc-review/ prefix, so an object that outlives
+//     its expiry is removed by the bucket itself;
+//   - OBJECT VERSIONING OFF, because versioning keeps "deleted" objects
+//     recoverable as noncurrent versions, which is incompatible with the
+//     promise the product makes. Versioning is bucket-wide in GCS, so this
+//     applies to the whole bucket, not just this prefix.
+//
+// Both are bucket settings rather than Firebase Storage settings, so
+// `firebase deploy` does not apply them. The intended state and the exact
+// gcloud commands are kept in firebase/storage.lifecycle.json.
+//
+// See docs/SECURITY.md section 3 and the header of
+// src/lib/verification/reviewBuffer.ts, which states exactly what is and is
+// not still guaranteed.
+//
+// =============================================================================
+// WRITES ARE SERVER-ONLY, EVERYWHERE
+// =============================================================================
+// Every upload passes through an API route that validates the BYTES - magic
+// number sniffing, executable rejection, PDF active-content checks, and a
+// re-encode that strips EXIF GPS data from photographs. A direct client upload
+// would skip all of it, so no path below grants write. The Admin SDK bypasses
+// these rules, which is how the routes still write.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isStaff() {
+      return signedIn() && request.auth.token.role in ['MODERATOR', 'ADMIN'];
+    }
+
+    // ---- avatars -----------------------------------------------------------
+    // Public by nature: an avatar renders next to every post and comment.
+    match /avatars/{userId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---- post images -------------------------------------------------------
+    // Readable by anyone who has the URL. This matches the decision already
+    // documented on GET /api/media/[mediaId]: enforcing per-post visibility on
+    // every <img> would cost a database read per image per request, the ids are
+    // unguessable, and nothing sensitive is stored through this path. It is an
+    // unlisted-link boundary, not a permission boundary, and it is named as
+    // such rather than pretended otherwise.
+    match /media/{assetId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---- study notes -------------------------------------------------------
+    // A paid product. "Who may download this file" is a per-request
+    // authorization decision - seller, paying buyer, free-and-published, or
+    // staff - which a rule cannot evaluate without reading the orders
+    // collection. So this is CLOSED to clients entirely and served by
+    // GET /api/notes/:id/file, which already makes that decision.
+    match /notes/{noteId}/{fileName} {
+      allow read: if isStaff();
+      allow write: if false;
+    }
+
+    // ---- the review buffer -------------------------------------------------
+    // Encrypted identity documents awaiting a human decision. CLOSED to every
+    // client without exception - not even staff, who reach them through
+    // GET /api/admin/verification/:caseId, the one path that decrypts them and
+    // the only one that writes a KYC_DOCUMENTS_VIEWED audit row.
+    //
+    // Listed explicitly rather than left to the catch-all below, so that a
+    // future edit widening some other prefix cannot silently widen this one.
+    match /kyc-review/{objectId} {
+      allow read, write: if false;
+    }
+
+    // ---- default deny ------------------------------------------------------
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

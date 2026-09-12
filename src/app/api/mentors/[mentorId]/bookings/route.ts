@@ -1,14 +1,24 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { LedgerTxnKind } from '@prisma/client';
+import { FieldValue } from 'firebase-admin/firestore';
+import { LedgerAccountType, LedgerTxnKind } from '@/lib/enums';
 import { z } from 'zod';
-import { db } from '@/lib/db';
-import { requireSession } from '@/lib/auth/session';
-import { assertCan } from '@/lib/permissions';
+import { adminDb } from '@/lib/firebase/admin';
+import { COLLECTIONS } from '@/lib/firebase/collections';
+import { forFirestore } from '@/lib/firebase/convert';
+import {
+  ACTIVE_BOOKING_STATUSES,
+  bookingIdFor,
+  mentorCollections,
+} from '@/lib/firebase/repositories/mentors';
+import { getAccountTx, postTx, txnIdFor } from '@/lib/firebase/repositories/ledger';
+import { scheduleTx } from '@/lib/firebase/repositories/scheduledTasks';
+import { requireSession, UnauthorizedError } from '@/lib/auth/session';
+import { can } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { assertSlotBookable, BookingError, getDaySlots } from '@/lib/mentors/availability';
-import { getAccount, post as postLedger, splitPrice } from '@/lib/wallet/ledger';
+import { splitPrice } from '@/lib/wallet/ledger';
 import { sealJson } from '@/lib/crypto/vault';
-import { enqueueNotification } from '@/lib/notifications/dispatch';
+import { enqueueNotificationTx } from '@/lib/notifications/dispatch';
 import { createMeetingRoom } from '@/lib/mentors/meeting';
 
 export const runtime = 'nodejs';
@@ -64,8 +74,30 @@ export async function POST(
   { params }: { params: Promise<{ mentorId: string }> },
 ) {
   const { mentorId } = await params;
-  const { userId, viewer } = await requireSession(request);
-  assertCan(viewer, 'mentors:book');
+
+  /**
+   * `can`, not `assertCan`.
+   *
+   * assertCan THROWS a ForbiddenError and nothing here caught it, so an
+   * UNVERIFIED student pressing Book - the single most likely refusal on this
+   * endpoint, since booking is exactly what verification gates - got a 500
+   * with a stack trace instead of a message telling them to verify. Same
+   * defect and same fix as POST /api/feed.
+   */
+  let userId: string;
+  let viewer;
+  try {
+    ({ userId, viewer } = await requireSession(request));
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
+    }
+    throw error;
+  }
+
+  if (!can(viewer, 'mentors:book')) {
+    return NextResponse.json({ error: 'verification.restricted.title' }, { status: 403 });
+  }
 
   const rate = await rateLimit('bookings:create', { userId, ip: clientIp(request.headers) });
   if (!rate.ok) return NextResponse.json({ error: 'errors.rateLimited' }, { status: 429 });
@@ -78,98 +110,173 @@ export async function POST(
   try {
     const { endsAt, sessionMinutes } = await assertSlotBookable({ mentorId, startsAt, menteeId: userId });
 
-    const booking = await db.$transaction(async (tx) => {
-      const mentor = await tx.mentorProfile.findUniqueOrThrow({
-        where: { id: mentorId },
-        select: { id: true, userId: true, hourlyRateMinor: true, sessionMinutes: true, timezone: true },
+    /**
+     * The booking id, the meeting room and the escrow reference are all
+     * DERIVED, and all computed before the transaction opens.
+     *
+     * That is not a micro-optimisation, it is what makes the transaction
+     * possible at all. The old code created the booking row to learn its id,
+     * then called createMeetingRoom() and sealJson() with it, then updated the
+     * row - three writes interleaved with an async encryption call. A Firestore
+     * transaction may not interleave unrelated async work between its reads and
+     * its writes, and it re-runs its body on contention, so sealing inside it
+     * would redo the crypto on every retry.
+     *
+     * Because bookingIdFor() is a pure function of (mentor, slot), all of it
+     * can happen up front and the transaction becomes reads-then-writes with
+     * nothing in between.
+     */
+    const bookingId = bookingIdFor(mentorId, startsAt);
+    const meeting = await createMeetingRoom({ bookingId, startsAt, endsAt });
+    // Encrypted at rest and only handed out inside a 30-minute window around
+    // the session - a link that leaks days early is a link strangers can join.
+    const meetingUrlEnc = await sealJson({ url: meeting.url }, { bookingId });
+    const escrowTxnId = txnIdFor(`booking:${bookingId}`);
+
+    const bookingRef = mentorCollections.bookings().doc(bookingId);
+    const walletRef = adminDb().collection(COLLECTIONS.wallets).doc(userId);
+
+    const booking = await adminDb().runTransaction(async (tx) => {
+      // ------------------------------------------------------------- reads
+      const mentorSnap = await tx.get(mentorCollections.mentors().doc(mentorId));
+      if (!mentorSnap.exists) throw new BookingError('errors.notFound');
+      const mentor = mentorSnap.data() as {
+        userId: string;
+        hourlyRateMinor: number;
+        sessionMinutes: number;
+        timezone: string;
+      };
+
+      /**
+       * The overlap check, re-run INSIDE the transaction.
+       *
+       * assertSlotBookable() already checked this, but that check is a
+       * courtesy that produces a good error message - it cannot hold under
+       * concurrency. This one can: a transactional query participates in
+       * Firestore conflict detection, so if a competing booking lands between
+       * this read and the commit, the transaction aborts and re-runs.
+       *
+       * It is the replacement for the `bookings_no_overlap` GiST exclusion
+       * constraint, which has no Firestore equivalent. The derived document id
+       * covers the exact-same-instant case; this covers genuine overlap.
+       */
+      const clashSnap = await tx.get(
+        mentorCollections
+          .bookings()
+          .where('mentorId', '==', mentorId)
+          .where('status', 'in', ACTIVE_BOOKING_STATUSES as unknown as string[])
+          .where('startsAt', '>=', new Date(startsAt.getTime() - 6 * 60 * 60_000))
+          .where('startsAt', '<', endsAt),
+      );
+      const clash = clashSnap.docs.some((doc) => {
+        const data = doc.data();
+        const otherEnds: Date = data.endsAt?.toDate?.() ?? data.endsAt;
+        return doc.id !== bookingId && otherEnds > startsAt;
       });
+      if (clash) throw new BookingError('mentors.errors.slotTaken');
 
       const priceMinor = Math.round((mentor.hourlyRateMinor * sessionMinutes) / 60);
       const { platformFeeMinor } = splitPrice(priceMinor);
 
-      const [wallet] = await tx.$queryRaw<{ id: string; availableMinor: number }[]>`
-        SELECT id, "availableMinor" FROM wallets WHERE "userId" = ${userId} FOR UPDATE
-      `;
+      const walletSnap = await tx.get(walletRef);
+      const wallet = walletSnap.data() as { availableMinor: number } | undefined;
       if (!wallet || wallet.availableMinor < priceMinor) {
         throw new BookingError('notes.errors.insufficientFunds');
       }
 
-      const created = await tx.booking.create({
-        data: {
-          mentorId: mentor.id,
-          menteeId: userId,
-          startsAt,
-          endsAt,
-          timezone: mentor.timezone,
-          topic: parsed.data.topic,
-          menteeNote: parsed.data.menteeNote,
-          priceMinor,
-          platformFeeMinor,
-          idempotencyKey: parsed.data.idempotencyKey,
-          status: 'CONFIRMED',
-          confirmedAt: new Date(),
-        },
-      });
+      const menteeAvailable = await getAccountTx(tx, userId, LedgerAccountType.USER_AVAILABLE);
+      const escrow = await getAccountTx(tx, null, LedgerAccountType.PLATFORM_ESCROW);
 
-      // The meeting URL is created now but encrypted at rest and only handed
-      // out inside a 30-minute window around the session - a link that leaks
-      // days early is a link strangers can join.
-      const meeting = await createMeetingRoom({ bookingId: created.id, startsAt, endsAt });
-      await tx.booking.update({
-        where: { id: created.id },
-        data: {
-          meetingProvider: meeting.provider,
-          meetingUrlEnc: await sealJson({ url: meeting.url }, { bookingId: created.id }),
-        },
-      });
+      // ------------------------------------------------------------ writes
+      for (const account of [menteeAvailable, escrow]) {
+        if (!account.existed) {
+          tx.set(
+            adminDb().collection(COLLECTIONS.ledgerAccounts).doc(account.id),
+            forFirestore(account.data),
+          );
+        }
+      }
 
-      const menteeAvailable = await getAccount(tx, wallet.id, 'USER_AVAILABLE');
-      const escrow = await getAccount(tx, null, 'PLATFORM_ESCROW');
-      const txn = await postLedger(tx, {
+      const now = new Date();
+      const record = {
+        mentorId,
+        menteeId: userId,
+        startsAt,
+        endsAt,
+        timezone: mentor.timezone,
+        status: 'CONFIRMED',
+        topic: parsed.data.topic,
+        menteeNote: parsed.data.menteeNote ?? null,
+        meetingProvider: meeting.provider,
+        meetingUrlEnc,
+        priceMinor,
+        platformFeeMinor,
+        currency: 'AZN',
+        escrowTxnId,
+        idempotencyKey: parsed.data.idempotencyKey,
+        confirmedAt: now,
+        completedAt: null,
+        cancelledAt: null,
+        cancelReason: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      // `create`, not `set`: a resubmitted form must collide on the derived id
+      // rather than overwrite a booking that already charged someone.
+      tx.create(bookingRef, forFirestore(record));
+
+      postTx(tx, {
         kind: LedgerTxnKind.BOOKING_ESCROW_HOLD,
-        referenceKey: `booking:${created.id}`,
-        description: `Escrow hold for booking ${created.id}`,
+        referenceKey: `booking:${bookingId}`,
+        description: `Escrow hold for booking ${bookingId}`,
         legs: [
-          { accountId: menteeAvailable.id, amountMinor: -priceMinor },
-          { accountId: escrow.id, amountMinor: priceMinor },
+          {
+            accountId: menteeAvailable.id,
+            walletId: userId,
+            accountType: LedgerAccountType.USER_AVAILABLE,
+            amountMinor: -priceMinor,
+          },
+          {
+            accountId: escrow.id,
+            walletId: null,
+            accountType: LedgerAccountType.PLATFORM_ESCROW,
+            amountMinor: priceMinor,
+          },
         ],
       });
 
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { availableMinor: { decrement: priceMinor }, version: { increment: 1 } },
+      tx.update(walletRef, {
+        availableMinor: FieldValue.increment(-priceMinor),
+        version: FieldValue.increment(1),
       });
-      await tx.booking.update({ where: { id: created.id }, data: { escrowTxnId: txn.id } });
 
-      await enqueueNotification(tx, {
+      enqueueNotificationTx(tx, {
         userId: mentor.userId,
         type: 'BOOKING_REQUESTED',
         titleKey: 'notifications.types.BOOKING_REQUESTED',
         bodyKey: 'mentors.booking.summary',
         params: { date: startsAt.toISOString(), duration: sessionMinutes },
-        linkUrl: `/mentors/sessions/${created.id}`,
+        linkUrl: '/bookings',
       });
 
-      // Reminders are scheduled rows, so a cancellation deletes them rather
-      // than a worker having to remember not to send.
+      // Reminders are scheduled documents, so a cancellation deletes them
+      // rather than a worker having to remember not to send.
       for (const [kind, offsetMs] of [
         ['BOOKING_REMINDER_24H', 24 * 3_600_000],
         ['BOOKING_REMINDER_1H', 3_600_000],
       ] as const) {
         const runAt = new Date(startsAt.getTime() - offsetMs);
         if (runAt > new Date()) {
-          await tx.scheduledTask.create({
-            data: {
-              kind,
-              runAt,
-              dedupeKey: `${kind}:${created.id}`,
-              payload: { bookingId: created.id },
-            },
+          scheduleTx(tx, {
+            kind,
+            runAt,
+            dedupeKey: `${kind}:${bookingId}`,
+            payload: { bookingId },
           });
         }
       }
 
-      return created;
+      return { id: bookingId, ...record };
     });
 
     return NextResponse.json(
@@ -188,8 +295,12 @@ export async function POST(
     if (error instanceof BookingError) {
       return NextResponse.json({ error: error.messageKey, params: error.params }, { status: 409 });
     }
-    // The GiST exclusion constraint fired: someone else won the race.
-    if (typeof error === 'object' && error && 'code' in error && error.code === 'P2010') {
+    /**
+     * ALREADY_EXISTS on the derived booking id: someone else won the race for
+     * this exact slot. The successor to the GiST exclusion constraint firing,
+     * and the same answer - the slot is taken, and nobody was charged.
+     */
+    if ((error as { code?: number }).code === 6) {
       return NextResponse.json({ error: 'mentors.errors.slotTaken' }, { status: 409 });
     }
     throw error;

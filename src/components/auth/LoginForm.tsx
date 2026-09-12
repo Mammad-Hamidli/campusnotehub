@@ -102,11 +102,7 @@ export function LoginForm() {
       */}
       <form method="post" onSubmit={submit} className="mt-7 space-y-4" noValidate>
         {error && (
-          <p
-            role="alert"
-            className="flex items-start gap-2 rounded-lg border border-danger/40 bg-danger-soft
- px-3 py-2.5 text-xs text-danger-fg"
-          >
+          <p role="alert" className="alert-danger">
             <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span className="min-w-0">{t(error)}</span>
           </p>

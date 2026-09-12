@@ -31,7 +31,9 @@
  * Exported so the upload form can state the limit in the UI rather than
  * hardcoding a second number that drifts from this one.
  */
-export const MAX_NOTE_BYTES = 50 * 1024 * 1024; // 50 MB
+// 10 MB: Cloudinary's per-file limit for raw uploads on the account's plan.
+// Accepting more here would only fail after the upload finished.
+export const MAX_NOTE_BYTES = 10 * 1024 * 1024;
 export const MAX_NOTE_MB = MAX_NOTE_BYTES / (1024 * 1024);
 export const MIN_NOTE_BYTES = 256; // below this it is not a document
 
@@ -317,3 +319,18 @@ export const REJECTION_KEY: Record<NoteFileRejection, string> = {
   ARCHIVE_NOT_OFFICE: 'notes.upload.errors.archiveNotOffice',
   PDF_ACTIVE_CONTENT: 'notes.upload.errors.pdfUnsafe',
 };
+
+/**
+ * The UniNotes UPLOAD policy: PDF and Word only (.pdf, .doc, .docx).
+ *
+ * validateNoteFile() above still recognises more formats - it decides what a
+ * file IS from its bytes - and this list decides what may be uploaded.
+ * Keeping them separate means existing notes in other formats still download.
+ */
+export const NOTE_UPLOAD_MIME: readonly AllowedNoteMime[] = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+
+export const NOTE_UPLOAD_ACCEPT = [...NOTE_UPLOAD_MIME, '.pdf', '.doc', '.docx'].join(',');

@@ -39,11 +39,9 @@
     "languageSwitcher": "Change language",
     "theme": "Theme",
     "help": "Help",
-    "messages": "Messages",
     "bookmarks": "Bookmarks",
     "explore": "Explore",
-    "admin": "Admin",
-    "messagesPage": "Messages"
+    "admin": "Admin"
   },
   "auth": {
     "register": {
@@ -85,7 +83,47 @@
       "facultyPlaceholder": "Search for your faculty…",
       "facultyNoMatch": "No faculty matches that search. Choose “Other” to type your own.",
       "facultyOther": "Your faculty",
-      "facultyOtherPlaceholder": "Type your faculty or field of study"
+      "facultyOtherPlaceholder": "Type your faculty or field of study",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "dateOfBirth": "Date of birth",
+      "documentNotice": "Şəxsiyyət vəsiqəsində olduğu kimi yazın. Məlumatlar sənədlə yoxlanılacaq.",
+      "accountType": "Account type",
+      "accountTypeHint": "This decides what you can do on UniPath and which documents we ask for.",
+      "detailsTitle": "Your details",
+      "detailsStudentHint": "Tell us where you study.",
+      "detailsTeacherHint": "Tell us where you teach.",
+      "detailsMentorHint": "Tell us where you work and what you do.",
+      "studentNumber": "Student number",
+      "studentNumberPlaceholder": "e.g. 20231234",
+      "department": "Department",
+      "departmentPlaceholder": "e.g. Computer Science",
+      "academicTitle": "Academic position",
+      "academicTitlePlaceholder": "e.g. Assistant Professor",
+      "organisation": "Organisation",
+      "organisationPlaceholder": "e.g. Azercell",
+      "position": "Position",
+      "positionPlaceholder": "e.g. Senior Product Manager",
+      "types": {
+        "student": {
+          "title": "Student",
+          "body": "For university students studying now.",
+          "point1": "Sell notes and book mentors once verified",
+          "point2": "Needs an ID document and your student card"
+        },
+        "teacher": {
+          "title": "Teacher",
+          "body": "For university teaching staff.",
+          "point1": "Offer mentoring sessions once verified",
+          "point2": "Needs an ID document only"
+        },
+        "mentor": {
+          "title": "Mentor",
+          "body": "For professionals who will guide students on UniPath.",
+          "point1": "Offer mentoring sessions once verified and approved",
+          "point2": "Needs an ID document only"
+        }
+      }
     },
     "login": {
       "title": "Welcome back",
@@ -113,7 +151,12 @@
       "phoneTaken": "That number is already in use",
       "consentRequired": "You must consent to document processing",
       "credentialsUnavailable": "An account cannot be created with these details. Try a different email or phone number.",
-      "facultyOtherRequired": "Please type your faculty"
+      "facultyOtherRequired": "Please type your faculty",
+      "dobInvalid": "Enter a valid date of birth",
+      "dobImplausible": "That date of birth does not look right",
+      "studentNumberRequired": "Your student number is required",
+      "departmentRequired": "Your department is required",
+      "academicTitleRequired": "Your academic position is required"
     }
   },
   "verification": {
@@ -245,6 +288,17 @@
         "uploadFailed": "The image could not be uploaded. Try again.",
         "invalidKey": "That image is no longer available. Attach it again."
       }
+    },
+    "menu": {
+      "label": "Post actions",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this post? This cannot be undone.",
+      "deleteFailed": "The post could not be deleted.",
+      "report": "Report",
+      "reported": "Thanks - the post was reported to moderators.",
+      "reportFailed": "The report could not be sent.",
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied."
     }
   },
   "notes": {
@@ -281,8 +335,8 @@
     },
     "upload": {
       "title": "New note",
-      "file": "PDF file",
-      "fileHint": "Up to 50 MB, PDF only",
+      "file": "PDF or Word file",
+      "fileHint": "Up to 10 MB, PDF or Word",
       "noteTitle": "Title",
       "description": "Description",
       "subject": "Subject",
@@ -290,9 +344,9 @@
       "priceHint": "Enter 0 to publish it for free. Maximum 50 AZN.",
       "processing": "Processing file: generating preview...",
       "pendingReview": "Your note is in moderation and will be published once approved.",
-      "subtitle": "PDF, Word, Excel, PowerPoint or an image export. Max 50 MB.",
+      "subtitle": "PDF or Word (.pdf, .doc, .docx). Max 10 MB.",
       "choose": "Choose a file",
-      "accepted": "PDF · DOC/DOCX · XLS/XLSX · PPT/PPTX · PNG/JPG — up to 50 MB",
+      "accepted": "PDF · DOC · DOCX — up to 10 MB",
       "remove": "Remove file",
       "submit": "Upload",
       "draftNote": "Saved as a draft for review before it is listed.",
@@ -308,8 +362,8 @@
         "missing": "Choose a file to upload.",
         "empty": "That file is empty.",
         "tooSmall": "That file is too small to be a document.",
-        "tooLarge": "That file is larger than 50 MB.",
-        "typeNotAllowed": "That file type is not accepted. Use PDF, Word, Excel, PowerPoint, PNG or JPG.",
+        "tooLarge": "That file is larger than 10 MB.",
+        "typeNotAllowed": "That file type is not accepted. Use PDF or Word (.pdf, .doc, .docx).",
         "mimeMismatch": "The file contents do not match its type. Re-export and try again.",
         "extensionMismatch": "The file extension does not match its actual contents.",
         "executable": "Executable and script files are not accepted.",
@@ -318,20 +372,26 @@
         "duplicate": "You have already uploaded this exact file.",
         "txtOnly": "That file type is not supported.",
         "cancelled": "Upload cancelled.",
-        "network": "The upload failed. Check your connection and try again."
+        "network": "The upload failed. Check your connection and try again.",
+        "storageFailed": "The file could not be stored. Please try again."
       },
       "progress": "Uploading… {percent}%",
       "cancel": "Cancel upload",
       "retry": "Try again",
       "success": "Note uploaded",
-      "maxSize": "Up to {mb} MB. PDF, Word, PowerPoint, Excel, text or image.",
+      "maxSize": "Up to {mb} MB. PDF or Word (.pdf, .doc, .docx).",
+      "verifyFirstTitle": "Verify your identity first",
+      "verifyFirstBody": "Selling notes requires a verified identity. Once your verification is complete you can upload notes.",
       "selected": "{name} ({size})"
     },
     "errors": {
       "notVerified": "Your account must be verified before you can sell notes",
       "insufficientFunds": "Your balance is not enough",
       "duplicate": "This exact file is already on the platform",
-      "encrypted": "Password-protected PDFs are not accepted"
+      "encrypted": "Password-protected PDFs are not accepted",
+      "notForSale": "That note is not available for sale.",
+      "cannotBuyOwn": "You cannot buy your own note.",
+      "alreadyOwned": "You already own this note."
     },
     "free": "Free",
     "download": "Download",
@@ -340,7 +400,20 @@
       "purchases": "{n} purchases"
     },
     "empty": "No notes have been uploaded yet.",
-    "addNote": "Add note"
+    "addNote": "Add note",
+    "purchases": {
+      "subtitle": "Notes you have bought",
+      "empty": "No purchases yet",
+      "emptyHint": "Notes you buy will appear here, ready to download.",
+      "browse": "Browse UniNotes",
+      "download": "Download",
+      "refunded": "Refunded"
+    },
+    "buy": "Buy",
+    "buyFree": "Get for free",
+    "buying": "Purchasing…",
+    "owned": "Owned",
+    "bought": "Purchase complete"
   },
   "mentors": {
     "title": "PocketMentor",
@@ -384,7 +457,9 @@
         "joinCall": "Join call"
       },
       "cancel": "Cancel session",
-      "cancelPolicy": "Cancel more than 24 hours ahead for a full refund"
+      "cancelPolicy": "Cancel more than 24 hours ahead for a full refund",
+      "menteeNote": "Anything else to share (optional)",
+      "menteeNotePlaceholder": "Context that helps your mentor prepare"
     },
     "errors": {
       "slotTaken": "That slot was just taken. Please pick another.",
@@ -396,7 +471,6 @@
     "emptyHint": "Verified students and alumni can offer mentoring. Check back soon.",
     "loading": "Loading mentors…",
     "book": "Request a session",
-    "message": "Message",
     "viewProfile": "View profile",
     "sessions": "{count} sessions",
     "rate": "{price} / session",
@@ -420,7 +494,61 @@
     "sessionLength": "{minutes} min",
     "years": "{count} yrs",
     "editProfile": "Edit my mentor profile",
-    "notAccepting": "Not accepting bookings"
+    "notAccepting": "Not accepting bookings",
+    "filters": {
+      "university": "University",
+      "allUniversities": "All universities",
+      "experience": "Experience",
+      "anyExperience": "Any experience",
+      "yearsPlus": "{years}+ years",
+      "price": "Price",
+      "anyPrice": "Any price",
+      "upTo": "Up to {price}",
+      "acceptingOnly": "Accepting bookings"
+    },
+    "apply": {
+      "title": "Become a mentor",
+      "subtitle": "Tell students about your experience. A moderator reviews every application.",
+      "headline": "Headline",
+      "bio": "About you",
+      "bioHint": "At least 50 characters.",
+      "expertise": "Expertise areas",
+      "expertiseHint": "Comma-separated, e.g. React, Career advice",
+      "experience": "Work experience",
+      "addExperience": "Add role",
+      "company": "Company / workplace",
+      "role": "Role",
+      "years": "Years",
+      "education": "Education",
+      "addEducation": "Add education",
+      "educationHint": "Optional.",
+      "institution": "Institution",
+      "degree": "Degree",
+      "field": "Field of study",
+      "year": "Year",
+      "languages": "Languages",
+      "rate": "Hourly rate (AZN, 0 = free)",
+      "sessionLength": "Session length",
+      "minutes": "{minutes} min",
+      "linkedin": "LinkedIn (optional)",
+      "remove": "Remove",
+      "submit": "Submit application",
+      "pending": "Your application is under review. We will email you when a moderator decides.",
+      "approved": "You are an approved mentor.",
+      "rejected": "Your previous application was not approved.",
+      "verifyFirst": "Verify your identity before applying to become a mentor.",
+      "guest": {
+        "title": "Create a mentor account",
+        "body": "Applying as a mentor needs an account. You can create a mentor account from scratch — a student account is not required.",
+        "cta": "Create a mentor account",
+        "haveAccount": "Already have an account?",
+        "signIn": "Sign in"
+      },
+      "errors": {
+        "pending": "You already have an application under review.",
+        "alreadyMentor": "You are already an approved mentor."
+      }
+    }
   },
   "wallet": {
     "title": "Wallet",
@@ -441,7 +569,22 @@
       "PLATFORM_FEE": "Platform fee",
       "ADJUSTMENT": "Adjustment"
     },
-    "empty": "No transactions yet"
+    "empty": "No transactions yet",
+    "subtitle": "Your balance and recent activity",
+    "availableHint": "Ready to spend on notes and sessions",
+    "frozen": "This wallet is frozen. Contact support.",
+    "topUpForm": {
+      "title": "Add balance",
+      "hint": "Top up between {min} and {max} AZN.",
+      "amount": "Amount (AZN)",
+      "submit": "Add balance",
+      "success": "{amount} AZN was added to your balance.",
+      "providerNote": "Test payment mode: no card is charged until a payment provider is connected.",
+      "errors": {
+        "amount": "Enter an amount between {min} and {max} AZN.",
+        "declined": "The payment was declined."
+      }
+    }
   },
   "notifications": {
     "title": "Notifications",
@@ -492,6 +635,25 @@
     "accountUnfrozen": {
       "title": "Account restored",
       "body": "The freeze on your account was lifted"
+    },
+    "noteSold": {
+      "body": "Someone bought \"{title}\""
+    },
+    "mentor": {
+      "approvedTitle": "Mentor application approved",
+      "approvedBody": "You are now listed in PocketMentor.",
+      "rejectedTitle": "Mentor application not approved",
+      "rejectedBody": "See your email for the reason."
+    },
+    "note": {
+      "approvedTitle": "Note published",
+      "approvedBody": "\"{title}\" is now listed in UniNotes.",
+      "rejectedTitle": "Note not approved",
+      "rejectedBody": "\"{title}\" was not approved."
+    },
+    "wallet": {
+      "topUpTitle": "Balance topped up",
+      "topUpBody": "{amount} was added to your wallet."
     }
   },
   "errors": {
@@ -598,6 +760,8 @@
   "register": {
     "steps": {
       "account": "Account",
+      "type": "Account type",
+      "details": "Details",
       "documents": "Documents",
       "review": "Review"
     },
@@ -650,6 +814,11 @@
   "dashboard": {
     "greeting": "Hi, {name}",
     "subtitle": "Here is what is happening on campus today",
+    "mentorPrompt": {
+      "title": "Complete your mentor profile",
+      "body": "Your account is ready. Submit your mentor profile to appear in the directory — a moderator reviews every application.",
+      "cta": "Complete mentor profile"
+    },
     "graduation": {
       "title": "Graduation countdown",
       "months": "{count} months to go",
@@ -700,7 +869,8 @@
       "universities": "Universities",
       "auditLogs": "Audit logs",
       "backToApp": "Back to app",
-      "skipToContent": "Skip to content"
+      "skipToContent": "Skip to content",
+      "reviews": "Reviews"
     },
     "common": {
       "all": "All",
@@ -985,6 +1155,31 @@
       "sessionsHint": "Signing out here ends this session everywhere it is open.",
       "dangerZone": "Session",
       "signOutAll": "Sign out"
+    },
+    "reviews": {
+      "title": "Reviews",
+      "subtitle": "Mentor applications and uploaded notes waiting for a decision.",
+      "tabs": {
+        "mentors": "Mentor applications",
+        "notes": "Notes"
+      },
+      "reason": "Reason (required to reject)",
+      "reasonHint": "Shown to the applicant",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approved": "Approved.",
+      "rejected": "Rejected.",
+      "emptyMentors": "No pending mentor applications.",
+      "emptyNotes": "No notes waiting for review.",
+      "download": "Open file",
+      "experience": "Experience (years)",
+      "education": "Education",
+      "submitted": "Submitted",
+      "rate": "Price",
+      "errors": {
+        "reasonRequired": "Give a reason of at least 5 characters.",
+        "alreadyDecided": "This item was already decided."
+      }
     }
   },
   "settings": {
@@ -1090,26 +1285,5 @@
     },
     "headline": "Headline",
     "bio": "About you"
-  },
-  "messages": {
-    "title": "Messages",
-    "subtitle": "Your conversations",
-    "empty": "No conversations yet",
-    "emptyHint": "Start a conversation from someone’s profile.",
-    "selectPrompt": "Select a conversation to start reading",
-    "placeholder": "Write a message…",
-    "send": "Send",
-    "sending": "Sending…",
-    "loading": "Loading…",
-    "loadOlder": "Load older messages",
-    "you": "You",
-    "deleted": "Message deleted",
-    "newConversation": "New conversation",
-    "backToList": "Back to conversations",
-    "errors": {
-      "cannotMessageSelf": "You cannot message yourself",
-      "sendFailed": "Message could not be sent. Try again.",
-      "loadFailed": "Conversations could not be loaded."
-    }
   }
 }

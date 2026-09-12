@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AccountStatus, UserRole, VerificationStatus } from '@prisma/client';
+import { AccountStatus, UserRole, VerificationStatus } from '@/lib/enums';
 
 /**
  * Query and mutation schemas for the admin panel.

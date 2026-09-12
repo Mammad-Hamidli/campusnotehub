@@ -1,6 +1,11 @@
 import { addMinutes, startOfDay } from 'date-fns';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
-import { db } from '@/lib/db';
+import {
+  bookingsOverlapping,
+  findMentorById,
+  listAvailabilityExceptions,
+  listAvailabilityRules,
+} from '@/lib/firebase/repositories/mentors';
 
 export type Slot = { startsAt: Date; endsAt: Date; available: boolean };
 
@@ -27,26 +32,28 @@ export async function getDaySlots(params: {
   date: string;
   viewerTimezone: string;
 }): Promise<Slot[]> {
-  const mentor = await db.mentorProfile.findUniqueOrThrow({
-    where: { id: params.mentorId },
-    include: {
-      availabilityRules: true,
-      availabilityExceptions: true,
-    },
-  });
+  const mentor = await findMentorById(params.mentorId);
+  if (!mentor) throw new BookingError('errors.notFound');
+
+  // Rules and exceptions are subcollections, so they are two reads rather than
+  // an `include`. Issued concurrently: neither depends on the other.
+  const [availabilityRules, availabilityExceptions] = await Promise.all([
+    listAvailabilityRules(mentor.id),
+    listAvailabilityExceptions(mentor.id),
+  ]);
 
   const dayStartUtc = fromZonedTime(`${params.date}T00:00:00`, mentor.timezone);
   const localDay = toZonedTime(dayStartUtc, mentor.timezone);
   const weekday = localDay.getDay();
 
-  const exception = mentor.availabilityExceptions.find(
+  const exception = availabilityExceptions.find(
     (e) => e.date.toISOString().slice(0, 10) === params.date,
   );
   if (exception?.isBlocked && exception.startMinute === null) return [];
 
   const windows = exception && !exception.isBlocked && exception.startMinute !== null
     ? [{ startMinute: exception.startMinute, endMinute: exception.endMinute ?? 1440 }]
-    : mentor.availabilityRules
+    : availabilityRules
         .filter((r) => r.weekday === weekday)
         .filter((r) => !r.validFrom || r.validFrom <= dayStartUtc)
         .filter((r) => !r.validUntil || r.validUntil >= dayStartUtc)
@@ -59,15 +66,7 @@ export async function getDaySlots(params: {
 
   // One query for the whole day rather than one per candidate slot.
   const dayEndUtc = addMinutes(dayStartUtc, 1440);
-  const booked = await db.booking.findMany({
-    where: {
-      mentorId: mentor.id,
-      status: { in: ['REQUESTED', 'CONFIRMED', 'RESCHEDULED'] },
-      startsAt: { lt: dayEndUtc },
-      endsAt: { gt: dayStartUtc },
-    },
-    select: { startsAt: true, endsAt: true },
-  });
+  const booked = await bookingsOverlapping(mentor.id, dayStartUtc, dayEndUtc);
 
   const slots: Slot[] = [];
   for (const w of windows) {
@@ -90,26 +89,26 @@ export async function getDaySlots(params: {
  *
  * The availability read and the booking write are seconds apart, and two
  * mentees looking at the same calendar will race. This check is a courtesy
- * that produces a good error message; the actual guarantee is the
- * `bookings_no_overlap` GiST exclusion constraint in the database, which is
- * the only thing that holds under concurrency.
+ * that produces a good error message; it is NOT what holds under concurrency.
+ *
+ * What does has changed, and the difference matters. Under Postgres it was the
+ * `bookings_no_overlap` GiST exclusion constraint - a database guarantee that
+ * held no matter which code path wrote the row. Firestore has no equivalent,
+ * so the guarantee now lives in the booking route, which repeats this overlap
+ * check INSIDE a Firestore transaction: a transactional query participates in
+ * conflict detection, so two racing mentees cannot both commit.
+ *
+ * The practical consequence is that writing a booking document without going
+ * through that transaction would silently lose the protection. See the header
+ * of src/lib/firebase/repositories/mentors.ts.
  */
 export async function assertSlotBookable(params: {
   mentorId: string;
   startsAt: Date;
   menteeId: string;
 }) {
-  const mentor = await db.mentorProfile.findUniqueOrThrow({
-    where: { id: params.mentorId },
-    select: {
-      userId: true,
-      sessionMinutes: true,
-      minNoticeHours: true,
-      timezone: true,
-      isApproved: true,
-      isAcceptingBookings: true,
-    },
-  });
+  const mentor = await findMentorById(params.mentorId);
+  if (!mentor) throw new BookingError('errors.notFound');
 
   if (params.menteeId === mentor.userId) {
     throw new BookingError('mentors.errors.selfBooking');
@@ -124,16 +123,8 @@ export async function assertSlotBookable(params: {
   }
 
   const endsAt = addMinutes(params.startsAt, mentor.sessionMinutes);
-  const clash = await db.booking.findFirst({
-    where: {
-      mentorId: params.mentorId,
-      status: { in: ['REQUESTED', 'CONFIRMED', 'RESCHEDULED'] },
-      startsAt: { lt: endsAt },
-      endsAt: { gt: params.startsAt },
-    },
-    select: { id: true },
-  });
-  if (clash) throw new BookingError('mentors.errors.slotTaken');
+  const clashes = await bookingsOverlapping(params.mentorId, params.startsAt, endsAt);
+  if (clashes.length > 0) throw new BookingError('mentors.errors.slotTaken');
 
   const dayKey = toZonedTime(params.startsAt, mentor.timezone).toISOString().slice(0, 10);
   const offered = await getDaySlots({

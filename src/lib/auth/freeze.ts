@@ -1,5 +1,6 @@
-import { AccountStatus, Prisma } from '@prisma/client';
-import { db } from '@/lib/db';
+import { AccountStatus } from '@/lib/enums';
+import { findUserById, updateUser } from '@/lib/firebase/repositories/users';
+import { revokeUserSessions } from '@/lib/firebase/repositories/sessions';
 
 /**
  * Temporary account freeze.
@@ -25,6 +26,25 @@ import { db } from '@/lib/db';
  * belt and braces and it makes the freeze VISIBLE: the user is signed out and
  * meets the notice, rather than silently discovering that buttons no longer
  * work. It also matches what the existing status-change handler already does.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THE `tx` PARAMETER IS GONE
+ * ---------------------------------------------------------------------------
+ * These functions used to accept a `Prisma.TransactionClient` so a caller could
+ * fold the freeze into a larger transaction. Firestore has no equivalent: a
+ * transaction handle cannot be passed across module boundaries and reused,
+ * because every read in a Firestore transaction must happen before every write
+ * and the SDK enforces that on the handle itself. Threading one through here
+ * would mean these functions could only ever be called from inside a
+ * transaction - the opposite of what the parameter was for.
+ *
+ * The order below is chosen so an interruption fails SAFE. The status is
+ * written first and the sessions revoked second, so a crash between them
+ * leaves an account that is already SUSPENDED with sessions still live - and
+ * requireSession() re-reads account state on every request, so those sessions
+ * have already lost their write capabilities. The reverse order would leave
+ * the account signed out but still ACTIVE, which is the failure that lets
+ * someone sign straight back in with full access.
  */
 
 export type FreezeInput = {
@@ -36,28 +56,21 @@ export type FreezeInput = {
    * suspension behaviour and still reachable from the same UI.
    */
   until: Date | null;
-  tx?: Prisma.TransactionClient;
 };
 
 export async function freezeAccount(input: FreezeInput): Promise<void> {
-  const client = input.tx ?? db;
   const now = new Date();
 
-  await client.user.update({
-    where: { id: input.userId },
-    data: {
-      accountStatus: AccountStatus.SUSPENDED,
-      frozenUntil: input.until,
-      frozenReason: input.reason,
-      frozenById: input.actorId,
-      frozenAt: now,
-    },
+  // Status first - see the note above on failing safe.
+  await updateUser(input.userId, {
+    accountStatus: AccountStatus.SUSPENDED,
+    frozenUntil: input.until,
+    frozenReason: input.reason,
+    frozenById: input.actorId,
+    frozenAt: now,
   });
 
-  await client.session.updateMany({
-    where: { userId: input.userId, revokedAt: null },
-    data: { revokedAt: now },
-  });
+  await revokeUserSessions(input.userId);
 }
 
 /**
@@ -73,16 +86,8 @@ export async function freezeAccount(input: FreezeInput): Promise<void> {
  * Returns false when there was nothing to lift, so the caller can answer 409
  * rather than reporting a success that changed nothing.
  */
-export async function unfreezeAccount(input: {
-  userId: string;
-  tx?: Prisma.TransactionClient;
-}): Promise<boolean> {
-  const client = input.tx ?? db;
-
-  const target = await client.user.findUnique({
-    where: { id: input.userId },
-    select: { accountStatus: true, deletedAt: true },
-  });
+export async function unfreezeAccount(input: { userId: string }): Promise<boolean> {
+  const target = await findUserById(input.userId);
 
   if (!target || target.deletedAt) return false;
   if (target.accountStatus === AccountStatus.BANNED || target.accountStatus === AccountStatus.DELETED) {
@@ -90,15 +95,12 @@ export async function unfreezeAccount(input: {
   }
   if (target.accountStatus !== AccountStatus.SUSPENDED) return false;
 
-  await client.user.update({
-    where: { id: input.userId },
-    data: {
-      accountStatus: AccountStatus.ACTIVE,
-      frozenUntil: null,
-      frozenReason: null,
-      frozenAt: null,
-      frozenById: null,
-    },
+  await updateUser(input.userId, {
+    accountStatus: AccountStatus.ACTIVE,
+    frozenUntil: null,
+    frozenReason: null,
+    frozenAt: null,
+    frozenById: null,
   });
 
   return true;

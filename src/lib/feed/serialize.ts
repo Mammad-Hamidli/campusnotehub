@@ -1,4 +1,6 @@
-import { Prisma } from '@prisma/client';
+import type { PostRecord } from '@/lib/firebase/repositories/posts';
+import type { UserRecord } from '@/lib/firebase/repositories/users';
+import type { UniversityRecord } from '@/lib/firebase/repositories/reference';
 
 /**
  * The one definition of what a post looks like over the wire.
@@ -30,35 +32,42 @@ import { Prisma } from '@prisma/client';
  */
 
 /**
- * The include used by every query that returns a post.
+ * The author fields the feed renders.
  *
- * `satisfies` rather than a bare object literal so Prisma type-checks the
- * relation names at compile time: a typo here would otherwise surface as a
- * runtime "unknown field" from the database.
+ * ---------------------------------------------------------------------------
+ * WHAT REPLACED POST_INCLUDE
+ * ---------------------------------------------------------------------------
+ * Under Prisma this file exported an `include` object: one declaration that
+ * every query reused, so the read path and the write path could not describe a
+ * post differently. Firestore has no joins and no `include`, so that shared
+ * declaration cannot exist as a query fragment - the author and their
+ * university are separate documents, fetched by the caller.
+ *
+ * The guarantee it provided is preserved by moving it one step later: every
+ * route still funnels through serializePost(), and the author is now passed IN
+ * as a typed argument. A caller that forgets to load authors gets a type error
+ * rather than a post whose author silently renders as "@unknown", which is the
+ * failure this file was written to prevent.
+ *
+ * The feed shows the public handle, never fullName - see the User model.
  */
-export const POST_INCLUDE = {
-  author: {
-    select: {
-      id: true,
-      // nickname is REQUIRED by the client and was missing from the GET
-      // select, which is why every card rendered as "@unknown". The feed shows
-      // the public handle, never fullName - see the User model.
-      nickname: true,
-      fullName: true,
-      avatarUrl: true,
-      role: true,
-      isVerified: true,
-      headline: true,
-      university: { select: { code: true, nameAz: true, nameEn: true, nameRu: true } },
-    },
-  },
-  media: { orderBy: { position: 'asc' } },
-  tags: { include: { tag: { select: { slug: true, label: true } } } },
-} satisfies Prisma.PostInclude;
+export type PostAuthor = Pick<
+  UserRecord,
+  'id' | 'nickname' | 'fullName' | 'avatarUrl' | 'role' | 'isVerified' | 'headline'
+>;
 
-type PostWithRelations = Prisma.PostGetPayload<{ include: typeof POST_INCLUDE }> & {
-  /** Present only when the viewer is signed in; see the feed query. */
-  likes?: { userId: string }[];
+/**
+ * Everything serializePost needs that does not live on the post document.
+ *
+ * Grouped into one argument rather than several so adding a future decoration
+ * does not change the signature at every call site.
+ */
+export type PostContext = {
+  author: PostAuthor | null;
+  university: Pick<UniversityRecord, 'code' | 'nameAz' | 'nameEn' | 'nameRu'> | null;
+  viewerId?: string | null;
+  likedByViewer?: boolean;
+  shareCount?: number;
 };
 
 /** The response contract. Every field is always present. */
@@ -97,52 +106,65 @@ export type SerializedPost = {
 };
 
 /**
- * Turns a Prisma row into the wire shape.
+ * Turns a Firestore post document into the wire shape.
  *
- * `shareCount` is passed in rather than read off the row because counting
- * reposts is a separate aggregate; the caller decides whether that count is
- * worth a query. It defaults to 0, which is the correct value for a post that
- * was created moments ago and is what the create path passes.
+ * `shareCount` is passed in rather than read off the row when the caller has a
+ * better number; it otherwise comes from the denormalised counter on the post.
+ *
+ * A MISSING AUTHOR IS NOT A CRASH. Firestore has no foreign keys, so an author
+ * document can genuinely be absent - deleted account, or a batch that half
+ * committed. Under SQL the join simply excluded such a post. Here the post
+ * would still be returned, so the placeholder below keeps the contract
+ * (`author` is always an object with a nickname) rather than letting the
+ * client meet `undefined.nickname`. Routes that must not show such posts
+ * filter them out before serialising; this is the last line of defence.
  */
-export function serializePost(
-  post: PostWithRelations,
-  options: { viewerId?: string | null; shareCount?: number } = {},
-): SerializedPost {
+export function serializePost(post: PostRecord, context: PostContext): SerializedPost {
+  const author = context.author;
+
   return {
     id: post.id,
     body: post.body,
     visibility: post.visibility,
     createdAt: post.createdAt.toISOString(),
     editedAt: post.editedAt ? post.editedAt.toISOString() : null,
-    likeCount: post.likeCount,
-    commentCount: post.commentCount,
-    shareCount: options.shareCount ?? 0,
-    // `likes` is only selected for a signed-in viewer, so its absence means
-    // "nobody is signed in", not "not liked" - both serialise to false, but
-    // the distinction is why this is not written as post.likes.length > 0.
-    likedByViewer: Array.isArray(post.likes) ? post.likes.length > 0 : false,
+    likeCount: post.likeCount ?? 0,
+    commentCount: post.commentCount ?? 0,
+    shareCount: context.shareCount ?? post.shareCount ?? 0,
+    likedByViewer: context.likedByViewer ?? false,
     author: {
-      id: post.author.id,
-      nickname: post.author.nickname,
-      fullName: post.author.fullName,
-      avatarUrl: post.author.avatarUrl,
-      headline: post.author.headline,
-      role: post.author.role,
-      isVerified: post.author.isVerified,
-      university: post.author.university,
+      id: author?.id ?? post.authorId,
+      nickname: author?.nickname ?? 'unknown',
+      fullName: author?.fullName ?? '',
+      avatarUrl: author?.avatarUrl ?? null,
+      headline: author?.headline ?? null,
+      role: author?.role ?? 'STUDENT',
+      isVerified: author?.isVerified ?? false,
+      university: context.university,
     },
-    // The two guarantees the client depends on. `?? []` here is NOT the
-    // optional-chaining patch this file argues against: the relations are
-    // always included by POST_INCLUDE, so these coalesce only against a
-    // hand-built row in a test, and the contract stays "always an array".
-    tags: (post.tags ?? []).map((t) => ({ slug: t.tag.slug, label: t.tag.label || t.tag.slug })),
-    media: (post.media ?? []).map((m) => ({
-      id: m.id,
-      storageKey: m.storageKey,
-      mimeType: m.mimeType,
-      width: m.width,
-      height: m.height,
-      altText: m.altText,
-    })),
+    /**
+     * The two guarantees the client depends on.
+     *
+     * `?? []` is NOT the optional-chaining patch this file argues against. In
+     * Firestore an empty array is not stored at all - `forFirestore` strips
+     * nothing, but a document written before these fields existed simply has
+     * no key - so an absent `tags` genuinely means "no tags" and must
+     * serialise as `[]`. The contract stays "always an array".
+     */
+    tags: (post.tags ?? []).map((t) => ({ slug: t.slug, label: t.label || t.slug })),
+    media: (post.media ?? [])
+      // Ordered here rather than by the query: media is an embedded array, so
+      // there is no `orderBy` to apply to it. The position field is what the
+      // author arranged, and it must survive the round trip.
+      .slice()
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+      .map((m) => ({
+        id: m.id,
+        storageKey: m.storageKey,
+        mimeType: m.mimeType,
+        width: m.width,
+        height: m.height,
+        altText: m.altText,
+      })),
   };
 }

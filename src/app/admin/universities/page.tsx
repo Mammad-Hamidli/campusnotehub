@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@/lib/enums';
 import { getAdminViewer } from '@/lib/auth/admin';
 import { UniversitiesTable } from '@/components/admin/UniversitiesTable';
 

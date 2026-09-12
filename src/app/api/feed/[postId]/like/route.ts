@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { NotificationType, Prisma } from '@prisma/client';
-import { db } from '@/lib/db';
+import { NotificationType } from '@/lib/enums';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { can } from '@/lib/permissions';
 import { findVisiblePost } from '@/lib/feed/visibility';
+import { setPostLike } from '@/lib/firebase/repositories/posts';
+import { createNotification } from '@/lib/firebase/repositories/notifications';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,9 +17,10 @@ export const dynamic = 'force-dynamic';
  * like flipped the icon and was forgotten on the next render. This is the
  * other half of that feature.
  *
- * Both verbs are IDEMPOTENT, which the composite (postId, userId) primary key
- * gives for free: a double-tap or a retried request on a flaky connection
- * cannot double-count. That property is what lets the client update
+ * Both verbs are IDEMPOTENT, which the like document being KEYED BY THE LIKER
+ * gives for free - the Firestore equivalent of the composite (postId, userId)
+ * primary key the SQL table had. A double-tap or a retried request on a flaky
+ * connection cannot double-count. That property is what lets the client update
  * optimistically without reconciling a running total.
  */
 
@@ -51,44 +53,42 @@ export async function POST(
   const post = await findVisiblePost(postId, auth.viewer);
   if (!post) return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
 
-  try {
-    const likeCount = await db.$transaction(async (tx) => {
-      // Throws P2002 when the like already exists, which is caught below. The
-      // alternative - findFirst then create - is a race that double-counts
-      // under a double-tap, which is exactly the traffic this endpoint gets.
-      await tx.postLike.create({ data: { postId, userId: auth.userId } });
+  /**
+   * setPostLike reports whether the state actually changed by returning the
+   * resulting count; liking an already-liked post is a no-op that returns the
+   * current total. The SQL version got that from catching a unique violation -
+   * here it falls out of the document being keyed by the liker, so no
+   * exception is used as control flow.
+   */
+  const { likeCount, changed } = await setPostLike(postId, auth.userId, true);
 
-      const updated = await tx.post.update({
-        where: { id: postId },
-        data: { likeCount: { increment: 1 } },
-        select: { likeCount: true },
-      });
-
-      if (post.authorId !== auth.userId) {
-        await tx.notification.create({
-          data: {
-            userId: post.authorId,
-            type: NotificationType.POST_LIKE,
-            titleKey: 'notifications.postLike.title',
-            bodyKey: 'notifications.postLike.body',
-            linkUrl: `/dashboard?post=${postId}`,
-          },
-        });
-      }
-
-      return updated.likeCount;
+  /**
+   * The notification is written AFTER the like, not with it.
+   *
+   * Firestore cannot span a transaction across the post's like subcollection
+   * and the notifications collection in a way this module could express
+   * cleanly, and the two do not need to be atomic: a like without its
+   * notification is a missed bell, while a notification without its like would
+   * be a lie about something that never happened. The recoverable failure is
+   * the one left possible.
+   *
+   * Nobody is notified about liking their own post, and nobody is notified
+   * TWICE: `changed` is false when the like was already there, so a double-tap
+   * or a retried request cannot fan out a second notification. Under SQL the
+   * duplicate raised a unique violation before this line was reached; the flag
+   * is what reproduces that.
+   */
+  if (changed && post.authorId !== auth.userId) {
+    await createNotification({
+      userId: post.authorId,
+      type: NotificationType.POST_LIKE,
+      titleKey: 'notifications.postLike.title',
+      bodyKey: 'notifications.postLike.body',
+      linkUrl: `/dashboard?post=${postId}`,
     });
-
-    return NextResponse.json({ liked: true, likeCount }, { headers: { 'Cache-Control': 'no-store' } });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      // Already liked. Report the current truth rather than an error: the
-      // client's optimistic state is already correct.
-      const current = await db.post.findUnique({ where: { id: postId }, select: { likeCount: true } });
-      return NextResponse.json({ liked: true, likeCount: current?.likeCount ?? 0 });
-    }
-    throw error;
   }
+
+  return NextResponse.json({ liked: true, likeCount }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 /** DELETE - unlike. Removing a like that is not there is a no-op. */
@@ -112,24 +112,13 @@ export async function DELETE(
   const post = await findVisiblePost(postId, auth.viewer);
   if (!post) return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
 
-  const likeCount = await db.$transaction(async (tx) => {
-    const removed = await tx.postLike.deleteMany({ where: { postId, userId: auth.userId } });
-
-    // Decrement ONLY when a row was actually removed. Decrementing
-    // unconditionally lets a repeated DELETE drive the counter negative, which
-    // is how a "-3 likes" bug is born.
-    if (removed.count === 0) {
-      const current = await tx.post.findUnique({ where: { id: postId }, select: { likeCount: true } });
-      return current?.likeCount ?? 0;
-    }
-
-    const updated = await tx.post.update({
-      where: { id: postId },
-      data: { likeCount: { decrement: 1 } },
-      select: { likeCount: true },
-    });
-    return updated.likeCount;
-  });
+  /**
+   * The counter moves ONLY when a like was actually removed. Decrementing
+   * unconditionally lets a repeated DELETE drive the counter negative, which
+   * is how a "-3 likes" bug is born - setPostLike enforces that by comparing
+   * the current state before writing anything.
+   */
+  const { likeCount } = await setPostLike(postId, auth.userId, false);
 
   return NextResponse.json({ liked: false, likeCount }, { headers: { 'Cache-Control': 'no-store' } });
 }

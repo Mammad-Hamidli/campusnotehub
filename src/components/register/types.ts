@@ -1,6 +1,35 @@
 import type { DocKind, DocState } from './DocumentDropzone';
 
+/** Mirrors ACCOUNT_TYPES in src/server/validators/auth.ts. */
+export type AccountType = 'STUDENT' | 'TEACHER' | 'MENTOR';
+
+/**
+ * The types that answer "where do you work" rather than "where do you study".
+ * Mirrors PROFESSIONAL_TYPES in src/server/validators/auth.ts.
+ */
+export const PROFESSIONAL_TYPES: readonly AccountType[] = ['TEACHER', 'MENTOR'];
+export const isProfessional = (t: AccountType | '') =>
+  t === 'TEACHER' || t === 'MENTOR';
+
 export type AccountForm = {
+  /**
+   * The legal name, in two halves.
+   *
+   * Collected separately because a document check compares given name and
+   * surname independently. `fullName` below is derived from these on the
+   * server and remains what every existing surface renders.
+   */
+  firstName: string;
+  lastName: string;
+  /** YYYY-MM-DD. Checked against the identity document during verification. */
+  dateOfBirth: string;
+  /** Chosen in step 2; decides which fields and documents follow. */
+  accountType: AccountType | '';
+  /** STUDENT only. */
+  studentNumber: string;
+  /** TEACHER only. */
+  department: string;
+  academicTitle: string;
   fullName: string;
   nickname: string;
   email: string;
@@ -30,12 +59,18 @@ export type DocumentMap = Record<DocKind, DocState>;
  * actual DOM order — which is what makes an error summary useless.
  */
 export const FIELD_ORDER: (keyof AccountForm)[] = [
-  'fullName',
+  'firstName',
+  'lastName',
+  'dateOfBirth',
   'nickname',
   'email',
   'phone',
   'password',
+  'accountType',
   'universityId',
+  'studentNumber',
+  'department',
+  'academicTitle',
   'facultySlug',
   'facultyOther',
   'graduationYear',
@@ -46,6 +81,13 @@ export const FIELD_ORDER: (keyof AccountForm)[] = [
 
 /** Label keys for the error summary, so it reads "Nickname: required". */
 export const FIELD_LABEL_KEYS: Record<keyof AccountForm, string> = {
+  firstName: 'auth.register.firstName',
+  lastName: 'auth.register.lastName',
+  dateOfBirth: 'auth.register.dateOfBirth',
+  accountType: 'auth.register.accountType',
+  studentNumber: 'auth.register.studentNumber',
+  department: 'auth.register.department',
+  academicTitle: 'auth.register.academicTitle',
   fullName: 'auth.register.fullName',
   nickname: 'auth.register.nickname',
   email: 'auth.register.email',
@@ -61,6 +103,13 @@ export const FIELD_LABEL_KEYS: Record<keyof AccountForm, string> = {
 };
 
 export const EMPTY_ACCOUNT: AccountForm = {
+  firstName: '',
+  lastName: '',
+  dateOfBirth: '',
+  accountType: '',
+  studentNumber: '',
+  department: '',
+  academicTitle: '',
   fullName: '',
   nickname: '',
   email: '',
@@ -75,12 +124,41 @@ export const EMPTY_ACCOUNT: AccountForm = {
   consentDocuments: false,
 };
 
-export const DOCUMENT_SLOTS: { kind: DocKind; labelKey: string }[] = [
-  { kind: 'STUDENT_CARD_FRONT', labelKey: 'verification.slots.studentFront' },
-  { kind: 'STUDENT_CARD_BACK', labelKey: 'verification.slots.studentBack' },
+/**
+ * Identity documents, required of BOTH account types.
+ *
+ * Everyone proves who they are with the same two images.
+ */
+export const ID_SLOTS: { kind: DocKind; labelKey: string }[] = [
   { kind: 'ID_FRONT', labelKey: 'verification.slots.idFront' },
   { kind: 'ID_BACK', labelKey: 'verification.slots.idBack' },
 ];
+
+/**
+ * The student card, required of STUDENT only.
+ *
+ * Neither a teacher nor a mentor has a student card, so demanding one would
+ * make their verification impossible to complete. The server applies the same
+ * split in requiredKindsFor().
+ */
+export const STUDENT_CARD_SLOTS: { kind: DocKind; labelKey: string }[] = [
+  { kind: 'STUDENT_CARD_FRONT', labelKey: 'verification.slots.studentFront' },
+  { kind: 'STUDENT_CARD_BACK', labelKey: 'verification.slots.studentBack' },
+];
+
+/** All four. Retained for callers that iterate every possible slot. */
+export const DOCUMENT_SLOTS: { kind: DocKind; labelKey: string }[] = [
+  ...STUDENT_CARD_SLOTS,
+  ...ID_SLOTS,
+];
+
+/** The slots one account type must actually fill. */
+export function slotsFor(accountType: AccountType | ''): { kind: DocKind; labelKey: string }[] {
+  // '' (not yet chosen) keeps the conservative full set, matching the server's
+  // default in requiredKindsFor(): asking for an extra document is recoverable,
+  // silently skipping one is not.
+  return isProfessional(accountType) ? ID_SLOTS : DOCUMENT_SLOTS;
+}
 
 export const EMPTY_DOCUMENTS: DocumentMap = {
   STUDENT_CARD_FRONT: { phase: 'empty' },
@@ -106,15 +184,63 @@ const RESERVED_NICKNAMES = new Set([
  * more — including the phone number, which is now the strongest ban anchor the
  * platform has.
  */
-export function validateAccount(form: AccountForm): FieldErrors {
+/**
+ * Which fields a given step is responsible for.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY VALIDATION IS STEP-SCOPED
+ * ---------------------------------------------------------------------------
+ * Running the whole validator on step 1 demands `accountType`, which is not
+ * chosen until step 2 - so step 1 could never be satisfied and the wizard was
+ * impossible to advance past. The same trap applies in reverse: the
+ * type-specific fields cannot be judged before the type exists.
+ *
+ * `scope` therefore says what is being checked right now. 'all' is the submit
+ * path and is what the server mirrors.
+ */
+export type ValidationScope = 'basics' | 'all';
+
+export function validateAccount(
+  form: AccountForm,
+  scope: ValidationScope = 'all',
+): FieldErrors {
   const errors: FieldErrors = {};
 
-  const fullName = form.fullName.trim();
-  if (!fullName) errors.fullName = 'errors.fieldRequired';
-  else if (fullName.length < 3) errors.fullName = 'auth.errors.nameTooShort';
-  // Digits and punctuation never appear on an ID; rejecting them here avoids a
-  // mismatch the OCR cross-check would otherwise flag much later.
-  else if (!/^[\p{L}\s'-]+$/u.test(fullName)) errors.fullName = 'auth.errors.nameInvalid';
+  /**
+   * Name halves.
+   *
+   * Digits and punctuation never appear on an ID; rejecting them here avoids a
+   * mismatch the document cross-check would otherwise flag much later, after
+   * the user has already uploaded four photographs.
+   */
+  const NAME_RE = /^[\p{L}\s'-]+$/u;
+
+  const firstName = form.firstName.trim();
+  if (!firstName) errors.firstName = 'errors.fieldRequired';
+  else if (firstName.length < 2) errors.firstName = 'auth.errors.nameTooShort';
+  else if (!NAME_RE.test(firstName)) errors.firstName = 'auth.errors.nameInvalid';
+
+  const lastName = form.lastName.trim();
+  if (!lastName) errors.lastName = 'errors.fieldRequired';
+  else if (lastName.length < 2) errors.lastName = 'auth.errors.nameTooShort';
+  else if (!NAME_RE.test(lastName)) errors.lastName = 'auth.errors.nameInvalid';
+
+  /**
+   * Date of birth. Mirrors the server's plausibility window rather than
+   * inventing a second rule - a client that disagrees with the server just
+   * produces a confusing round trip.
+   */
+  if (!form.dateOfBirth) {
+    errors.dateOfBirth = 'errors.fieldRequired';
+  } else {
+    const dob = new Date(`${form.dateOfBirth}T00:00:00.000Z`);
+    if (Number.isNaN(dob.getTime())) {
+      errors.dateOfBirth = 'auth.errors.dobInvalid';
+    } else {
+      const years = (Date.now() - dob.getTime()) / (365.2425 * 86_400_000);
+      if (years < 16 || years > 100) errors.dateOfBirth = 'auth.errors.dobImplausible';
+    }
+  }
 
   const nickname = form.nickname.trim();
   if (!nickname) errors.nickname = 'errors.fieldRequired';
@@ -135,18 +261,46 @@ export function validateAccount(form: AccountForm): FieldErrors {
   else if (form.password.length < 12 || new Set(form.password).size < 5)
     errors.password = 'auth.errors.weakPassword';
 
+  /**
+   * Step 1 stops here.
+   *
+   * The university, the account type and everything that depends on it belong
+   * to steps 2 and 3; reporting them as missing while the user is still on
+   * step 1 is how the wizard became unadvanceable.
+   */
+  if (scope === 'basics') return errors;
+
+  // Both account types belong to an institution.
   if (!form.universityId) errors.universityId = 'errors.fieldRequired';
 
-  // Faculty mirrors the server: a catalogue choice is required, and the free
-  // text is required only when that choice is 'other'. The same pairing is
-  // enforced by a zod refinement and by a CHECK constraint - this copy exists
-  // to say so before the round trip, not instead of it.
-  if (!form.facultySlug) errors.facultySlug = 'errors.fieldRequired';
-  else if (form.facultySlug === 'other' && !form.facultyOther.trim())
-    errors.facultyOther = 'auth.errors.facultyOtherRequired';
+  if (!form.accountType) errors.accountType = 'errors.fieldRequired';
 
-  if (!form.graduationYear) errors.graduationYear = 'errors.fieldRequired';
-  if (!form.graduationMonth) errors.graduationMonth = 'errors.fieldRequired';
+  /**
+   * Type-specific requirements, mirroring the refinements in
+   * src/server/validators/auth.ts.
+   *
+   * This copy exists to show the error next to the field before a round trip -
+   * NOT instead of the server check. A client that skips this still meets the
+   * same rules on the server.
+   */
+  if (form.accountType === 'STUDENT') {
+    if (!form.studentNumber.trim()) errors.studentNumber = 'auth.errors.studentNumberRequired';
+
+    // Faculty: a catalogue choice is required, and the free text is required
+    // only when that choice is 'other'. The same pairing is enforced by a zod
+    // refinement and by a CHECK constraint.
+    if (!form.facultySlug) errors.facultySlug = 'errors.fieldRequired';
+    else if (form.facultySlug === 'other' && !form.facultyOther.trim())
+      errors.facultyOther = 'auth.errors.facultyOtherRequired';
+
+    if (!form.graduationYear) errors.graduationYear = 'errors.fieldRequired';
+    if (!form.graduationMonth) errors.graduationMonth = 'errors.fieldRequired';
+  }
+
+  if (isProfessional(form.accountType)) {
+    if (!form.department.trim()) errors.department = 'auth.errors.departmentRequired';
+    if (!form.academicTitle.trim()) errors.academicTitle = 'auth.errors.academicTitleRequired';
+  }
   if (!form.acceptTerms) errors.acceptTerms = 'auth.errors.termsRequired';
   if (!form.consentDocuments) errors.consentDocuments = 'auth.errors.consentRequired';
 

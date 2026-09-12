@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -17,11 +17,14 @@ import { useT } from '@/lib/i18n/LocaleProvider';
 import { DocumentDropzone, type DocKind, type DocState } from './DocumentDropzone';
 import { IntegrityScanner, type ScannerPhase } from './IntegrityScanner';
 import { StepAccount, UNIVERSITIES } from './StepAccount';
+import { StepAccountType } from './StepAccountType';
+import { StepDetails } from './StepDetails';
 import { ErrorSummary } from './ErrorSummary';
 import { ZeroRetentionNotice } from './ZeroRetentionNotice';
 import { useUniversityAutoDetect } from './useUniversityAutoDetect';
 import {
   DOCUMENT_SLOTS,
+  slotsFor,
   EMPTY_ACCOUNT,
   EMPTY_DOCUMENTS,
   collectFingerprint,
@@ -31,8 +34,21 @@ import {
   type FieldErrors,
 } from './types';
 
-type StepId = 'account' | 'documents' | 'review';
-const STEPS: StepId[] = ['account', 'documents', 'review'];
+/**
+ * Five steps, not three.
+ *
+ *   account   - name, date of birth, credentials (common to both types)
+ *   type      - Student or Teacher/Mentor
+ *   details   - the fields that depend on that choice
+ *   documents - the documents that depend on that choice
+ *   review    - confirm and submit
+ *
+ * The type choice sits between the common information and everything
+ * type-specific so a person is never asked for a student number before the
+ * product knows they are a student.
+ */
+type StepId = 'account' | 'type' | 'details' | 'documents' | 'review';
+const STEPS: StepId[] = ['account', 'type', 'details', 'documents', 'review'];
 
 export function RegisterWizard() {
   const t = useT();
@@ -48,6 +64,8 @@ export function RegisterWizard() {
   const [blocked, setBlocked] = useState<{ reference: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(false);
+  // Set once POST /api/auth/register has succeeded; see submit().
+  const registeredRef = useRef(false);
 
   /**
    * Auto-selects the university from the email domain. The hook latches a
@@ -72,13 +90,46 @@ export function RegisterWizard() {
   }, []);
 
   /**
+   * Preselects the account type from `?type=`.
+   *
+   * This is what makes "Become a mentor" work for someone with no account:
+   * /mentors/apply sends a signed-out visitor to /register?type=MENTOR, and
+   * arriving with the question already answered is the whole point - being
+   * asked "student or mentor?" immediately after clicking "Become a mentor"
+   * reads as the product having ignored the click.
+   *
+   * Read from location rather than useSearchParams() deliberately: this page is
+   * not otherwise dynamic, and useSearchParams() would force the whole wizard
+   * into a Suspense boundary to satisfy the App Router's static-rendering rule.
+   *
+   * It only preselects - it never skips a step or submits anything, and an
+   * unrecognised value is ignored, so the URL cannot put the form into a state
+   * the user could not reach by clicking.
+   */
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('type')?.toUpperCase();
+    if (requested === 'STUDENT' || requested === 'TEACHER' || requested === 'MENTOR') {
+      setAccount((prev) => ({ ...prev, accountType: requested }));
+    }
+  }, []);
+
+  /**
    * Documents live in browser memory until submit - there is no intermediate
    * upload any more. A refresh therefore loses them, so warn before unload
    * once the user has actually picked something.
    */
+  /**
+   * The slots this registration actually has to fill.
+   *
+   * A teacher has no student card, so requiring one would make their
+   * registration impossible to finish. requiredKindsFor() applies the same
+   * split on the server, from the account's own role.
+   */
+  const activeSlots = useMemo(() => slotsFor(account.accountType), [account.accountType]);
+
   const hasPickedDocuments = useMemo(
-    () => DOCUMENT_SLOTS.some(({ kind }) => documents[kind].phase === 'ready'),
-    [documents],
+    () => activeSlots.some(({ kind }) => documents[kind].phase === 'ready'),
+    [documents, activeSlots],
   );
 
   useEffect(() => {
@@ -91,10 +142,10 @@ export function RegisterWizard() {
   const stepIndex = STEPS.indexOf(step);
 
   const readyDocs = useMemo(
-    () => DOCUMENT_SLOTS.filter(({ kind }) => documents[kind].phase === 'ready').length,
-    [documents],
+    () => activeSlots.filter(({ kind }) => documents[kind].phase === 'ready').length,
+    [documents, activeSlots],
   );
-  const allDocsReady = readyDocs === DOCUMENT_SLOTS.length;
+  const allDocsReady = readyDocs === activeSlots.length;
 
   const handleDocChange = useCallback((kind: DocKind, next: DocState) => {
     setDocuments((prev) => ({ ...prev, [kind]: next }));
@@ -126,7 +177,8 @@ export function RegisterWizard() {
    * drift apart, which is how the two used to disagree.
    */
   function advanceFromAccount() {
-    const found = validateAccount(account);
+    // Step 1 judges only the common fields - see ValidationScope.
+    const found = validateAccount(account, 'basics');
     setErrors(found);
 
     const hasErrors = Object.keys(found).length > 0;
@@ -136,6 +188,40 @@ export function RegisterWizard() {
     // Valid: advance. `account` is owned by this component and is NOT unmounted
     // by the transition - StepAccount is a controlled child, so every field the
     // user typed survives moving to step 2 and back.
+    setShowSummary(false);
+    setFormError(null);
+    setStep('type');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /** Step 2 -> Step 3. The choice itself is the only thing to validate. */
+  function advanceFromType() {
+    if (!account.accountType) {
+      setErrors({ accountType: 'errors.fieldRequired' });
+      return;
+    }
+    setErrors({});
+    setFormError(null);
+    setStep('details');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /**
+   * Step 3 -> Step 4.
+   *
+   * Runs the FULL validator rather than a details-only subset: it already
+   * branches on accountType, and re-running it here means a value that became
+   * invalid because the type changed - a graduation date on a teacher, say -
+   * is caught before the document upload rather than at submit.
+   */
+  function advanceFromDetails() {
+    const found = validateAccount(account);
+    setErrors(found);
+
+    const hasErrors = Object.keys(found).length > 0;
+    setShowSummary(hasErrors);
+    if (hasErrors) return;
+
     setShowSummary(false);
     setFormError(null);
     setStep('documents');
@@ -213,63 +299,88 @@ export function RegisterWizard() {
     setScanner('scanning');
 
     try {
-      const registerRes = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          fullName: account.fullName.trim(),
-          nickname: account.nickname.trim(),
-          email: account.email.trim().toLowerCase(),
-          phone: account.phone.replace(/[\s-]/g, ''),
-          password: account.password,
-          passwordConfirm: account.password,
-          universityId: account.universityId,
-          facultySlug: account.facultySlug || undefined,
-          // Sent only for 'other'. The server clears it otherwise anyway, but
-          // sending a stale value would trip the schema's pairing refinement
-          // and turn a valid form into a 400.
-          facultyOther:
-            account.facultySlug === 'other' ? account.facultyOther.trim() || undefined : undefined,
-          graduationYear: Number(account.graduationYear),
-          graduationMonth: Number(account.graduationMonth),
-          locale: document.documentElement.lang || 'az',
-          acceptTerms: account.acceptTerms,
-          consentDocumentProcessing: account.consentDocuments,
-          deviceFingerprint: fingerprint,
-        }),
-      });
+      /**
+       * Register only once per wizard session.
+       *
+       * If the account was created on an earlier press and only the document
+       * step failed, the session cookie is already set - so a retry goes
+       * straight to the documents. Re-POSTing registration would be refused
+       * as a duplicate (409, bouncing the user back to step 1) AND would spend
+       * a token from the per-address auth:register budget, which is how a
+       * couple of document retries turned into a 429.
+       */
+      if (!registeredRef.current) {
+        const registerRes = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            accountType: account.accountType,
+            firstName: account.firstName.trim(),
+            lastName: account.lastName.trim(),
+            dateOfBirth: account.dateOfBirth,
+            nickname: account.nickname.trim(),
+            email: account.email.trim().toLowerCase(),
+            phone: account.phone.replace(/[\s-]/g, ''),
+            password: account.password,
+            passwordConfirm: account.password,
+            universityId: account.universityId,
+            facultySlug: account.facultySlug || undefined,
+            // Sent only for 'other'. The server clears it otherwise anyway, but
+            // sending a stale value would trip the schema's pairing refinement
+            // and turn a valid form into a 400.
+            facultyOther:
+              account.facultySlug === 'other' ? account.facultyOther.trim() || undefined : undefined,
+            // Type-specific. Each is omitted on the branch it does not belong
+            // to; the server's conditional refinements require the ones that
+            // matter, so an omission on the wrong branch is refused there.
+            studentNumber: account.studentNumber.trim() || undefined,
+            department: account.department.trim() || undefined,
+            academicTitle: account.academicTitle.trim() || undefined,
+            graduationYear: account.graduationYear ? Number(account.graduationYear) : undefined,
+            graduationMonth: account.graduationMonth ? Number(account.graduationMonth) : undefined,
+            locale: document.documentElement.lang || 'az',
+            acceptTerms: account.acceptTerms,
+            consentDocumentProcessing: account.consentDocuments,
+            deviceFingerprint: fingerprint,
+          }),
+        });
 
-      if (registerRes.status === 403) {
-        setBlocked({ reference: crypto.randomUUID().slice(0, 8).toUpperCase() });
-        return;
-      }
-      if (registerRes.status === 409) {
-        setScanner('idle');
-        const conflict = await registerRes.json().catch(() => ({}));
-        // The server tells us WHICH unique constraint fired, so the user is
-        // sent back to the right field rather than a generic "try again".
-        // Nickname clashes are named; email/phone clashes share one message
-        // (see the comment in the register route for why). Anchor the shared
-        // one on the email field, which is the more likely culprit.
-        setErrors(
-          conflict.error === 'auth.errors.nicknameTaken'
-            ? { nickname: 'auth.errors.nicknameTaken' }
-            : { email: conflict.error ?? 'auth.errors.credentialsUnavailable' },
-        );
-        setShowSummary(true);
-        setStep('account');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-      if (!registerRes.ok) {
-        setScanner('idle');
-        setFormError('errors.generic');
-        return;
+        if (registerRes.status === 403) {
+          setBlocked({ reference: crypto.randomUUID().slice(0, 8).toUpperCase() });
+          return;
+        }
+        if (registerRes.status === 409) {
+          setScanner('idle');
+          const conflict = await registerRes.json().catch(() => ({}));
+          // The server tells us WHICH unique constraint fired, so the user is
+          // sent back to the right field rather than a generic "try again".
+          // Nickname clashes are named; email/phone clashes share one message
+          // (see the comment in the register route for why). Anchor the shared
+          // one on the email field, which is the more likely culprit.
+          setErrors(
+            conflict.error === 'auth.errors.nicknameTaken'
+              ? { nickname: 'auth.errors.nicknameTaken' }
+              : { email: conflict.error ?? 'auth.errors.credentialsUnavailable' },
+          );
+          setShowSummary(true);
+          setStep('account');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+        if (!registerRes.ok) {
+          setScanner('idle');
+          setFormError(registerRes.status === 429 ? 'errors.rateLimited' : 'errors.generic');
+          return;
+        }
+        registeredRef.current = true;
       }
 
       // Multipart: the four files themselves, not references to uploads.
       const form = new FormData();
-      for (const { kind } of DOCUMENT_SLOTS) {
+      // Only the slots this account type must fill. Sending a teacher's
+      // absent student-card fields would fail the multipart parse on a
+      // document the server never asked for.
+      for (const { kind } of activeSlots) {
         const doc = documents[kind];
         if (doc.phase === 'ready') form.append(kind, doc.file, `${kind}.jpg`);
       }
@@ -297,8 +408,16 @@ export function RegisterWizard() {
 
       // The account exists and is usable regardless of the verdict, so route
       // to the dashboard either way. The banner reflects the real status.
+      //
+      // A mentor carries `next=mentor`, which makes the dashboard surface the
+      // remaining step - the mentor profile a moderator has to approve before
+      // the account is listed in the directory. The dashboard is still the
+      // landing page rather than /mentors/apply directly, so a new mentor sees
+      // their verification state first and understands why they are not
+      // bookable yet.
       const status = String(payload.status ?? 'NEEDS_REVIEW');
-      router.push(`/dashboard?verification=${status}&welcome=1`);
+      const next = account.accountType === 'MENTOR' ? '&next=mentor' : '';
+      router.push(`/dashboard?verification=${status}&welcome=1${next}`);
     } catch {
       // Network failure after the account may already exist. The dashboard
       // resolves the true state from the session, so send them there.
@@ -366,8 +485,6 @@ export function RegisterWizard() {
               value={account}
               errors={errors}
               onEmailChange={autoDetect.handleEmailChange}
-              onUniversityManualChange={autoDetect.handleManualChange}
-              autoDetected={autoDetect.wasAutoDetected}
               onChange={(patch) => {
                 setAccount((prev) => ({ ...prev, ...patch }));
                 setErrors((prev) => {
@@ -384,6 +501,63 @@ export function RegisterWizard() {
           </StepPanel>
         )}
 
+        {step === 'type' && (
+          <StepPanel
+            title={t('auth.register.accountType')}
+            subtitle={t('auth.register.accountTypeHint')}
+          >
+            <StepAccountType
+              value={account.accountType}
+              error={errors.accountType && t(errors.accountType)}
+              onChange={(accountType) => {
+                setAccount((prev) => ({
+                  ...prev,
+                  accountType,
+                  /**
+                   * Clear the OTHER branch's fields on switch.
+                   *
+                   * Without this, someone who fills in a student number, goes
+                   * back, and becomes a teacher would submit a teacher account
+                   * carrying a student number - data the account type says
+                   * nothing should have, and which the server would store.
+                   */
+                  ...(accountType === 'STUDENT'
+                    ? { department: '', academicTitle: '' }
+                    : { studentNumber: '', graduationYear: '', graduationMonth: '' }),
+                }));
+                setErrors({});
+              }}
+            />
+          </StepPanel>
+        )}
+
+        {step === 'details' && (
+          <StepPanel
+            title={t('auth.register.detailsTitle')}
+            subtitle={
+              account.accountType === 'MENTOR'
+                ? t('auth.register.detailsMentorHint')
+                : account.accountType === 'TEACHER'
+                  ? t('auth.register.detailsTeacherHint')
+                  : t('auth.register.detailsStudentHint')
+            }
+          >
+            <StepDetails
+              value={account}
+              errors={errors}
+              onChange={(patch) => {
+                setAccount((prev) => ({ ...prev, ...patch }));
+                setErrors((prev) => {
+                  const next = { ...prev };
+                  for (const key of Object.keys(patch)) delete next[key as keyof AccountForm];
+                  if (Object.keys(next).length === 0) setShowSummary(false);
+                  return next;
+                });
+              }}
+            />
+          </StepPanel>
+        )}
+
         {step === 'documents' && (
           <StepPanel title={t('verification.title')} subtitle={t('verification.subtitle')}>
             {/* Above the slots, not below: the reassurance has to land before
@@ -391,7 +565,7 @@ export function RegisterWizard() {
             <ZeroRetentionNotice />
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              {DOCUMENT_SLOTS.map(({ kind, labelKey }) => (
+              {activeSlots.map(({ kind, labelKey }) => (
                 <DocumentDropzone
                   key={kind}
                   kind={kind}
@@ -426,7 +600,7 @@ export function RegisterWizard() {
                 animating a process that had not started. */}
             {scanner !== 'idle' && (
               <div className="mt-5">
-                <IntegrityScanner phase={scanner} readyCount={readyDocs} totalCount={DOCUMENT_SLOTS.length} />
+                <IntegrityScanner phase={scanner} readyCount={readyDocs} totalCount={activeSlots.length} />
               </div>
             )}
           </StepPanel>
@@ -493,7 +667,15 @@ export function RegisterWizard() {
             // to do with this click; if JS is not ready the button is inert, and
             // inert is recoverable - a reload that discards the form is not.
             type="button"
-            onClick={step === 'account' ? advanceFromAccount : goToReview}
+            onClick={
+              step === 'account'
+                ? advanceFromAccount
+                : step === 'type'
+                  ? advanceFromType
+                  : step === 'details'
+                    ? advanceFromDetails
+                    : goToReview
+            }
             className="btn-primary h-10 px-5"
           >
             {t('register.next')}
@@ -506,7 +688,7 @@ export function RegisterWizard() {
           upload flows. Always say what is missing. */}
       {step === 'documents' && !allDocsReady && (
         <p aria-live="polite" className="mt-3 text-right text-xs text-fg-muted">
-          {readyDocs} / {DOCUMENT_SLOTS.length}
+          {readyDocs} / {activeSlots.length}
         </p>
       )}
     </div>
@@ -589,18 +771,40 @@ function ReviewSummary({
   const t = useT();
   const university = UNIVERSITIES.find((u) => u.id === account.universityId);
 
+  const isStudent = account.accountType === 'STUDENT';
+
   const rows = [
-    { label: t('auth.register.fullName'), value: account.fullName },
+    {
+      label: t('auth.register.accountType'),
+      value: t(
+        account.accountType === 'MENTOR'
+          ? 'auth.register.types.mentor.title'
+          : account.accountType === 'TEACHER'
+            ? 'auth.register.types.teacher.title'
+            : 'auth.register.types.student.title',
+      ),
+    },
+    { label: t('auth.register.fullName'), value: `${account.firstName} ${account.lastName}`.trim() },
+    { label: t('auth.register.dateOfBirth'), value: account.dateOfBirth },
     { label: t('auth.register.email'), value: account.email },
     ...(account.phone ? [{ label: t('auth.register.phone'), value: account.phone }] : []),
     {
       label: t('auth.register.university'),
       value: university ? `${university.id} — ${university.az}` : '—',
     },
-    {
-      label: t('auth.register.graduationYear'),
-      value: `${account.graduationMonth.padStart(2, '0')} / ${account.graduationYear}`,
-    },
+    /**
+     * Graduation is a STUDENT claim only. Listing it for a teacher or a mentor
+     * rendered "00 / " from the empty fields their branch never collects - a
+     * summary contradicting the form directly above it.
+     */
+    ...(isStudent
+      ? [
+          {
+            label: t('auth.register.graduationYear'),
+            value: `${account.graduationMonth.padStart(2, '0')} / ${account.graduationYear}`,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -638,7 +842,7 @@ function ReviewSummary({
           </button>
         </header>
         <ul className="grid gap-3 p-4 sm:grid-cols-2">
-          {DOCUMENT_SLOTS.map(({ kind, labelKey }) => {
+          {slotsFor(account.accountType).map(({ kind, labelKey }) => {
             const doc = documents[kind];
             return (
               <li key={kind} className="flex items-center gap-3 rounded-lg bg-surface-muted p-2.5">

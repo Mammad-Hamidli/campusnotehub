@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { type Prisma, VerificationStatus } from '@prisma/client';
-import { db } from '@/lib/db';
+import { VerificationStatus } from '@/lib/enums';
+import { listCases } from '@/lib/firebase/repositories/verification';
+import { findUsersByIds } from '@/lib/firebase/repositories/users';
+import { findUniversitiesByIds } from '@/lib/firebase/repositories/reference';
 import { withAdmin } from '@/lib/auth/admin';
 import { adminVerificationListSchema } from '@/server/validators/admin';
 
@@ -41,77 +43,76 @@ export async function GET(request: NextRequest) {
     }
     const input = parsed.data;
 
-    const where: Prisma.VerificationCaseWhereInput = {};
-    if (input.status) where.status = input.status;
+    const now = new Date();
+
     /**
      * Cleared rows are hidden by default and remain retrievable.
      *
-     * This is a VIEW filter, not a deletion: the row, its verdict, its
+     * This is a VIEW filter, not a deletion: the case, its verdict, its
      * moderator and its audit trail are all untouched, and asking for
      * includeDismissed=true brings it straight back. Keeping the two ideas
-     * separate is the whole point of the column - a queue that gets tidy by
+     * separate is the whole point of the field - a queue that gets tidy by
      * destroying evidence is not a queue anyone can audit.
+     *
+     * The free-text box matched the case id OR the applicant's name, nickname
+     * or id - a search across a JOINED document, which Firestore cannot do at
+     * all. It is resolved below, after the applicants are fetched, rather than
+     * being silently dropped.
+     *
+     * `sort` is a z.enum, so it cannot become an arbitrary field name.
      */
-    if (!input.includeDismissed) where.dismissedAt = null;
-    if (input.q) {
-      where.OR = [
-        { id: input.q },
-        { user: { fullName: { contains: input.q, mode: 'insensitive' } } },
-        { user: { nickname: { contains: input.q, mode: 'insensitive' } } },
-        { user: { id: input.q } },
-      ];
-    }
+    const { cases: allRows } = await listCases(
+      { status: input.status, includeDismissed: input.includeDismissed },
+      1,
+      // Paged after the applicant search, so the whole matched set is needed
+      // here rather than one page of it. Bounded by the repository's ceiling.
+      Number.MAX_SAFE_INTEGER,
+      input.sort,
+      input.order,
+    );
 
-    const orderBy: Prisma.VerificationCaseOrderByWithRelationInput[] = [
-      { [input.sort]: input.order } as Prisma.VerificationCaseOrderByWithRelationInput,
-      { id: 'asc' },
-    ];
+    const applicants = await findUsersByIds(allRows.map((c) => c.userId));
 
-    const now = new Date();
+    const needle = input.q?.toLowerCase();
+    const matched = needle
+      ? allRows.filter((c) => {
+          if (c.id === input.q || c.userId === input.q) return true;
+          const applicant = applicants.get(c.userId);
+          return Boolean(
+            applicant?.fullName?.toLowerCase().includes(needle) ||
+              applicant?.nickname?.toLowerCase().includes(needle),
+          );
+        })
+      : allRows;
 
-    const [total, rows] = await db.$transaction([
-      db.verificationCase.count({ where }),
-      db.verificationCase.findMany({
-        where,
-        orderBy,
-        skip: (input.page - 1) * input.pageSize,
-        take: input.pageSize,
-        select: {
-          id: true,
-          status: true,
-          attempt: true,
-          submittedAt: true,
-          decidedAt: true,
-          verdict: true,
-          confidence: true,
-          failureCodes: true,
-          // reviewPriority is no longer SELECTED: the Priority column was
-          // removed from the table because an operator cannot act on it - the
-          // queue is already ordered by it, so the number restated a fact the
-          // row order was showing and took a column's width to do it. It is
-          // still a permitted `sort` value, which needs no select.
-          reviewExpiresAt: true,
-          reviewBufferKey: true,
-          moderatorNote: true,
-          dismissedAt: true,
-          dismissedBy: { select: { id: true, nickname: true } },
-          user: {
-            select: {
-              id: true,
-              fullName: true,
-              nickname: true,
-              verificationStatus: true,
-              university: { select: { code: true, nameEn: true } },
-            },
-          },
-          decidedByModerator: { select: { id: true, nickname: true } },
-        },
-      }),
-    ]);
+    const total = matched.length;
+    const rows = matched.slice((input.page - 1) * input.pageSize, input.page * input.pageSize);
+
+    const universities = await findUniversitiesByIds(
+      rows
+        .map((c) => applicants.get(c.userId)?.universityId)
+        .filter((id): id is string => Boolean(id)),
+    );
+
+    const moderators = await findUsersByIds(
+      [...rows.map((c) => c.decidedByModeratorId), ...rows.map((c) => c.dismissedById)].filter(
+        (id): id is string => Boolean(id),
+      ),
+    );
 
     return NextResponse.json(
       {
-        cases: rows.map((c) => ({
+        cases: rows.map((c) => {
+          const applicant = applicants.get(c.userId);
+          const university = applicant?.universityId
+            ? universities.get(applicant.universityId)
+            : null;
+          const reviewer = c.decidedByModeratorId
+            ? moderators.get(c.decidedByModeratorId)
+            : null;
+          const dismisser = c.dismissedById ? moderators.get(c.dismissedById) : null;
+
+          return {
           id: c.id,
           status: c.status,
           attempt: c.attempt,
@@ -121,10 +122,31 @@ export async function GET(request: NextRequest) {
           confidence: c.confidence ? Number(c.confidence) : null,
           failureCodes: c.failureCodes,
           moderatorNote: c.moderatorNote,
-          user: c.user,
-          reviewer: c.decidedByModerator,
+          user: applicant
+            ? {
+                id: applicant.id,
+                fullName: applicant.fullName,
+                nickname: applicant.nickname,
+                verificationStatus: applicant.verificationStatus,
+                /**
+                 * The account type, so a reviewer knows which documents to
+                 * expect before opening the case. A teacher submits two
+                 * images, a student four - without this the queue looks like
+                 * a teacher is missing paperwork.
+                 */
+                role: applicant.role,
+                studentNumber: applicant.studentNumber,
+                department: applicant.department,
+                academicTitle: applicant.academicTitle,
+                dateOfBirth: applicant.dateOfBirth,
+                university: university
+                  ? { code: university.code, nameEn: university.nameEn }
+                  : null,
+              }
+            : null,
+          reviewer: reviewer ? { id: reviewer.id, nickname: reviewer.nickname } : null,
           dismissedAt: c.dismissedAt,
-          dismissedBy: c.dismissedBy,
+          dismissedBy: dismisser ? { id: dismisser.id, nickname: dismisser.nickname } : null,
           /**
            * The key itself never leaves the server - only whether documents are
            * still there to look at. That is what the UI needs to decide between
@@ -139,7 +161,8 @@ export async function GET(request: NextRequest) {
           minutesLeft: c.reviewExpiresAt
             ? Math.max(0, Math.round((c.reviewExpiresAt.getTime() - now.getTime()) / 60_000))
             : null,
-        })),
+          };
+        }),
         page: {
           page: input.page,
           pageSize: input.pageSize,

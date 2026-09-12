@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, ShoppingBag, ShoppingCart } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { FileChip } from './FileChip';
 
@@ -33,6 +33,51 @@ type Note = {
 export function NotesList() {
   const t = useT();
   const [notes, setNotes] = useState<Note[] | null>(null);
+  /** noteId currently being purchased, so only that row shows a spinner. */
+  const [buying, setBuying] = useState<string | null>(null);
+  /** noteIds this session has successfully bought, for immediate feedback. */
+  const [owned, setOwned] = useState<Set<string>>(new Set());
+  const [buyError, setBuyError] = useState<{ noteId: string; key: string } | null>(null);
+
+  /**
+   * Buys a note.
+   *
+   * The button is per-row rather than on a detail page because the listing is
+   * where the decision is made. Idempotency lives on the SERVER - the order's
+   * unique (buyerId, noteId) index and derived idempotency key mean a
+   * double-click cannot charge twice - so this only needs to stop the UI
+   * firing two requests at once.
+   */
+  async function buy(noteId: string) {
+    if (buying) return;
+    setBuying(noteId);
+    setBuyError(null);
+    try {
+      const response = await fetch(`/api/notes/${noteId}/purchase`, { method: 'POST' });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        // 409 means it is already owned, which is a success from the reader's
+        // point of view - the note is theirs and the download works.
+        if (response.status === 409) {
+          setOwned((prev) => new Set(prev).add(noteId));
+          return;
+        }
+        setBuyError({ noteId, key: payload?.error ?? 'errors.generic' });
+        return;
+      }
+
+      setOwned((prev) => new Set(prev).add(noteId));
+      // Reflect the new purchase count without a refetch of the whole list.
+      setNotes((prev) =>
+        prev?.map((n) => (n.id === noteId ? { ...n, purchaseCount: n.purchaseCount + 1 } : n)) ?? prev,
+      );
+    } catch {
+      setBuyError({ noteId, key: 'errors.generic' });
+    } finally {
+      setBuying(null);
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -50,10 +95,19 @@ export function NotesList() {
           <h1 className="text-xl font-bold tracking-tight text-fg">{t('notes.title')}</h1>
           <p className="mt-0.5 text-sm text-fg-muted">{t('notes.subtitle')}</p>
         </div>
-        <Link href="/notes/new" className="btn-primary">
-          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('notes.upload.title')}
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* The purchases page is the only route to a paid download, so it
+              needs a link from here - it was previously reachable by typing
+              the URL and nothing else. */}
+          <Link href="/notes/purchases" className="btn-secondary">
+            <ShoppingBag className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('notes.myPurchases')}
+          </Link>
+          <Link href="/notes/new" className="btn-primary">
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('notes.upload.title')}
+          </Link>
+        </div>
       </header>
 
       {notes === null && (
@@ -100,15 +154,45 @@ export function NotesList() {
             )}
 
             {/* Real counters from the database. Zero is shown as zero. */}
-            <p className="mt-2 flex gap-3 text-2xs tabular-nums text-fg-subtle">
-              <span>{t('notes.stats.downloads').replace('{n}', String(note.downloadCount))}</span>
-              <span>{t('notes.stats.purchases').replace('{n}', String(note.purchaseCount))}</span>
-              {note.ratingCount > 0 && (
-                <span>
-                  {note.ratingAvg.toFixed(1)} ({note.ratingCount})
-                </span>
-              )}
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <p className="flex gap-3 text-2xs tabular-nums text-fg-subtle">
+                <span>{t('notes.stats.downloads').replace('{n}', String(note.downloadCount))}</span>
+                <span>{t('notes.stats.purchases').replace('{n}', String(note.purchaseCount))}</span>
+                {note.ratingCount > 0 && (
+                  <span>
+                    {note.ratingAvg.toFixed(1)} ({note.ratingCount})
+                  </span>
+                )}
+              </p>
+
+              <div className="ml-auto flex items-center gap-2">
+                {owned.has(note.id) ? (
+                  <Link href="/notes/purchases" className="btn-secondary px-3 py-1 text-xs">
+                    {t('notes.owned')}
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void buy(note.id)}
+                    disabled={buying === note.id}
+                    className="btn-primary px-3 py-1 text-xs"
+                  >
+                    {buying === note.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <ShoppingCart className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    {note.priceMinor === 0 ? t('notes.buyFree') : t('notes.buy')}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {buyError?.noteId === note.id && (
+              <p className="mt-2 text-xs text-danger" role="alert">
+                {t(buyError.key)}
+              </p>
+            )}
           </li>
         ))}
       </ul>

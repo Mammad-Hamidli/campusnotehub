@@ -4,6 +4,7 @@ import { cookies, headers } from 'next/headers';
 import { LocaleProvider } from '@/lib/i18n/LocaleProvider';
 import { DEFAULT_LOCALE, LOCALE_COOKIE, isLocale } from '@/lib/i18n/dictionaries';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
+import { SessionKeeper } from '@/components/auth/SessionKeeper';
 // Imported from constants.ts, NOT from the 'use client' provider: a plain
 // export read across that boundary resolves to undefined on the server.
 // See src/lib/theme/constants.ts.
@@ -34,13 +35,29 @@ export const metadata: Metadata = {
     siteName: 'CampusHub',
     locale: 'az_AZ',
     alternateLocale: ['en_US', 'ru_RU'],
+    images: ['/brand/campus-hub-logo.svg'],
   },
+  /**
+   * The tab icon is NOT declared here on purpose.
+   *
+   * src/app/icon.svg and src/app/apple-icon.png are Next.js file conventions:
+   * the framework hashes them, serves them from /icon.svg?<hash> and emits the
+   * <link rel="icon"> tags itself. Repeating them in this object would produce
+   * a second, unhashed set of tags pointing at the same artwork, and the two
+   * would then have to be kept in step by hand.
+   */
 };
 
 export const viewport: Viewport = {
+  /**
+   * These must track --canvas in globals.css. They colour the browser chrome
+   * around the page (Android address bar, iOS status bar, the macOS Safari tab
+   * strip), so a stale value shows up as a hairline of the OLD theme sitting
+   * directly above the new one.
+   */
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#F8FAFC' },
-    { media: '(prefers-color-scheme: dark)', color: '#0B0F19' },
+    { media: '(prefers-color-scheme: light)', color: '#F6F8FB' },
+    { media: '(prefers-color-scheme: dark)', color: '#111620' },
   ],
   width: 'device-width',
   initialScale: 1,
@@ -110,7 +127,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           Skip to content
         </a>
         <ThemeProvider initialPreference={themePreference}>
-          <LocaleProvider initialLocale={locale}>{children}</LocaleProvider>
+          <LocaleProvider initialLocale={locale}>
+            <SessionKeeper />
+            {children}
+          </LocaleProvider>
         </ThemeProvider>
       </body>
     </html>

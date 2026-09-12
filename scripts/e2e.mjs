@@ -17,8 +17,27 @@ import { chromium } from 'playwright';
 const BASE = process.env.E2E_BASE ?? 'http://localhost:3000';
 const PW = process.env.E2E_PASSWORD ?? 'UniPathTest2026!';
 
+/**
+ * Refuses to create test accounts in the live project. This script (and the
+ * e2e suite) is what kept producing the e2e.* / repro* accounts once scripts
+ * could reach the real Firestore. Run it against the emulator, or opt in
+ * deliberately with E2E_ALLOW_LIVE_DB=1.
+ */
+if (!process.env.FIRESTORE_EMULATOR_HOST && process.env.E2E_ALLOW_LIVE_DB !== '1') {
+  console.error(
+    '\n  Refusing to create test accounts in the live Firestore project.\n' +
+      '  Use the emulator (FIRESTORE_EMULATOR_HOST) or set E2E_ALLOW_LIVE_DB=1 deliberately.\n',
+  );
+  process.exit(1);
+}
+
 const ACCOUNTS = {
-  admin: { email: 'aysel.dev01@ada.edu.az', password: 'UniPathAdmin2026!' },
+  // The real admin is created by scripts/bootstrap-admin.mts with its own
+  // password, so the suite takes the admin credentials from the environment.
+  admin: {
+    email: process.env.E2E_ADMIN_EMAIL ?? 'aysel.dev01@ada.edu.az',
+    password: process.env.E2E_ADMIN_PASSWORD ?? 'UniPathAdmin2026!',
+  },
   student: { email: 'e2e.student@ada.edu.az', password: PW },
   unverified: { email: 'e2e.unverified@ada.edu.az', password: PW },
   moderator: { email: 'e2e.mod@ada.edu.az', password: PW },
@@ -45,6 +64,40 @@ async function check(name, fn) {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+/**
+ * Clears the sliding-window rate-limit buckets.
+ *
+ * Registration allows 3 attempts per hour per address and charges a token for
+ * REJECTED attempts too - correctly, since that is what stops someone probing
+ * the validator. A suite that exercises one success and three refusals
+ * therefore exceeds the budget by design, and the fourth assertion fails with
+ * a 429 that looks like a broken endpoint.
+ *
+ * Resetting the buckets between phases is test-environment control, not a
+ * weakening of the limiter: the production behaviour is unchanged and is
+ * asserted elsewhere (the feed group relies on it).
+ */
+async function clearRateLimits() {
+  /**
+   * The buckets are Firestore documents now, one per (limit key, identity).
+   *
+   * Imported lazily so this file does not pull the Admin SDK in on runs that
+   * never reach this helper, and via ./admin.core rather than ./admin because
+   * the latter starts with `import 'server-only'`, which throws outside Next's
+   * bundler.
+   */
+  await import('../src/server/load-env.ts');
+  const { adminDb } = await import('../src/lib/firebase/admin.core.ts');
+  const snap = await adminDb().collection('rateLimits').get();
+  if (snap.empty) return;
+
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    const batch = adminDb().batch();
+    for (const doc of snap.docs.slice(i, i + 400)) batch.delete(doc.ref);
+    await batch.commit();
+  }
 }
 
 /**
@@ -247,12 +300,19 @@ GROUPS.security = async (browser) => {
       return `status ${res.status()}`;
     });
 
-    await check('frozen account CANNOT send a message', async () => {
-      const res = await ctx.request.post(`${BASE}/api/messages`, {
+    await check('the messaging API is GONE, not merely hidden', async () => {
+      // Removing a feature means the endpoint stops existing. A signed-in
+      // account posting directly to the old route must get 404 - if this ever
+      // returns 200/403 the handler is still deployed and reachable.
+      const post = await ctx.request.post(`${BASE}/api/messages`, {
         data: { userId: 'cxxxxxxxxxxxxxxxxxxxxxxxx' },
       });
-      assert(res.status() === 403, `expected 403, got ${res.status()}`);
-      return `status ${res.status()}`;
+      const list = await ctx.request.get(`${BASE}/api/messages`);
+      const page = await ctx.request.get(`${BASE}/messages`);
+      assert(post.status() === 404, `POST /api/messages returned ${post.status()}`);
+      assert(list.status() === 404, `GET /api/messages returned ${list.status()}`);
+      assert(page.status() === 404, `GET /messages returned ${page.status()}`);
+      return 'POST/GET /api/messages and /messages all 404';
     });
 
     await check('frozen account CAN still read the feed', async () => {
@@ -431,8 +491,14 @@ GROUPS.feed = async (browser) => {
   await check('LIKE persists across a reload', async () => {
     const card = page.locator(`article:has-text("e2e text post ${stamp}")`).first();
     const likeBtn = card.locator('button[aria-label*="ike" i], button[aria-label*="Bəyən" i]').first();
-    await likeBtn.click();
-    await page.waitForTimeout(1200);
+    // Wait for the write to COMPLETE. A fixed delay reloads while the POST is
+    // still in flight and then reports a persistence failure that is really a
+    // race in the test.
+    const [likeResponse] = await Promise.all([
+      page.waitForResponse((r) => /\/api\/feed\/.+\/like$/.test(r.url()), { timeout: 20000 }),
+      likeBtn.click(),
+    ]);
+    assert(likeResponse.ok(), `like returned ${likeResponse.status()}`);
     await page.reload({ waitUntil: 'networkidle' });
     const after = page.locator(`article:has-text("e2e text post ${stamp}")`).first();
     const pressed = await after
@@ -804,14 +870,6 @@ GROUPS.features = async (browser) => {
     return text.split('\n')[0].slice(0, 60);
   });
 
-  await check('/messages renders a real inbox', async () => {
-    await page.goto(`${BASE}/messages`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1200);
-    const text = await page.locator('main').innerText();
-    assert(!/not built yet|hazır deyil/i.test(text), 'still a stub page');
-    return text.split('\n')[0].slice(0, 60);
-  });
-
   await check('/mentors lists the seeded mentor', async () => {
     await page.goto(`${BASE}/mentors`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(1500);
@@ -822,17 +880,35 @@ GROUPS.features = async (browser) => {
   });
 
   await check('mentor card links through to a working profile page', async () => {
-    // Exclude by HREF, not by text: the "Become a mentor" link points at
-    // /mentors/apply but its label contains no "apply", so a text filter lets
-    // it through and the test lands on the application stub instead.
-    await page
-      .locator('a[href^="/mentors/"]:not([href="/mentors/apply"])')
-      .first()
-      .click();
+    /**
+     * Exclude by HREF, not by text: the "Become a mentor" link points at
+     * /mentors/apply but its label contains no "apply", so a text filter lets
+     * it through and the test lands on the application stub instead.
+     *
+     * The wait matters too - the directory fetch is debounced, so immediately
+     * after navigation the ONLY mentor link on the page is /mentors/apply.
+     */
+    const profileLink = page.locator('a[href^="/mentors/"]:not([href="/mentors/apply"])').first();
+    await profileLink.waitFor({ timeout: 20000 });
+    await profileLink.click();
     await page.waitForURL(/\/mentors\/[a-z0-9]+/i, { timeout: 15000 });
-    await page.waitForTimeout(1200);
+    /**
+     * Wait for the profile CONTENT, not a fixed delay.
+     *
+     * The page renders a skeleton while /api/mentors/:id resolves, so a timed
+     * read under load captures the skeleton and reports a missing headline on
+     * a page that loads fine a moment later.
+     */
+    await page.locator('h1').first().waitFor({ timeout: 20000 });
+    await page.waitForFunction(
+      () => !document.querySelector('[aria-busy="true"]'),
+      { timeout: 20000 },
+    ).catch(() => {});
     const text = await page.locator('main').innerText();
-    assert(/Backend engineer/i.test(text), 'headline missing on profile');
+    assert(
+      /Backend engineer/i.test(text),
+      `headline missing on ${page.url().replace(BASE, '')} - first 100 chars: ${text.slice(0, 100)}`,
+    );
     assert(/mentored 20\+/i.test(text), 'about section missing');
     return page.url().replace(BASE, '');
   });
@@ -868,108 +944,7 @@ GROUPS.features = async (browser) => {
     return 'txt accepted by the picker, limit shown';
   });
 
-  await check('registration form has a searchable 50+ faculty picker', async () => {
-    const anon = await browser.newContext();
-    await anon.addCookies([{ name: 'CH_LOCALE', value: 'en', url: BASE }]);
-    const p2 = await anon.newPage();
-    await p2.goto(`${BASE}/register`, { waitUntil: 'networkidle' });
-    const combo = p2.locator('#facultySlug');
-    await combo.waitFor({ timeout: 10000 });
-    await combo.click();
-    await p2.waitForTimeout(400);
-    const count = await p2.locator('[role="option"]').count();
-    assert(count >= 50, `only ${count} options rendered`);
-
-    await combo.fill('comp');
-    await p2.waitForTimeout(400);
-    const filtered = await p2.locator('[role="option"]').allTextContents();
-    assert(filtered.some((o) => /Computer Science/i.test(o)), `filter produced ${filtered.join(',')}`);
-
-    await combo.fill('Other');
-    await p2.waitForTimeout(400);
-    await p2.locator('[role="option"]:has-text("Other")').first().click();
-    await p2.waitForTimeout(400);
-    const manual = await p2.locator('#facultyOther').count();
-    assert(manual === 1, '"Other" did not reveal a manual input');
-    await anon.close();
-    return `${count} options, search works, Other reveals manual input`;
-  });
-
   await ctx.close();
-};
-
-// ---------------------------------------------------------------------------
-GROUPS.messaging = async (browser) => {
-  const a = await browser.newContext();
-  const b = await browser.newContext();
-  const pa = await a.newPage();
-  const pb = await b.newPage();
-
-  await login(pa, 'student');
-  await login(pb, 'unverified');
-
-  const stamp = Date.now();
-  let conversationId = null;
-
-  await check('student opens a conversation with another user', async () => {
-    const me = await b.request.get(`${BASE}/api/me`);
-    const { user } = await me.json();
-    const res = await a.request.post(`${BASE}/api/messages`, { data: { userId: user.id } });
-    assert(res.ok(), `status ${res.status()}`);
-    const body = await res.json();
-    conversationId = body.conversationId;
-    assert(conversationId, 'no conversationId returned');
-    return conversationId;
-  });
-
-  await check('opening the same pair twice is idempotent', async () => {
-    const me = await b.request.get(`${BASE}/api/me`);
-    const { user } = await me.json();
-    const res = await a.request.post(`${BASE}/api/messages`, { data: { userId: user.id } });
-    const body = await res.json();
-    assert(body.conversationId === conversationId, `got a second thread ${body.conversationId}`);
-    return 'same thread returned';
-  });
-
-  await check('message sends and appears in the sender UI', async () => {
-    await pa.goto(`${BASE}/messages`, { waitUntil: 'networkidle' });
-    await pa.waitForTimeout(1200);
-    await pa.locator('li button').first().click();
-    await pa.waitForTimeout(1000);
-    await pa.fill('#message-input', `e2e hello ${stamp}`);
-    await pa.click('button[aria-label*="Send" i], button[aria-label*="Göndər" i]');
-    await pa.locator(`text=e2e hello ${stamp}`).first().waitFor({ timeout: 15000 });
-    return 'sent and rendered';
-  });
-
-  await check('recipient RECEIVES it with an unread badge', async () => {
-    await pb.goto(`${BASE}/messages`, { waitUntil: 'networkidle' });
-    await pb.waitForTimeout(1500);
-    const text = await pb.locator('main').innerText();
-    assert(text.includes(`e2e hello ${stamp}`), 'message not visible to the recipient');
-    return 'recipient sees the message preview';
-  });
-
-  await check('opening the thread marks it read', async () => {
-    await pb.locator('li button').first().click();
-    await pb.waitForTimeout(1800);
-    const res = await b.request.get(`${BASE}/api/messages`);
-    const { conversations } = await res.json();
-    const conv = conversations.find((c) => c.id === conversationId);
-    assert(conv && conv.unreadCount === 0, `unreadCount=${conv?.unreadCount}`);
-    return 'unread cleared';
-  });
-
-  await check('message PERSISTS across a reload', async () => {
-    await pa.reload({ waitUntil: 'networkidle' });
-    await pa.waitForTimeout(1500);
-    await pa.locator('li button').first().click();
-    await pa.locator(`text=e2e hello ${stamp}`).first().waitFor({ timeout: 15000 });
-    return 'still there after reload';
-  });
-
-  await a.close();
-  await b.close();
 };
 
 // ---------------------------------------------------------------------------
@@ -1022,6 +997,540 @@ GROUPS.notifications = async (browser) => {
 
   await a.close();
   await b.close();
+};
+
+
+// ---------------------------------------------------------------------------
+GROUPS.commerce = async (browser) => {
+  const seller = await browser.newContext();
+  const buyer = await browser.newContext();
+  const ps = await seller.newPage();
+  const pb = await buyer.newPage();
+
+  await login(ps, 'student');     // owns the seeded purchasable note
+  await login(pb, 'unverified');  // has wallet funds
+
+  let noteId = null;
+
+  await check('a priced note is listed with a Buy control', async () => {
+    await pb.goto(`${BASE}/notes`, { waitUntil: 'networkidle' });
+    await pb.waitForTimeout(1200);
+    const buy = pb.locator('button:has-text("Buy"), button:has-text("Get for free")');
+    assert((await buy.count()) > 0, 'no buy button rendered');
+    const res = await buyer.request.get(`${BASE}/api/notes?limit=50`);
+    const { notes } = await res.json();
+    const target = notes
+      .filter((n) => n.title.startsWith('E2E purchasable note'))
+      .sort((a, b) => (a.title < b.title ? 1 : -1))[0];
+    assert(target, 'no seeded note in the listing - run: npx tsx scripts/seed-e2e.mts');
+    noteId = target.id;
+    return `${await buy.count()} buy buttons, note ${noteId}`;
+  });
+
+  await check('wallet shows a real balance', async () => {
+    await pb.goto(`${BASE}/wallet`, { waitUntil: 'networkidle' });
+    await pb.waitForTimeout(1200);
+    const text = await pb.locator('main').innerText();
+    assert(!/not built yet/i.test(text), 'still a stub page');
+    assert(/AZN|₼/.test(text), `no currency rendered: ${text.slice(0, 100)}`);
+    return text.split('\n').slice(0, 3).join(' / ');
+  });
+
+  await check('purchase debits the buyer and escrows the seller net', async () => {
+    const before = await (await buyer.request.get(`${BASE}/api/wallet`)).json();
+
+    const res = await buyer.request.post(`${BASE}/api/notes/${noteId}/purchase`);
+    assert(res.status() === 201, `expected 201, got ${res.status()} ${await res.text()}`);
+
+    const after = await (await buyer.request.get(`${BASE}/api/wallet`)).json();
+    const spent = before.wallet.availableMinor - after.wallet.availableMinor;
+    assert(spent === 500, `buyer debited ${spent}, expected 500`);
+
+    const sellerWallet = await (await seller.request.get(`${BASE}/api/wallet`)).json();
+    // 15% platform fee on 500 => 425 net, held pending until the clearing window.
+    assert(sellerWallet.wallet.pendingMinor >= 425, `seller pending ${sellerWallet.wallet.pendingMinor}`);
+    return `buyer -500, seller pending ${sellerWallet.wallet.pendingMinor}`;
+  });
+
+  await check('a second purchase is refused (idempotent, not double-charged)', async () => {
+    const res = await buyer.request.post(`${BASE}/api/notes/${noteId}/purchase`);
+    assert(res.status() === 409, `expected 409, got ${res.status()}`);
+    return `status ${res.status()}`;
+  });
+
+  await check('the seller cannot buy their own note', async () => {
+    const res = await seller.request.post(`${BASE}/api/notes/${noteId}/purchase`);
+    assert(res.status() === 400, `expected 400, got ${res.status()}`);
+    return `status ${res.status()}`;
+  });
+
+  await check('purchases page lists it with a working download', async () => {
+    await pb.goto(`${BASE}/notes/purchases`, { waitUntil: 'networkidle' });
+    await pb.waitForTimeout(1200);
+    const text = await pb.locator('main').innerText();
+    assert(!/not built yet/i.test(text), 'still a stub page');
+    assert(/E2E purchasable note/.test(text), 'purchase not listed');
+
+    const link = pb.locator(`a[href="/api/notes/${noteId}/file"]`).first();
+    assert((await link.count()) > 0, 'no download link');
+    const dl = await buyer.request.get(`${BASE}/api/notes/${noteId}/file`);
+    assert(dl.ok(), `download returned ${dl.status()}`);
+    return `download ${dl.status()}, ${(await dl.body()).length} bytes`;
+  });
+
+  await check('the seller sees a NOTE_SOLD notification', async () => {
+    const res = await seller.request.get(`${BASE}/api/notifications`);
+    const { notifications } = await res.json();
+    assert(notifications.some((n) => n.type === 'NOTE_SOLD'), 'no NOTE_SOLD row');
+    return 'NOTE_SOLD present';
+  });
+
+  await check('wallet activity shows the ledger entry', async () => {
+    await pb.goto(`${BASE}/wallet`, { waitUntil: 'networkidle' });
+    await pb.waitForTimeout(1200);
+    const text = await pb.locator('main').innerText();
+    assert(/note purchase/i.test(text), `activity missing: ${text.slice(-200)}`);
+    return 'purchase visible in activity';
+  });
+
+  await check('an account with no funds is refused with 402, not 500', async () => {
+    const broke = await browser.newContext();
+    const pg = await broke.newPage();
+    await login(pg, 'moderator'); // moderator account has an empty wallet
+    const res = await broke.request.post(`${BASE}/api/notes/${noteId}/purchase`);
+    await broke.close();
+    assert(res.status() === 402, `expected 402, got ${res.status()}`);
+    return `status ${res.status()} (insufficient funds)`;
+  });
+
+  await seller.close();
+  await buyer.close();
+};
+
+// ---------------------------------------------------------------------------
+GROUPS.settings = async (browser) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await login(page, 'student');
+
+  await check('settings SAVES a change and it survives a reload', async () => {
+    await page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+
+    const value = `E2E bio ${Date.now()}`;
+    const bio = page.locator('textarea').first();
+    await bio.waitFor({ timeout: 10000 });
+    await bio.fill(value);
+
+    // Wait for the real PATCH. The old implementation had no request at all -
+    // it slept 500ms and reported success, so this is the check that would
+    // have caught it.
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().endsWith('/api/me') && r.request().method() === 'PATCH',
+        { timeout: 20000 },
+      ),
+      page.click('button:has-text("Save")'),
+    ]);
+    assert(response.ok(), `PATCH /api/me returned ${response.status()}`);
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(1500);
+    const after = await page.locator('textarea').first().inputValue();
+    assert(after === value, `expected "${value}", got "${after}"`);
+    return 'bio persisted through /api/me';
+  });
+
+  await ctx.close();
+};
+
+// ---------------------------------------------------------------------------
+GROUPS.deadlinks = async (browser) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await login(page, 'student');
+
+  /**
+   * Visits every FEATURE route and fails any that renders the "not built yet"
+   * placeholder or is effectively empty.
+   *
+   * A stub is not automatically a bug - several remaining ones are honest
+   * placeholders for marketing and legal copy. This check exists to keep
+   * FEATURE routes off that list, which is the class of problem behind the
+   * mentor profile's Book button pointing at a stub.
+   */
+  const FEATURE_ROUTES = [
+    '/dashboard', '/notes', '/notes/new', '/notes/purchases',
+    '/mentors', '/notifications', '/profile', '/settings', '/wallet',
+  ];
+
+  for (const route of FEATURE_ROUTES) {
+    await check(`route is functional: ${route}`, async () => {
+      const response = await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' });
+      assert(response.status() < 400, `HTTP ${response.status()}`);
+      await page.waitForTimeout(700);
+      const text = await page.locator('main').innerText().catch(() => '');
+      assert(!/not built yet|hazır deyil|не готово/i.test(text), 'renders the stub placeholder');
+      assert(text.trim().length > 20, 'page is effectively empty');
+      return `${response.status()}, ${text.trim().split('\n')[0].slice(0, 40)}`;
+    });
+  }
+
+  await ctx.close();
+};
+
+
+// ---------------------------------------------------------------------------
+GROUPS.registration = async (browser) => {
+  /**
+   * Walks the five-step wizard for both account types, in a real browser, and
+   * then checks the SERVER refuses the bypasses the wizard prevents.
+   */
+  const stamp = Date.now();
+
+  async function fillStepOne(page, who) {
+    await page.goto(`${BASE}/register`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('#firstName', { timeout: 20000 });
+    await page.fill('#firstName', 'Aysel');
+    await page.fill('#lastName', 'Mammadova');
+    await page.fill('#dateOfBirth', '2003-04-15');
+    await page.fill('#nickname', who);
+    await page.fill('#email', `${who}@ada.edu.az`);
+    await page.fill('#phone', `+99450${String(stamp).slice(-7)}`);
+    await page.fill('#password', 'CampusHubTest2026!');
+    // Both consents are required to leave step 1.
+    await page.locator('#terms').check();
+    await page.locator('#consent').check();
+  }
+
+  await check('step 1 shows the document-consistency notice on identity fields', async () => {
+    const ctx = await browser.newContext();
+    await ctx.addCookies([{ name: 'CH_LOCALE', value: 'en', url: BASE }]);
+    const page = await ctx.newPage();
+    await page.goto(`${BASE}/register`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('#firstName', { timeout: 20000 });
+
+    const body = await page.locator('main, form').first().innerText();
+    const notice = 'Şəxsiyyət vəsiqəsində olduğu kimi yazın. Məlumatlar sənədlə yoxlanılacaq.';
+    const occurrences = body.split(notice).length - 1;
+    // First name, last name and date of birth each carry it.
+    assert(occurrences >= 3, `notice appears ${occurrences} times, expected >= 3`);
+
+    const dob = await page.locator('#dateOfBirth').getAttribute('type');
+    assert(dob === 'date', `date of birth input type is "${dob}"`);
+    await ctx.close();
+    return `notice shown ${occurrences}x, dob is a real date input`;
+  });
+
+  await check('step 2 offers Student, Teacher and Mentor', async () => {
+    const ctx = await browser.newContext();
+    await ctx.addCookies([{ name: 'CH_LOCALE', value: 'en', url: BASE }]);
+    const page = await ctx.newPage();
+    await fillStepOne(page, `e2ereg${stamp}a`);
+    await page.click('button:has-text("Continue")');
+    await page.waitForTimeout(900);
+
+    const radios = page.locator('input[name="accountType"]');
+    const count = await radios.count();
+    // MENTOR is a self-service type: a mentor must be able to register from
+    // zero rather than create a student account first and upgrade.
+    assert(count === 3, `${count} account types offered`);
+    const values = await radios.evaluateAll((els) => els.map((e) => e.value).sort());
+    assert(values.join(',') === 'MENTOR,STUDENT,TEACHER', `values were ${values.join(',')}`);
+    await ctx.close();
+    return values.join(' / ');
+  });
+
+  await check('a signed-out visitor reaches mentor signup, NOT /login', async () => {
+    /**
+     * The regression this guards is the reported bug: /mentors/apply was in the
+     * middleware's PROTECTED list, so clicking "Become a mentor" while signed
+     * out redirected to /login - a dead end for someone with no account.
+     */
+    const ctx = await browser.newContext();
+    await ctx.addCookies([{ name: 'CH_LOCALE', value: 'en', url: BASE }]);
+    const page = await ctx.newPage();
+    await page.goto(`${BASE}/mentors/apply`, { waitUntil: 'networkidle' });
+
+    const url = page.url();
+    assert(!url.includes('/login'), `signed-out visitor was bounced to ${url}`);
+
+    const signup = page.locator('a[href="/register?type=MENTOR"]');
+    assert((await signup.count()) > 0, 'no link to mentor registration');
+
+    // And the link actually preselects the Mentor branch in the wizard.
+    await signup.first().click();
+    await page.waitForURL('**/register**', { timeout: 15000 });
+    await page.waitForSelector('#firstName', { timeout: 20000 });
+    const checked = await page
+      .locator('input[name="accountType"][value="MENTOR"]')
+      .isChecked()
+      .catch(() => false);
+    await ctx.close();
+    assert(checked, 'Mentor was not preselected from ?type=MENTOR');
+    return 'guest -> mentor signup, Mentor preselected';
+  });
+
+  await check('MENTOR branch asks for organisation/position and only 2 documents', async () => {
+    const ctx = await browser.newContext();
+    await ctx.addCookies([{ name: 'CH_LOCALE', value: 'en', url: BASE }]);
+    const page = await ctx.newPage();
+    await fillStepOne(page, `e2ereg${stamp}m`);
+    await page.click('button:has-text("Continue")');
+    await page.waitForTimeout(800);
+
+    await page.locator('input[value="MENTOR"]').click({ force: true });
+    await page.click('button:has-text("Continue")');
+    await page.waitForTimeout(900);
+
+    assert((await page.locator('#department').count()) === 1, 'no organisation field');
+    assert((await page.locator('#academicTitle').count()) === 1, 'no position field');
+    assert((await page.locator('#studentNumber').count()) === 0, 'student field leaked into mentor branch');
+    assert((await page.locator('#gradYear').count()) === 0, 'mentor was asked for a graduation date');
+
+    await page.selectOption('#university', 'ADA');
+    await page.fill('#department', 'Azercell');
+    await page.fill('#academicTitle', 'Senior Product Manager');
+    await page.click('button:has-text("Continue")');
+    await page.waitForTimeout(1000);
+
+    const slots = await page.locator('input[type="file"]').count();
+    // A mentor has no student card, so only the two ID images are demanded.
+    assert(slots === 2, `mentor sees ${slots} document slots, expected 2`);
+    await ctx.close();
+    return 'organisation + position, 2 document slots (no student card)';
+  });
+
+  await check('STUDENT branch asks for student number and 4 documents', async () => {
+    const ctx = await browser.newContext();
+    await ctx.addCookies([{ name: 'CH_LOCALE', value: 'en', url: BASE }]);
+    const page = await ctx.newPage();
+    await fillStepOne(page, `e2ereg${stamp}b`);
+    await page.click('button:has-text("Continue")');
+    await page.waitForTimeout(800);
+
+    await page.locator('input[value="STUDENT"]').click({ force: true });
+    await page.click('button:has-text("Continue")');
+    await page.waitForTimeout(900);
+
+    assert((await page.locator('#studentNumber').count()) === 1, 'no student number field');
+    assert((await page.locator('#department').count()) === 0, 'teacher field leaked into student branch');
+    assert((await page.locator('#gradYear').count()) === 1, 'no graduation date');
+
+    // Fill the details and reach the documents step.
+    await page.selectOption('#university', 'ADA');
+    await page.fill('#studentNumber', '20231234');
+    await page.locator('#facultySlug').click();
+    await page.waitForTimeout(400);
+    await page.locator('[role="option"]:has-text("Computer Science")').first().click();
+    await page.selectOption('#gradYear', String(new Date().getFullYear() + 1));
+    await page.locator('select[aria-label="Graduation month"]').selectOption('06');
+    await page.click('button:has-text("Continue")');
+    await page.waitForTimeout(1000);
+
+    const slots = await page.locator('input[type="file"]').count();
+    assert(slots === 4, `student sees ${slots} document slots, expected 4`);
+    await ctx.close();
+    return 'student number + graduation + 4 document slots';
+  });
+
+  await check('TEACHER branch asks for department/title and only 2 documents', async () => {
+    const ctx = await browser.newContext();
+    await ctx.addCookies([{ name: 'CH_LOCALE', value: 'en', url: BASE }]);
+    const page = await ctx.newPage();
+    await fillStepOne(page, `e2ereg${stamp}c`);
+    await page.click('button:has-text("Continue")');
+    await page.waitForTimeout(800);
+
+    await page.locator('input[value="TEACHER"]').click({ force: true });
+    await page.click('button:has-text("Continue")');
+    await page.waitForTimeout(900);
+
+    assert((await page.locator('#department').count()) === 1, 'no department field');
+    assert((await page.locator('#academicTitle').count()) === 1, 'no academic position field');
+    assert((await page.locator('#studentNumber').count()) === 0, 'student field leaked into teacher branch');
+    assert((await page.locator('#gradYear').count()) === 0, 'teacher was asked for a graduation date');
+
+    await page.selectOption('#university', 'ADA');
+    await page.fill('#department', 'Computer Science');
+    await page.fill('#academicTitle', 'Assistant Professor');
+    await page.click('button:has-text("Continue")');
+    await page.waitForTimeout(1000);
+
+    const slots = await page.locator('input[type="file"]').count();
+    // A teacher has no student card, so only the two ID images are demanded.
+    assert(slots === 2, `teacher sees ${slots} document slots, expected 2`);
+    await ctx.close();
+    return 'department + title, 2 document slots (no student card)';
+  });
+
+  // A fresh budget, so the four registration attempts below all reach the
+  // validator instead of the limiter.
+  await clearRateLimits();
+
+  /**
+   * The successful registration runs BEFORE the refusal cases.
+   *
+   * auth:register allows 3 attempts per hour per address, and every attempt -
+   * including a rejected one - spends a token. Ordering the refusals first
+   * therefore starves the success case into a 429 that looks like a broken
+   * registration.
+   */
+  await check('a TEACHER registration succeeds and is stored as role=TEACHER', async () => {
+    const ctx = await browser.newContext();
+    const email = `teacher${stamp}@ada.edu.az`;
+    const res = await ctx.request.post(`${BASE}/api/auth/register`, {
+      data: {
+        accountType: 'TEACHER',
+        firstName: 'Elvin', lastName: 'Seferov', dateOfBirth: '1985-09-02',
+        nickname: `teach${String(stamp).slice(-6)}`, email,
+        phone: `+99470${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        universityId: 'ADA', department: 'Computer Science', academicTitle: 'Assistant Professor',
+        locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
+      },
+    });
+    const body = await res.json().catch(() => ({}));
+    assert(res.status() === 201, `expected 201, got ${res.status()} ${JSON.stringify(body).slice(0, 160)}`);
+
+    // The session cookie is set, so /api/me reports what was stored.
+    const me = await ctx.request.get(`${BASE}/api/me`);
+    const { user } = await me.json();
+    await ctx.close();
+    assert(user.role === 'TEACHER', `role stored as ${user.role}`);
+    assert(user.fullName === 'Elvin Seferov', `fullName derived as "${user.fullName}"`);
+    return `role=${user.role}, fullName="${user.fullName}"`;
+  });
+
+  await clearRateLimits();
+
+  await check('a MENTOR registration succeeds from zero and stores role=MENTOR', async () => {
+    /**
+     * The whole point of the fix: no pre-existing account of any kind, one
+     * request, and the result is a usable signed-in MENTOR account.
+     */
+    const ctx = await browser.newContext();
+    const email = `mentor${stamp}@ada.edu.az`;
+    const res = await ctx.request.post(`${BASE}/api/auth/register`, {
+      data: {
+        accountType: 'MENTOR',
+        firstName: 'Nigar', lastName: 'Aliyeva', dateOfBirth: '1990-03-11',
+        nickname: `ment${String(stamp).slice(-6)}`, email,
+        phone: `+99477${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        universityId: 'ADA', department: 'Azercell', academicTitle: 'Senior Product Manager',
+        locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
+      },
+    });
+    const body = await res.json().catch(() => ({}));
+    assert(res.status() === 201, `expected 201, got ${res.status()} ${JSON.stringify(body).slice(0, 160)}`);
+
+    // Registration signs the account in, so /api/me reports what was stored.
+    const me = await ctx.request.get(`${BASE}/api/me`);
+    const { user } = await me.json();
+
+    // And the mentor application endpoint is now reachable with that session.
+    const status = await ctx.request.get(`${BASE}/api/mentors/apply`);
+    await ctx.close();
+
+    assert(user.role === 'MENTOR', `role stored as ${user.role}`);
+    assert(status.status() === 200, `GET /api/mentors/apply returned ${status.status()}`);
+    return `role=${user.role}, session live, application status readable`;
+  });
+
+  // --- server-side enforcement ----------------------------------------------
+  // The success case above spent a token; refill so each refusal is judged on
+  // its merits rather than on how many requests preceded it.
+  await clearRateLimits();
+
+  await check('server REFUSES a mentor claim with no organisation', async () => {
+    const ctx = await browser.newContext();
+    const res = await ctx.request.post(`${BASE}/api/auth/register`, {
+      data: {
+        accountType: 'MENTOR',
+        firstName: 'Aysel', lastName: 'Mammadova', dateOfBirth: '1992-04-15',
+        nickname: `bypassm${stamp}`, email: `bypassm${stamp}@ada.edu.az`,
+        phone: `+99460${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        universityId: 'ADA', locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
+      },
+    });
+    const body = await res.json().catch(() => ({}));
+    await ctx.close();
+    assert(res.status() === 400, `expected 400, got ${res.status()}`);
+    const fields = Object.keys(body.fields ?? {});
+    assert(fields.includes('department'), `fields were ${fields.join(',')}`);
+    return `400, missing: ${fields.join(', ')}`;
+  });
+
+  await check('server REFUSES a student claim with no student number', async () => {
+    const ctx = await browser.newContext();
+    const res = await ctx.request.post(`${BASE}/api/auth/register`, {
+      data: {
+        accountType: 'STUDENT',
+        firstName: 'Aysel', lastName: 'Mammadova', dateOfBirth: '2003-04-15',
+        nickname: `bypass${stamp}`, email: `bypass${stamp}@ada.edu.az`,
+        phone: `+99450${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        universityId: 'ADA', locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
+        // studentNumber, facultySlug and graduation deliberately omitted
+      },
+    });
+    const body = await res.json().catch(() => ({}));
+    await ctx.close();
+    assert(res.status() === 400, `expected 400, got ${res.status()}`);
+    const fields = Object.keys(body.fields ?? {});
+    assert(fields.includes('studentNumber'), `fields were ${fields.join(',')}`);
+    return `400, missing: ${fields.join(', ')}`;
+  });
+
+  await check('server REFUSES a teacher claim with no department', async () => {
+    const ctx = await browser.newContext();
+    const res = await ctx.request.post(`${BASE}/api/auth/register`, {
+      data: {
+        accountType: 'TEACHER',
+        firstName: 'Aysel', lastName: 'Mammadova', dateOfBirth: '2003-04-15',
+        nickname: `bypasst${stamp}`, email: `bypasst${stamp}@ada.edu.az`,
+        phone: `+99451${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        universityId: 'ADA', locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
+      },
+    });
+    const body = await res.json().catch(() => ({}));
+    await ctx.close();
+    assert(res.status() === 400, `expected 400, got ${res.status()}`);
+    const fields = Object.keys(body.fields ?? {});
+    assert(fields.includes('department'), `fields were ${fields.join(',')}`);
+    return `400, missing: ${fields.join(', ')}`;
+  });
+
+  await check('server REFUSES an implausible date of birth', async () => {
+    const ctx = await browser.newContext();
+    const res = await ctx.request.post(`${BASE}/api/auth/register`, {
+      data: {
+        accountType: 'STUDENT',
+        firstName: 'Aysel', lastName: 'Mammadova',
+        dateOfBirth: '2020-01-01', // a four-year-old
+        nickname: `dob${stamp}`, email: `dob${stamp}@ada.edu.az`,
+        phone: `+99455${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        universityId: 'ADA', studentNumber: '20231234', facultySlug: 'computer-science',
+        graduationYear: new Date().getFullYear() + 1, graduationMonth: 6,
+        locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
+      },
+    });
+    const body = await res.json().catch(() => ({}));
+    await ctx.close();
+    assert(res.status() === 400, `expected 400, got ${res.status()}`);
+    assert(Object.keys(body.fields ?? {}).includes('dateOfBirth'), 'dateOfBirth not flagged');
+    return '400, dateOfBirth rejected';
+  });
+
+  await check('existing student accounts still sign in', async () => {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    const url = await login(page, 'student');
+    const me = await ctx.request.get(`${BASE}/api/me`);
+    const { user } = await me.json();
+    await ctx.close();
+    // Legacy rows have no firstName/dateOfBirth and must remain usable.
+    assert(user.role === 'STUDENT', `role is ${user.role}`);
+    return `signed in, landed on ${url.replace(BASE, '')}, legacy fields null-safe`;
+  });
 };
 
 // ---------------------------------------------------------------------------

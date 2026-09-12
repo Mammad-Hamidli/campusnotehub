@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import ExcelJS from 'exceljs';
-import { db } from '@/lib/db';
+import { listAuditLogs } from '@/lib/firebase/repositories/audit';
+import { findUsersByIds } from '@/lib/firebase/repositories/users';
 import { withAdmin, adminAudit } from '@/lib/auth/admin';
 import { adminAuditListSchema } from '@/server/validators/admin';
 import { auditWhere } from '@/lib/admin/auditQuery';
@@ -78,27 +79,17 @@ export async function GET(request: NextRequest) {
       request,
     });
 
-    const rows = await db.auditLog.findMany({
-      where,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: MAX_EXPORT_ROWS + 1,
-      select: {
-        id: true,
-        createdAt: true,
-        action: true,
-        entityType: true,
-        entityId: true,
-        result: true,
-        ip: true,
-        userAgent: true,
-        before: true,
-        after: true,
-        actor: { select: { id: true, nickname: true, role: true } },
-      },
-    });
+    const { rows, truncated: hitCeiling } = await listAuditLogs(where, MAX_EXPORT_ROWS + 1);
 
-    const truncated = rows.length > MAX_EXPORT_ROWS;
-    const page = truncated ? rows.slice(0, MAX_EXPORT_ROWS) : rows;
+    const truncated = hitCeiling || rows.length > MAX_EXPORT_ROWS;
+    const page = rows.slice(0, MAX_EXPORT_ROWS);
+
+    // The actor decoration Prisma did with a join. One batched read for the
+    // whole export rather than a lookup per row - at fifty thousand rows the
+    // difference is the export finishing or timing out.
+    const actors = await findUsersByIds(
+      page.map((r) => r.actorId).filter((id): id is string => Boolean(id)),
+    );
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'UniPath Admin';
@@ -131,6 +122,7 @@ export async function GET(request: NextRequest) {
     header.alignment = { vertical: 'middle' };
 
     for (const row of page) {
+      const actor = row.actorId ? actors.get(row.actorId) : null;
       sheet.addRow({
         /**
          * A real Date, not a formatted string, so the column sorts and filters
@@ -140,8 +132,8 @@ export async function GET(request: NextRequest) {
          * happened.
          */
         createdAt: row.createdAt,
-        admin: safeCell(row.actor?.nickname ? `@${row.actor.nickname}` : '(system)'),
-        adminRole: safeCell(row.actor?.role ?? ''),
+        admin: safeCell(actor?.nickname ? `@${actor.nickname}` : '(system)'),
+        adminRole: safeCell(actor?.role ?? ''),
         action: safeCell(row.action),
         entityType: safeCell(row.entityType),
         entityId: safeCell(row.entityId),

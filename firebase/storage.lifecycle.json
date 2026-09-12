@@ -1,0 +1,56 @@
+{
+  "_comment": [
+    "Bucket lifecycle for campushub-c3957.firebasestorage.app.",
+    "",
+    "WHY THIS FILE EXISTS AND IS NOT PART OF `firebase deploy`",
+    "Object lifecycle and versioning are GCS bucket settings, not Firebase",
+    "Storage settings. `firebase.json` has no field for them and the Firebase",
+    "CLI has no command that sets them, so they are applied with gcloud or the",
+    "Cloud console. Keeping the intended state here means it is reviewable in",
+    "code review and reproducible after a bucket is recreated, instead of",
+    "living only in one operator's shell history.",
+    "",
+    "APPLY WITH:",
+    "  gcloud storage buckets update gs://campushub-c3957.firebasestorage.app \\",
+    "      --lifecycle-file=firebase/storage.lifecycle.json",
+    "  gcloud storage buckets update gs://campushub-c3957.firebasestorage.app \\",
+    "      --no-versioning",
+    "",
+    "VERIFY WITH:",
+    "  gcloud storage buckets describe gs://campushub-c3957.firebasestorage.app \\",
+    "      --format='value(lifecycle_config,versioning_enabled)'",
+    "",
+    "WHY 8 DAYS AND NOT 7",
+    "The review buffer's own TTL is REVIEW_BUFFER_TTL_SECONDS, 7 days, and it",
+    "is enforced twice in application code: retrieve() refuses and destroys an",
+    "expired buffer on the read path, and the scheduler's reapExpired() sweeps",
+    "and closes the cases. This rule is the THIRD layer - the backstop for an",
+    "object both of those missed.",
+    "",
+    "A backstop must never fire early. GCS `age` is measured in whole days and",
+    "the lifecycle scan is asynchronous, so 7 could delete a buffer that still",
+    "has hours of legitimate review window left - which would destroy a",
+    "moderator's evidence mid-review. 8 gives a full day of margin and still",
+    "bounds retention tightly. Raising this above the application TTL is safe;",
+    "lowering it to 7 or below is not.",
+    "",
+    "WHY VERSIONING MUST BE OFF",
+    "Versioning keeps 'deleted' objects recoverable as noncurrent versions. For",
+    "the kyc-review/ prefix that would silently defeat every deletion path in",
+    "reviewBuffer.ts and break the retention promise the product makes. There",
+    "is no per-prefix versioning setting in GCS - it is bucket-wide - so the",
+    "bucket that holds kyc-review/ must have it off entirely.",
+    "",
+    "SCOPE: this rule matches the kyc-review/ prefix ONLY. Notes, post media",
+    "and avatars are durable user content and are deliberately untouched."
+  ],
+  "rule": [
+    {
+      "action": { "type": "Delete" },
+      "condition": {
+        "age": 8,
+        "matchesPrefix": ["kyc-review/"]
+      }
+    }
+  ]
+}

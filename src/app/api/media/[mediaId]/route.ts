@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { findMediaAsset, readMediaBytes } from '@/lib/firebase/repositories/media';
 
 export const runtime = 'nodejs';
 
@@ -33,22 +33,30 @@ export async function GET(
 ) {
   const { mediaId } = await params;
 
-  // A cuid, never a path. This endpoint reads a database row by id and touches
-  // no filesystem, so there is no traversal surface to defend.
+  /**
+   * An id, never a path.
+   *
+   * This mattered when the bytes were a database column and it matters MORE
+   * now that they are a Storage object: the id is interpolated into an object
+   * path by STORAGE_PATHS.postMedia(), so an id containing `../` or a slash
+   * would be a genuine traversal into another prefix of the bucket. The
+   * character class here is what makes that unrepresentable.
+   */
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(mediaId)) {
     return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
   }
 
-  const asset = await db.mediaAsset.findUnique({
-    where: { id: mediaId },
-    select: { bytes: true, mime: true, sizeBytes: true, createdAt: true },
-  });
+  const asset = await findMediaAsset(mediaId);
 
   if (!asset) {
     return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
   }
 
-  return new NextResponse(new Uint8Array(asset.bytes), {
+  // The object is private in Storage; this route is what serves it, exactly as
+  // it did when the bytes lived in the database.
+  const bytes = await readMediaBytes(asset);
+
+  return new NextResponse(new Uint8Array(bytes), {
     status: 200,
     headers: {
       // The stored MIME, which was decided by the encoder on upload - never a

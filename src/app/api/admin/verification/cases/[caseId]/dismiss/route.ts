@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { VerificationStatus } from '@prisma/client';
-import { db } from '@/lib/db';
+import { VerificationStatus } from '@/lib/enums';
+import { findCaseById, updateCase } from '@/lib/firebase/repositories/verification';
 import { withAdmin, adminAudit } from '@/lib/auth/admin';
 import { adminDismissCaseSchema } from '@/server/validators/admin';
 
@@ -54,10 +54,7 @@ export async function POST(
     }
     const { dismissed } = parsed.data;
 
-    const kase = await db.verificationCase.findUnique({
-      where: { id: caseId },
-      select: { id: true, status: true, dismissedAt: true, decidedAt: true, userId: true },
-    });
+    const kase = await findCaseById(caseId);
     if (!kase) return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
 
     /**
@@ -93,27 +90,28 @@ export async function POST(
 
     const dismissedAt = dismissed ? new Date() : null;
 
-    await db.$transaction(async (tx) => {
-      await tx.verificationCase.update({
-        where: { id: caseId },
-        data: { dismissedAt, dismissedById: dismissed ? actor.id : null },
-      });
+    /**
+     * The flag, then the audit row. Not one atomic unit any more - and the
+     * order is what makes that acceptable, as everywhere else in this panel:
+     * a flipped filter with no audit entry is recoverable and visible on the
+     * case itself, while an audit entry for a dismissal that never happened
+     * would be a lie in the log.
+     */
+    await updateCase(caseId, { dismissedAt, dismissedById: dismissed ? actor.id : null });
 
-      await adminAudit({
-        tx,
-        actorId: actor.id,
-        action: dismissed ? 'ADMIN_CASE_DISMISSED' : 'ADMIN_CASE_RESTORED',
-        entityType: 'verification_case',
-        entityId: caseId,
-        before: { dismissedAt: kase.dismissedAt?.toISOString() ?? null },
-        // Recorded explicitly so a later reader of the audit log can tell at a
-        // glance that this action moved nothing but a view filter.
-        after: {
-          dismissedAt: dismissedAt?.toISOString() ?? null,
-          note: 'queue view only; case, decision and account unchanged',
-        },
-        request,
-      });
+    await adminAudit({
+      actorId: actor.id,
+      action: dismissed ? 'ADMIN_CASE_DISMISSED' : 'ADMIN_CASE_RESTORED',
+      entityType: 'verification_case',
+      entityId: caseId,
+      before: { dismissedAt: kase.dismissedAt?.toISOString() ?? null },
+      // Recorded explicitly so a later reader of the audit log can tell at a
+      // glance that this action moved nothing but a view filter.
+      after: {
+        dismissedAt: dismissedAt?.toISOString() ?? null,
+        note: 'queue view only; case, decision and account unchanged',
+      },
+      request,
     });
 
     return NextResponse.json(

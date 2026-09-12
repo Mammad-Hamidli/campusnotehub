@@ -1,13 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Heart, MessageCircle, MoreHorizontal, Repeat2, Share2 } from 'lucide-react';
+import { Flag, Heart, Link2, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { Menu, MenuItem } from '@/components/ui/Menu';
 import { VerifiedBadge } from './VerificationBanner';
 import { CommentThread } from './CommentThread';
 
 export type Post = {
   id: string;
+  /** The author's user id. Decides which actions the "..." menu offers. */
+  authorId: string;
   author: {
     /**
      * PUBLIC HANDLE, not the legal name.
@@ -34,12 +37,26 @@ export type Post = {
   likedByViewer: boolean;
 };
 
-export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
+export function PostCard({
+  post,
+  index = 0,
+  viewerId = null,
+  onDeleted,
+}: {
+  post: Post;
+  index?: number;
+  viewerId?: string | null;
+  onDeleted?: (postId: string) => void;
+}) {
   const t = useT();
   const [liked, setLiked] = useState(post.likedByViewer);
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [commentCount, setCommentCount] = useState(post.commentCount);
   const [showComments, setShowComments] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const isOwn = Boolean(viewerId) && post.authorId === viewerId;
 
   /**
    * Likes.
@@ -53,10 +70,6 @@ export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
    * The optimistic update flips state before the request and rolls back on
    * failure. Waiting for the round trip makes the button feel broken on campus
    * wifi, and a like is cheap enough to be wrong for 300ms.
-   *
-   * This call used to be COMMENTED OUT, which is why a like survived until the
-   * next render and then vanished - the icon filled in, nothing was written,
-   * and the count reset on reload.
    */
   async function toggleLike() {
     const next = !liked;
@@ -85,10 +98,56 @@ export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
     }
   }
 
+  /** DELETE /api/feed/:postId - own posts only; the server re-checks. */
+  async function deletePost() {
+    if (!window.confirm(t('feed.menu.deleteConfirm'))) return;
+    setDeleting(true);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/feed/${post.id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        setNotice(t('feed.menu.deleteFailed'));
+        return;
+      }
+      onDeleted?.(post.id);
+    } catch {
+      setNotice(t('feed.menu.deleteFailed'));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function reportPost() {
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/feed/${post.id}/report`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      });
+      setNotice(t(response.ok ? 'feed.menu.reported' : 'feed.menu.reportFailed'));
+    } catch {
+      setNotice(t('feed.menu.reportFailed'));
+    }
+  }
+
+  async function copyLink() {
+    const url = `${window.location.origin}/dashboard#post-${post.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice(t('feed.menu.linkCopied'));
+    } catch {
+      // Clipboard access refused (insecure context, permissions): show the
+      // link so it can still be copied by hand.
+      setNotice(url);
+    }
+  }
+
   return (
     <article
+      id={`post-${post.id}`}
       style={{ animationDelay: `${Math.min(index, 6) * 50}ms` }}
-      className="card animate-rise p-4 transition-shadow hover:shadow-raised"
+      className={`card animate-rise p-4 transition-shadow hover:shadow-raised ${deleting ? 'opacity-60' : ''}`}
     >
       <header className="flex items-start gap-3">
         <span
@@ -116,13 +175,64 @@ export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
           <p className="mt-0.5 truncate text-xs text-fg-muted">{post.author.headline}</p>
         </div>
 
-        <button
-          type="button"
-          aria-label={t('common.showMore')}
-          className="rounded-lg p-1.5 text-fg-subtle transition hover:bg-surface-inset hover:text-fg"
+        {/* Own post: copy link + delete. Someone else's: copy link + report.
+            There is deliberately no edit action. */}
+        <Menu
+          label={t('feed.menu.label')}
+          width="w-48"
+          trigger={({ open, toggle, id }) => (
+            <button
+              type="button"
+              data-menu-trigger
+              aria-haspopup="menu"
+              aria-expanded={open}
+              aria-controls={id}
+              aria-label={t('feed.menu.label')}
+              onClick={toggle}
+              disabled={deleting}
+              className="rounded-lg p-1.5 text-fg-subtle transition hover:bg-surface-inset hover:text-fg"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          )}
         >
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
+          {({ close }) => (
+            <>
+              <MenuItem
+                icon={<Link2 className="h-4 w-4" />}
+                onSelect={() => {
+                  close();
+                  void copyLink();
+                }}
+              >
+                {t('feed.menu.copyLink')}
+              </MenuItem>
+              {isOwn ? (
+                <MenuItem
+                  tone="danger"
+                  icon={<Trash2 className="h-4 w-4" />}
+                  onSelect={() => {
+                    close();
+                    void deletePost();
+                  }}
+                >
+                  {t('feed.menu.delete')}
+                </MenuItem>
+              ) : (
+                <MenuItem
+                  tone="danger"
+                  icon={<Flag className="h-4 w-4" />}
+                  onSelect={() => {
+                    close();
+                    void reportPost();
+                  }}
+                >
+                  {t('feed.menu.report')}
+                </MenuItem>
+              )}
+            </>
+          )}
+        </Menu>
       </header>
 
       <p className="mt-3 whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-fg">
@@ -136,9 +246,6 @@ export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
         reserves the right box BEFORE the bytes arrive. Without it every image
         loads at zero height and then shoves the rest of the feed down - the
         layout shift that makes a timeline unusable while scrolling.
-
-        Dimensions come from the server, which read them off the re-encoded
-        file, so they are measurements rather than client claims.
       */}
       {post.media.length > 0 && (
         <div
@@ -190,13 +297,19 @@ export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
         </div>
       )}
 
+      {notice && (
+        <p role="status" className="mt-2 break-all text-xs text-fg-muted">
+          {notice}
+        </p>
+      )}
+
       <footer className="mt-3.5 flex items-center gap-1 border-t border-edge pt-2.5">
         <ActionButton
           icon={Heart}
           label={t('feed.like')}
           count={likeCount}
           active={liked}
-          activeClass="text-rose-600"
+          activeClass="text-danger"
           iconFill={liked}
           onClick={toggleLike}
         />
@@ -208,20 +321,6 @@ export function PostCard({ post, index = 0 }: { post: Post; index?: number }) {
           activeClass="text-accent"
           onClick={() => setShowComments((v) => !v)}
         />
-        <ActionButton
-          icon={Repeat2}
-          label={t('feed.share')}
-          count={post.shareCount}
-          activeClass="text-verified"
-        />
-        <div className="flex-1" />
-        <button
-          type="button"
-          aria-label={t('feed.share')}
-          className="rounded-lg p-2 text-fg-subtle transition hover:bg-surface-inset hover:text-fg"
-        >
-          <Share2 className="h-4 w-4" />
-        </button>
       </footer>
 
       {/* Mounted only when expanded, so the thread's fetch happens on demand

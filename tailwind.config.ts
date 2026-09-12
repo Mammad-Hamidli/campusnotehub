@@ -9,9 +9,11 @@ import type { Config } from 'tailwindcss';
  *
  * Three rules that keep this from drifting back into template territory:
  *
- *  1. ONE accent. A single restrained indigo carries every interactive
- *     affordance. Emerald appears only on verified identity, amber only on
- *     warnings. No gradient ever carries meaning, and no heading is a gradient.
+ *  1. FIVE hues, ONE meaning each. Blue carries every interactive affordance,
+ *     orange is the brand highlight, green is verified identity, yellow is
+ *     action-needed, red is destructive. A colour is never used decoratively,
+ *     which is what keeps five accents from reading as chaos. No gradient ever
+ *     carries meaning, and no heading is a gradient.
  *  2. Borders do the work, not shadows. Hairline `1px` separators at low
  *     contrast, with shadows reserved for genuinely floating layers (menus,
  *     popovers). Big soft drop-shadows on static cards are the single most
@@ -44,12 +46,26 @@ export default {
           DEFAULT: 'rgb(var(--edge) / <alpha-value>)',
           strong: 'rgb(var(--edge-strong) / <alpha-value>)',
         },
-        // --- the single accent --------------------------------------------
+        // --- blue: every interactive affordance ---------------------------
         accent: {
           DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
           hover: 'rgb(var(--accent-hover) / <alpha-value>)',
           soft: 'rgb(var(--accent-soft) / <alpha-value>)',
           fg: 'rgb(var(--accent-fg) / <alpha-value>)',
+        },
+        /**
+         * Orange: the logo's own colour.
+         *
+         * Separate from `accent` because it means something different. Accent
+         * says "you can act on this"; brand says "this is CampusHub" - the
+         * mark, and the few places the product should feel warm. Giving it a
+         * status meaning as well is how a palette starts to lie.
+         */
+        brand: {
+          DEFAULT: 'rgb(var(--brand) / <alpha-value>)',
+          hover: 'rgb(var(--brand-hover) / <alpha-value>)',
+          soft: 'rgb(var(--brand-soft) / <alpha-value>)',
+          fg: 'rgb(var(--brand-fg) / <alpha-value>)',
         },
         // --- semantic status ----------------------------------------------
         verified: {

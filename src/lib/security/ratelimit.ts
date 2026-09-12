@@ -1,47 +1,54 @@
 import { hashIpForRateLimit } from '@/lib/crypto/hash';
-import { getRedis } from '@/lib/queue/connection';
+import { adminDb } from '@/lib/firebase/admin.core';
 
 export type RateLimitResult = { ok: boolean; remaining: number; retryAfterSeconds: number };
 
 /**
- * Sliding-window limiter in one Redis round trip.
+ * Sliding-window limiter, on Firestore.
  *
+ * ===========================================================================
+ * WHY A SLIDING WINDOW, STILL
+ * ===========================================================================
  * A fixed window lets an attacker send 2x the limit across a window boundary,
  * which matters most on exactly the endpoints we care about: login and
- * document upload. This uses a sorted set of request timestamps instead.
+ * document upload. The bucket therefore stores the TIMESTAMPS of recent
+ * requests rather than a counter, and each check prunes anything older than
+ * the window before it decides. Same algorithm as the Redis sorted set it
+ * replaces.
+ *
+ * ===========================================================================
+ * WHAT THE REDIS LUA SCRIPT GAVE US, AND WHAT REPLACES IT
+ * ===========================================================================
+ * The old implementation ran ZREMRANGEBYSCORE + ZCARD + ZADD as ONE Lua
+ * script, which Redis executes atomically - so two simultaneous requests could
+ * not both read a count of 9 and both append.
+ *
+ * A Firestore transaction gives the same property by a different mechanism:
+ * the read and the write are one commit, and if the bucket document changes in
+ * between, the transaction aborts and re-runs. Optimistic instead of
+ * single-threaded, identical outcome.
+ *
+ * The cost is real and worth stating: this is a transaction (one read, one
+ * write) per limited request, where Redis needed one round trip. It is spent
+ * only on endpoints that are explicitly rate-limited - login, registration,
+ * uploads, purchases - and never on ordinary reads. peekRateLimit() does not
+ * pay it at all, being a plain document read.
+ *
+ * ===========================================================================
+ * BUCKETS EXPIRE THEMSELVES
+ * ===========================================================================
+ * Redis dropped an idle key when its PEXPIRE elapsed. Firestore does not
+ * garbage-collect, so every bucket carries `expiresAt` and the deployment
+ * declares a FIRESTORE TTL POLICY on that field for this collection:
+ *
+ *     gcloud firestore fields ttls update expiresAt \
+ *       --collection-group=rateLimits --enable-ttl
+ *
+ * Without that policy nothing breaks and no limit is wrong - a stale bucket is
+ * pruned on its next read regardless - it simply accumulates documents nobody
+ * looks at. The policy is hygiene, not correctness, which is why its absence
+ * is not something this module tries to detect.
  */
-const SCRIPT = `
-local key = KEYS[1]
-local now = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
-local limit = tonumber(ARGV[3])
-redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
-local count = redis.call('ZCARD', key)
-if count >= limit then
-  local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
-  return {0, 0, math.ceil((tonumber(oldest[2]) + window - now) / 1000)}
-end
-redis.call('ZADD', key, now, now .. ':' .. math.random())
-redis.call('PEXPIRE', key, window)
-return {1, limit - count - 1, 0}
-`;
-
-/** Read-only counterpart to SCRIPT. Adds nothing to the sorted set. */
-const PEEK_SCRIPT = `
-local key = KEYS[1]
-local now = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
-local limit = tonumber(ARGV[3])
-local count = redis.call('ZCOUNT', key, now - window, '+inf')
-if count >= limit then
-  local oldest = redis.call('ZRANGEBYSCORE', key, now - window, '+inf', 'WITHSCORES', 'LIMIT', 0, 1)
-  if oldest[2] == nil then
-    return {1, limit, 0}
-  end
-  return {0, 0, math.ceil((tonumber(oldest[2]) + window - now) / 1000)}
-end
-return {1, limit - count, 0}
-`;
 
 export const LIMITS = {
   /**
@@ -79,14 +86,9 @@ export const LIMITS = {
   // Content endpoints: generous enough that a real user never sees them.
   'feed:post': { limit: 20, windowMs: 60 * 60_000 },
   'feed:comment': { limit: 60, windowMs: 60 * 60_000 },
-  /**
-   * Direct messages. Higher than commenting because a real conversation is
-   * bursty - people send several short lines in a row - but bounded, since
-   * messaging is the one surface that reaches a specific stranger's inbox and
-   * is therefore the natural vector for harassment at volume.
-   */
-  'messages:send': { limit: 120, windowMs: 60 * 60_000 },
   'notes:upload': { limit: 10, windowMs: 24 * 60 * 60_000 },
+  // Its own bucket: uploading notes must never use up the right to apply.
+  'mentors:apply': { limit: 5, windowMs: 24 * 60 * 60_000 },
   'orders:create': { limit: 30, windowMs: 60 * 60_000 },
   'bookings:create': { limit: 10, windowMs: 24 * 60 * 60_000 },
   'search': { limit: 120, windowMs: 60_000 },
@@ -104,12 +106,28 @@ export type RateLimitIdentity = {
   subject?: string;
 };
 
+const COLLECTION = 'rateLimits';
+
+/**
+ * The bucket document id.
+ *
+ * `/` is the one character a Firestore document id may not contain, and none
+ * of the pieces here can produce one: the key is a literal from LIMITS, and
+ * everything else is a hex digest or an id. The replacement is kept anyway,
+ * because an id that silently became a path would put rate-limit state in a
+ * subcollection and quietly stop limiting anything.
+ */
 function bucketKey(key: LimitKey, identity: RateLimitIdentity): string {
   if (identity.subject) {
-    return `rl:${key}:s:${hashIpForRateLimit(`${identity.ip}|${identity.subject}`)}`;
+    return `${key}:s:${hashIpForRateLimit(`${identity.ip}|${identity.subject}`)}`.replace(/\//g, '_');
   }
   const subject = identity.userId ? `u:${identity.userId}` : `i:${hashIpForRateLimit(identity.ip)}`;
-  return `rl:${key}:${subject}`;
+  return `${key}:${subject}`.replace(/\//g, '_');
+}
+
+/** Drops timestamps that have fallen out of the window. */
+function prune(hits: number[], now: number, windowMs: number): number[] {
+  return hits.filter((at) => at > now - windowMs);
 }
 
 export async function rateLimit(
@@ -120,57 +138,74 @@ export async function rateLimit(
   // Authenticated traffic is limited per user; anonymous traffic per hashed IP.
   // Both are needed: per-IP alone punishes a whole NAT'd campus, per-user alone
   // is defeated by registering more accounts.
-  const redisKey = bucketKey(key, identity);
+  const ref = adminDb().collection(COLLECTION).doc(bucketKey(key, identity));
 
-  const [ok, remaining, retryAfter] = (await getRedis().eval(
-    SCRIPT,
-    1,
-    redisKey,
-    Date.now().toString(),
-    windowMs.toString(),
-    limit.toString(),
-  )) as [number, number, number];
+  return adminDb().runTransaction(async (tx) => {
+    const now = Date.now();
+    const snap = await tx.get(ref);
+    const stored = (snap.data()?.hits as number[] | undefined) ?? [];
+    const hits = prune(stored, now, windowMs);
 
-  return { ok: ok === 1, remaining, retryAfterSeconds: retryAfter };
+    if (hits.length >= limit) {
+      const oldest = Math.min(...hits);
+      return {
+        ok: false,
+        remaining: 0,
+        retryAfterSeconds: Math.max(1, Math.ceil((oldest + windowMs - now) / 1000)),
+      };
+    }
+
+    hits.push(now);
+    tx.set(ref, { hits, expiresAt: new Date(now + windowMs) });
+
+    return { ok: true, remaining: limit - hits.length, retryAfterSeconds: 0 };
+  });
 }
-
 
 /**
  * Read-only variant of the sliding window.
  *
- * ZCOUNT over the live window rather than ZREMRANGEBYSCORE + ZCARD, so asking
- * "am I allowed?" genuinely does not mutate the bucket. This is what lets the
- * login route check the limit BEFORE verifying a password and then charge a
- * token only when the password turns out to be wrong.
+ * A plain read with no write, so asking "am I allowed?" genuinely does not
+ * mutate the bucket. This is what lets the login route check the limit BEFORE
+ * verifying a password and then charge a token only when the password turns
+ * out to be wrong.
+ *
+ * No transaction, deliberately: nothing is written, so there is nothing to
+ * make atomic, and a peek must not cost a commit on every login attempt.
  */
 export async function peekRateLimit(
   key: LimitKey,
   identity: RateLimitIdentity,
 ): Promise<RateLimitResult> {
   const { limit, windowMs } = LIMITS[key];
-  const [ok, remaining, retryAfter] = (await getRedis().eval(
-    PEEK_SCRIPT,
-    1,
-    bucketKey(key, identity),
-    Date.now().toString(),
-    windowMs.toString(),
-    limit.toString(),
-  )) as [number, number, number];
+  const snap = await adminDb().collection(COLLECTION).doc(bucketKey(key, identity)).get();
 
-  return { ok: ok === 1, remaining, retryAfterSeconds: retryAfter };
+  const now = Date.now();
+  const hits = prune((snap.data()?.hits as number[] | undefined) ?? [], now, windowMs);
+
+  if (hits.length >= limit) {
+    const oldest = Math.min(...hits);
+    return {
+      ok: false,
+      remaining: 0,
+      retryAfterSeconds: Math.max(1, Math.ceil((oldest + windowMs - now) / 1000)),
+    };
+  }
+
+  return { ok: true, remaining: limit - hits.length, retryAfterSeconds: 0 };
 }
 
 /**
  * Clears a bucket. Called on a SUCCESSFUL login, mirroring what the route
- * already does with failedLoginCount and lockedUntil in Postgres: proving you
- * own the account forgives the earlier fumbles. Without this the two counters
- * disagree, and the Redis one silently outlives the reason it exists.
+ * already does with failedLoginCount and lockedUntil: proving you own the
+ * account forgives the earlier fumbles. Without this the two counters
+ * disagree, and this one silently outlives the reason it exists.
  */
 export async function resetRateLimit(
   key: LimitKey,
   identity: RateLimitIdentity,
 ): Promise<void> {
-  await getRedis().del(bucketKey(key, identity));
+  await adminDb().collection(COLLECTION).doc(bucketKey(key, identity)).delete();
 }
 
 export class RateLimitError extends Error {

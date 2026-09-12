@@ -31,22 +31,66 @@ for (const file of ['.env.local', '.env']) {
 
 const nodemailer = require('nodemailer');
 
-const user = process.env.SMTP_USER;
-const pass = process.env.SMTP_PASSWORD;
-const from = process.env.EMAIL_FROM ?? 'UniPath <mammdhamidli04@gmail.com>';
+// Same precedence as src/lib/email/send.ts: the Gmail pair first, then SMTP_*.
+const gmail = Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+const user = gmail ? process.env.GMAIL_USER.trim() : process.env.SMTP_USER;
+/**
+ * Whitespace is stripped from BOTH variables, matching smtpSettings() in
+ * src/lib/email/send.ts. Stripping only the Gmail one made this script
+ * disagree with the application about the same credential: a 16-character App
+ * Password pasted with Google's display spaces was reported here as 19
+ * characters, which fired the "not 16 characters" warning below against a
+ * secret the app itself was using correctly.
+ */
+const pass = (gmail ? process.env.GMAIL_APP_PASSWORD : process.env.SMTP_PASSWORD).replace(/\s+/g, '');
+const host = gmail ? 'smtp.gmail.com' : (process.env.SMTP_HOST || 'smtp.gmail.com');
+const port = gmail ? 465 : Number(process.env.SMTP_PORT || 465);
+const displayName =
+  /^(.*?)\s*</.exec(process.env.EMAIL_FROM ?? '')?.[1]?.replace(/^"|"$/g, '').trim() || 'UniPath';
+const from = `${displayName} <${user}>`;
 
 if (!user || !pass) {
-  console.error('\n  SMTP_USER / SMTP_PASSWORD are not set.\n');
+  console.error('\n  GMAIL_USER / GMAIL_APP_PASSWORD are not set.\n');
   console.error('  For Gmail:');
   console.error('    1. Enable 2-Step Verification on the account.');
   console.error('    2. Create an App Password: https://myaccount.google.com/apppasswords');
-  console.error('    3. Put it in .env as SMTP_PASSWORD (16 chars, spaces are fine).\n');
+  console.error('    3. Put it in .env as GMAIL_APP_PASSWORD (16 chars, spaces are fine).\n');
   process.exit(1);
 }
 
-const port = Number(process.env.SMTP_PORT ?? 465);
+/**
+ * Says WHICH variables are in play and whether the secret is the right SHAPE,
+ * without ever printing it.
+ *
+ * Both facts were invisible before, and both produce the same 535 from Google
+ * as a genuinely wrong password:
+ *   - the wrong variable pair silently winning (GMAIL_* takes precedence over
+ *     SMTP_*, so a stale GMAIL_USER masks the SMTP_USER being debugged);
+ *   - a Gmail App Password that is not 16 characters, which means it was
+ *     truncated on paste or is the account password rather than an App
+ *     Password.
+ * Only the LENGTH and the mailbox are reported - never the value itself.
+ */
+console.log(`\n  Using      -  ${gmail ? 'GMAIL_USER + GMAIL_APP_PASSWORD' : 'SMTP_USER + SMTP_PASSWORD'}`);
+console.log(`  Mailbox    -  ${user}`);
+console.log(`  Host       -  ${host}:${port}`);
+console.log(`  Secret     -  ${pass.length} characters (value never printed)`);
+
+const configuredFrom = /<([^>]+)>/.exec(process.env.EMAIL_FROM ?? '')?.[1]?.trim();
+if (configuredFrom && configuredFrom.toLowerCase() !== user.toLowerCase()) {
+  // Gmail rewrites any From that is not the authenticated mailbox, so this is
+  // a silent surprise rather than an error: mail arrives from the wrong address.
+  console.warn(`  WARNING    -  EMAIL_FROM is <${configuredFrom}> but mail will be sent as <${user}>`);
+}
+if (host.includes('gmail.com') && pass.length !== 16) {
+  console.warn(
+    `  WARNING    -  a Google App Password is exactly 16 characters; this one is ${pass.length}.` +
+      '\n                That alone will produce "535 Username and Password not accepted".',
+  );
+}
+
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
+  host,
   port,
   secure: port === 465,
   auth: { user, pass },
@@ -55,7 +99,7 @@ const transporter = nodemailer.createTransport({
 
 try {
   await transporter.verify();
-  console.log(`\n  SMTP OK  -  ${user} via ${process.env.SMTP_HOST ?? 'smtp.gmail.com'}:${port}`);
+  console.log(`\n  SMTP OK  -  ${user} via ${host}:${port}`);
   console.log(`  From     -  ${from}\n`);
 } catch (error) {
   console.error(`\n  SMTP FAILED: ${error.message}\n`);

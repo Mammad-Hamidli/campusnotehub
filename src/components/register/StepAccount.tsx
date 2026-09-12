@@ -4,61 +4,99 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { AlertCircle, AtSign, Eye, EyeOff } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import type { AccountForm, FieldErrors } from './types';
-import { FacultySelect } from './FacultySelect';
-import { UNIVERSITIES as UNI_LIST } from '@/lib/universities';
 
 // Re-exported so existing imports keep working; the list itself now lives in
 // src/lib/universities.ts alongside the domain map that powers auto-detection.
 export { UNIVERSITIES } from '@/lib/universities';
-
-const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
 export function StepAccount({
   value,
   errors,
   onChange,
   onEmailChange,
-  onUniversityManualChange,
-  autoDetected = false,
 }: {
   value: AccountForm;
   errors: FieldErrors;
   onChange: (patch: Partial<AccountForm>) => void;
   /** Fires alongside onChange so the parent can run domain auto-detection. */
   onEmailChange?: (email: string) => void;
-  /** Latches the manual override so auto-detect stops overwriting. */
-  onUniversityManualChange?: () => void;
-  /** True when the current selection came from the email domain. */
-  autoDetected?: boolean;
 }) {
   const t = useT();
   const [showPassword, setShowPassword] = useState(false);
-
-  const years = useMemo(() => {
-    const now = new Date().getFullYear();
-    return Array.from({ length: 12 }, (_, i) => now - 3 + i);
-  }, []);
 
   const strength = passwordStrength(value.password);
 
   return (
     <div className="space-y-5">
+      {/*
+        The legal name, in two halves.
+
+        Collected separately because verification compares given name and
+        surname against the identity document independently. The helper text
+        under each is the document-consistency notice: these values WILL be
+        checked, and a mismatch found after four photographs have been uploaded
+        is a much worse experience than a sentence read before typing.
+      */}
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field
+          id="firstName"
+          label={t('auth.register.firstName')}
+          hint={t('auth.register.documentNotice')}
+          error={errors.firstName && t(errors.firstName)}
+        >
+          <input
+            id="firstName"
+            name="given-name"
+            autoComplete="given-name"
+            required
+            aria-required="true"
+            value={value.firstName}
+            onChange={(e) => onChange({ firstName: e.target.value })}
+            placeholder="Aysel"
+            className={inputClass(!!errors.firstName)}
+          />
+        </Field>
+
+        <Field
+          id="lastName"
+          label={t('auth.register.lastName')}
+          hint={t('auth.register.documentNotice')}
+          error={errors.lastName && t(errors.lastName)}
+        >
+          <input
+            id="lastName"
+            name="family-name"
+            autoComplete="family-name"
+            required
+            aria-required="true"
+            value={value.lastName}
+            onChange={(e) => onChange({ lastName: e.target.value })}
+            placeholder="Məmmədova"
+            className={inputClass(!!errors.lastName)}
+          />
+        </Field>
+      </div>
+
       <Field
-        id="fullName"
-        label={t('auth.register.fullName')}
-        hint={t('auth.register.fullNameHint')}
-        error={errors.fullName && t(errors.fullName)}
+        id="dateOfBirth"
+        label={t('auth.register.dateOfBirth')}
+        hint={t('auth.register.documentNotice')}
+        error={errors.dateOfBirth && t(errors.dateOfBirth)}
       >
         <input
-          id="fullName"
-          name="name"
-          autoComplete="name"
+          id="dateOfBirth"
+          type="date"
+          name="bday"
+          autoComplete="bday"
           required
           aria-required="true"
-          value={value.fullName}
-          onChange={(e) => onChange({ fullName: e.target.value })}
-          placeholder="Aysel Məmmədova"
-          className={inputClass(!!errors.fullName)}
+          value={value.dateOfBirth}
+          onChange={(e) => onChange({ dateOfBirth: e.target.value })}
+          // Bounds mirror the server's plausibility window, so the native
+          // picker cannot offer a value the API will reject.
+          min="1925-01-01"
+          max={new Date(Date.now() - 16 * 365.2425 * 86_400_000).toISOString().slice(0, 10)}
+          className={inputClass(!!errors.dateOfBirth)}
         />
       </Field>
 
@@ -185,92 +223,6 @@ export function StepAccount({
         )}
       </Field>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field
-          id="university"
-          label={t('auth.register.university')}
-          error={errors.universityId && t(errors.universityId)}
-          hint={autoDetected ? t('auth.register.universityAutoDetected') : undefined}
-        >
-          <select
-            id="university"
-            required
-            aria-required="true"
-            value={value.universityId}
-            onChange={(e) => {
-              onChange({ universityId: e.target.value });
-              onUniversityManualChange?.();
-            }}
-            className={selectClass(!!errors.universityId)}
-          >
-            <option value="">{t('auth.register.universityPlaceholder')}</option>
-            {UNI_LIST.map((uni) => (
-              <option key={uni.id} value={uni.id}>
-                {uni.id} — {uni.az}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        {/* Faculty sits beside university because the two are read together:
-            "ADA / Computer Science" is one fact about the student, and
-            splitting them across the form makes the second look optional. */}
-        <div className="sm:col-span-2">
-          <FacultySelect
-            value={value.facultySlug}
-            otherValue={value.facultyOther}
-            onChange={(facultySlug) => onChange({ facultySlug })}
-            onOtherChange={(facultyOther) => onChange({ facultyOther })}
-            error={errors.facultySlug && t(errors.facultySlug)}
-            otherError={errors.facultyOther && t(errors.facultyOther)}
-          />
-        </div>
-
-        <Field
-          id="gradYear"
-          label={t('auth.register.graduationDate')}
-          error={
-            (errors.graduationYear && t(errors.graduationYear)) ||
-            (errors.graduationMonth && t(errors.graduationMonth))
-          }
-        >
-          <div className="grid grid-cols-2 gap-2">
-            <select
-              id="gradYear"
-              required
-              aria-required="true"
-              aria-label={t('auth.register.graduationYear')}
-              value={value.graduationYear}
-              onChange={(e) => onChange({ graduationYear: e.target.value })}
-              className={selectClass(!!errors.graduationYear)}
-            >
-              <option value="">{t('auth.register.graduationYear')}</option>
-              {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-            {/* Required, not optional: the 1 May sweep needs the month to know
-                whether someone graduating "in 2026" has graduated yet. */}
-            <select
-              required
-              aria-required="true"
-              aria-label={t('auth.register.graduationMonth')}
-              value={value.graduationMonth}
-              onChange={(e) => onChange({ graduationMonth: e.target.value })}
-              className={selectClass(!!errors.graduationMonth)}
-            >
-              <option value="">{t('auth.register.graduationMonth')}</option>
-              {MONTHS.map((month) => (
-                <option key={month} value={String(Number(month))}>
-                  {month}
-                </option>
-              ))}
-            </select>
-          </div>
-        </Field>
-      </div>
 
       {/*
         Two SEPARATE consents.
@@ -309,11 +261,6 @@ export function StepAccount({
 
 function inputClass(invalid: boolean) {
   return `input ${invalid ? 'input-invalid' : ''}`;
-}
-
-function selectClass(invalid: boolean) {
-  return `${inputClass(invalid)} appearance-none bg-[length:1rem] bg-[right_0.6rem_center] bg-no-repeat pr-8
-    [background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20fill='none'%20stroke='%2394a3b8'%20stroke-width='2'%20viewBox='0%200%2024%2024'%3E%3Cpath%20d='m6%209%206%206%206-6'/%3E%3C/svg%3E")]`;
 }
 
 function Field({

@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileText, Loader2, Upload, X } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
-import { ACCEPT_ATTRIBUTE, MAX_NOTE_BYTES, MAX_NOTE_MB } from '@/lib/notes/fileTypes';
+import { NOTE_UPLOAD_ACCEPT, MAX_NOTE_BYTES, MAX_NOTE_MB } from '@/lib/notes/fileTypes';
 import { FileChip } from './FileChip';
 
 /**
@@ -118,6 +118,8 @@ export function NoteUploadForm({ universities }: { universities: { id: string; c
       }
 
       if (xhr.status >= 200 && xhr.status < 300) {
+        // Uploaded notes wait for moderator approval before they are listed.
+        window.alert(t('notes.upload.pendingReview'));
         router.push('/notes');
         return;
       }
@@ -224,7 +226,7 @@ export function NoteUploadForm({ universities }: { universities: { id: string; c
           ref={inputRef}
           type="file"
           className="sr-only"
-          accept={ACCEPT_ATTRIBUTE}
+          accept={NOTE_UPLOAD_ACCEPT}
           onChange={(event) => pick(event.target.files?.[0] ?? null)}
         />
       </div>

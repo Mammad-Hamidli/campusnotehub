@@ -50,6 +50,19 @@ export function FacultySelect({
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
 
+  /**
+   * Suppresses the reopen that a programmatic refocus would otherwise cause.
+   *
+   * choose() closes the list and then returns focus to the input for keyboard
+   * users - but the input's onFocus opens the list, so the two fought and the
+   * dropdown never actually closed. Sixty-six options stayed on screen
+   * covering the rest of the form after every selection.
+   *
+   * A ref rather than state: it must be readable inside the very next focus
+   * event, before React would have re-rendered.
+   */
+  const suppressOpenRef = useRef(false);
+
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -116,6 +129,9 @@ export function FacultySelect({
     // the pair coherent, which is what both the zod refinement and the CHECK
     // constraint require. Leaving a stale value here would be a 500 at submit.
     if (option.slug !== FACULTY_OTHER) onOtherChange('');
+
+    // Refocus for keyboard users without letting onFocus reopen the list.
+    suppressOpenRef.current = true;
     inputRef.current?.focus();
   }
 
@@ -181,7 +197,15 @@ export function FacultySelect({
               setQuery(e.target.value);
               if (!open) setOpen(true);
             }}
-            onFocus={() => setOpen(true)}
+            onFocus={() => {
+              // A focus caused by choose() must not reopen the list; a focus
+              // the user initiated should.
+              if (suppressOpenRef.current) {
+                suppressOpenRef.current = false;
+                return;
+              }
+              setOpen(true);
+            }}
             onKeyDown={onKeyDown}
             placeholder={t('auth.register.facultyPlaceholder')}
             className={`input py-2 pl-9 pr-9 text-sm ${error ? 'input-invalid' : ''}`}

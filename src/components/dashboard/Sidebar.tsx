@@ -35,7 +35,6 @@ const TABS: { tab: DashboardTab; icon: LucideIcon; labelKey: string }[] = [
 const LINKS: { href: string; icon: LucideIcon; labelKey: string }[] = [
   { href: '/notifications', icon: Bell, labelKey: 'nav.notifications' },
   { href: '/bookmarks', icon: Bookmark, labelKey: 'nav.bookmarks' },
-  { href: '/messages', icon: MessagesSquare, labelKey: 'nav.messages' },
 ];
 
 /**

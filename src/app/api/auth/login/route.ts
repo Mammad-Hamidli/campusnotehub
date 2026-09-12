@@ -1,10 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { UserRole } from '@prisma/client';
-import { db } from '@/lib/db';
+import { UserRole } from '@/lib/enums';
+import {
+  findUserByEmail,
+  getCredentials,
+  incrementFailedLogins,
+  updateCredentials,
+  updateUser,
+} from '@/lib/firebase/repositories/users';
+import { writeAuditLog } from '@/lib/firebase/repositories/audit';
 import { loginSchema } from '@/server/validators/auth';
 import { burnPasswordTime, hashPassword, verifyPassword } from '@/lib/crypto/hash';
 import { rateLimit, peekRateLimit, resetRateLimit, clientIp } from '@/lib/security/ratelimit';
-import { isUserBlocked, recordDevice } from '@/lib/security/blocklist';
+import { isUserBlocked, recordDeviceDetailed } from '@/lib/security/blocklist';
+import { sendEmailAsync } from '@/lib/email/send';
 import { deviceLabel } from '@/lib/security/fingerprint';
 import { issueSession } from '@/lib/auth/session';
 
@@ -101,22 +109,23 @@ export async function POST(request: NextRequest) {
     ]);
   };
 
-  const user = await db.user.findUnique({
-    where: { email },
-    select: {
-      id: true,
-      passwordHash: true,
-      role: true,
-      accountStatus: true,
-      verificationStatus: true,
-      failedLoginCount: true,
-      lockedUntil: true,
-      deletedAt: true,
-    },
-  });
+  /**
+   * Profile and credential are two reads, by design.
+   *
+   * The argon2id hash lives in `credentials/{userId}`, not on the user
+   * document, because Firestore grants are per-document: a rule permitting
+   * "read your own profile" would otherwise hand out the password hash with
+   * it. See the header of the users repository.
+   *
+   * The hash is still argon2id and is still verified by this application -
+   * Firebase Auth cannot check argon2, and re-hashing everyone with something
+   * it can would be a silent downgrade.
+   */
+  const user = await findUserByEmail(email);
+  const credential = user ? await getCredentials(user.id) : null;
 
   // No such user. Burn comparable time, then answer identically.
-  if (!user || user.deletedAt) {
+  if (!user || user.deletedAt || !credential) {
     await burnPasswordTime();
     await chargeFailure();
     return NextResponse.json(GENERIC_FAILURE, { status: 401 });
@@ -130,20 +139,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(GENERIC_FAILURE, { status: 401 });
   }
 
-  const check = await verifyPassword(password, user.passwordHash);
+  const check = await verifyPassword(password, credential.passwordHash);
 
   if (!check.valid) {
     const nextCount = user.failedLoginCount + 1;
-    await db.user.update({
-      where: { id: user.id },
-      data: {
-        failedLoginCount: nextCount,
-        lockedUntil:
-          nextCount >= MAX_FAILED_ATTEMPTS
-            ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000)
-            : null,
-      },
-    });
+    // An atomic increment rather than a read-modify-write: two simultaneous
+    // wrong guesses must both count, or the lockout can be outrun.
+    await incrementFailedLogins(
+      user.id,
+      nextCount >= MAX_FAILED_ATTEMPTS
+        ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000)
+        : null,
+    );
     await chargeFailure();
     return NextResponse.json(GENERIC_FAILURE, { status: 401 });
   }
@@ -175,23 +182,32 @@ export async function POST(request: NextRequest) {
   // occasion we legitimately hold the plaintext. No migration, no forced reset.
   const passwordHash = check.needsRehash ? await hashPassword(password) : undefined;
 
-  await db.user.update({
-    where: { id: user.id },
-    data: {
-      failedLoginCount: 0,
-      lockedUntil: null,
-      lastLoginAt: new Date(),
-      ...(passwordHash ? { passwordHash } : {}),
-    },
+  await updateUser(user.id, {
+    failedLoginCount: 0,
+    lockedUntil: null,
+    lastLoginAt: new Date(),
   });
+  // The rehash lands in the credential document, never on the profile.
+  if (passwordHash) await updateCredentials(user.id, { passwordHash });
 
-  const deviceId = deviceFingerprint
-    ? await recordDevice({
+  const device = deviceFingerprint
+    ? await recordDeviceDetailed({
         userId: user.id,
         fingerprint: deviceFingerprint,
         label: deviceLabel(request.headers.get('user-agent') ?? undefined),
       })
     : undefined;
+  const deviceId = device?.id;
+
+  // First sign-in from this device (registration records the device it was
+  // created on, so a normal login there is not "new").
+  if (device?.created) {
+    sendEmailAsync(user.email, 'newDeviceLogin', {
+      nickname: user.nickname,
+      device: deviceLabel(request.headers.get('user-agent') ?? undefined),
+      when: new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC',
+    });
+  }
 
   const session = await issueSession({
     user: {
@@ -204,15 +220,14 @@ export async function POST(request: NextRequest) {
     deviceId,
   });
 
-  await db.auditLog.create({
-    data: {
-      actorId: user.id,
-      action: 'USER_LOGIN',
-      entityType: 'user',
-      entityId: user.id,
-      deviceFingerprint,
-      userAgent: request.headers.get('user-agent')?.slice(0, 512),
-    },
+  await writeAuditLog({
+    actorId: user.id,
+    action: 'USER_LOGIN',
+    entityType: 'user',
+    entityId: user.id,
+    deviceFingerprint,
+    userAgent: request.headers.get('user-agent')?.slice(0, 512),
+    result: 'SUCCESS',
   });
 
   /**

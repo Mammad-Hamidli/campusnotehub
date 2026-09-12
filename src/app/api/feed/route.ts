@@ -1,11 +1,17 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { Prisma, PostVisibility } from '@prisma/client';
+import { PostVisibility } from '@/lib/enums';
 import { z } from 'zod';
-import { db } from '@/lib/db';
 import { getViewer, requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { can, ForbiddenError } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
-import { POST_INCLUDE, serializePost } from '@/lib/feed/serialize';
+import { serializePost } from '@/lib/feed/serialize';
+import { resolveViewerAudience } from '@/lib/feed/visibility';
+import { createPost, feedPage, likedPostIds, newPostId } from '@/lib/firebase/repositories/posts';
+import { findUserById, findUsersByIds } from '@/lib/firebase/repositories/users';
+import { findUniversitiesByIds } from '@/lib/firebase/repositories/reference';
+import { followingIds } from '@/lib/firebase/repositories/follows';
+import { claimMediaAssets } from '@/lib/firebase/repositories/media';
+import { upsertTags } from '@/lib/firebase/repositories/tags';
 import { mediaIdFromKey } from '@/lib/media/images';
 
 export const runtime = 'nodejs';
@@ -16,7 +22,7 @@ const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   filter: z.enum(['all', 'university', 'following']).default('all'),
   tag: z.string().max(50).optional(),
-  universityId: z.string().cuid().optional(),
+  universityId: z.string().min(1).max(64).optional(),
 });
 
 /**
@@ -39,87 +45,103 @@ export async function GET(request: NextRequest) {
   const rate = await rateLimit('search', { userId: viewer?.id, ip: clientIp(request.headers) });
   if (!rate.ok) return NextResponse.json({ error: 'errors.rateLimited' }, { status: 429 });
 
-  const [cursorTime, cursorId] = cursor ? cursor.split('_') : [];
+  const [cursorTime] = cursor ? cursor.split('_') : [];
 
-  // The viewer's own university comes from their record, never from the query
-  // string. Trusting `?universityId=` here would let anyone read another
-  // university's private feed by editing the URL.
-  const viewerUniversityId = viewer
-    ? (await db.user.findUnique({ where: { id: viewer.id }, select: { universityId: true } }))
-        ?.universityId ?? null
-    : null;
+  /**
+   * The viewer's entitlements, resolved from their OWN record.
+   *
+   * Never from the query string: trusting `?universityId=` here would let
+   * anyone read another university's private feed by editing the URL. This
+   * returns the audience tokens that replace the old SQL `OR` - see
+   * src/lib/feed/audience.ts.
+   */
+  const audience = await resolveViewerAudience(viewer);
 
-  // Visibility is enforced in the query, never by filtering the result set in
-  // JS - a post the viewer may not see must never leave the database.
-  // Clauses are built by pushing rather than by neutralising a clause with a
-  // sentinel id, so an unmet condition is genuinely absent from the SQL.
-  let visibilityWhere: Prisma.PostWhereInput = { visibility: PostVisibility.PUBLIC };
+  /**
+   * The `university` tab narrows to the viewer's own university feed. An
+   * explicit ?universityId= is only honoured for browsing another
+   * university's PUBLIC posts, which the audience tokens already limit - a
+   * viewer without a UNI token for that institution simply matches none of
+   * its UNIVERSITY_ONLY posts.
+   */
+  const narrowUniversityId =
+    filter === 'university' && viewer ? audience.universityId : (universityId ?? null);
 
-  if (viewer) {
-    const clauses: Prisma.PostWhereInput[] = [
-      { visibility: PostVisibility.PUBLIC },
-      { authorId: viewer.id },
-      { visibility: PostVisibility.FOLLOWERS, author: { followers: { some: { followerId: viewer.id } } } },
-    ];
-    if (viewer.verificationStatus === 'VERIFIED') {
-      clauses.push({ visibility: PostVisibility.VERIFIED_ONLY });
-    }
-    if (viewerUniversityId) {
-      clauses.push({ visibility: PostVisibility.UNIVERSITY_ONLY, universityId: viewerUniversityId });
-    }
-    visibilityWhere = { OR: clauses };
-  }
+  // The `following` tab is a presentation filter over posts the viewer may
+  // already see; it is not a security boundary (the tokens are).
+  const followedAuthors =
+    filter === 'following' && viewer ? await followingIds(viewer.id) : null;
 
-  const posts = await db.post.findMany({
-    where: {
-      isDeleted: false,
-      // Content from banned accounts disappears without a separate cleanup job.
-      author: { accountStatus: { in: ['ACTIVE', 'RESTRICTED'] } },
-      ...visibilityWhere,
-      // The `university` filter narrows to the viewer's own university feed.
-      // An explicit ?universityId= is only honoured for browsing another
-      // university's PUBLIC posts, which the visibility clause already limits.
-      ...(filter === 'university' && viewer
-        ? { universityId: viewerUniversityId ?? undefined }
-        : universityId
-          ? { universityId }
-          : {}),
-      ...(filter === 'following' && viewer
-        ? { author: { followers: { some: { followerId: viewer.id } } } }
-        : {}),
-      ...(tag ? { tags: { some: { tag: { slug: tag.toLowerCase() } } } } : {}),
-      ...(cursorTime && cursorId
-        ? {
-            OR: [
-              { createdAt: { lt: new Date(cursorTime) } },
-              { createdAt: new Date(cursorTime), id: { lt: cursorId } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: limit + 1, // one extra row tells us whether another page exists
-    include: {
-      ...POST_INCLUDE,
-      // Reposts are counted, not listed: the client shows a number, and
-      // loading the rows to call .length on them would pull every repost of
-      // every post on the page.
-      _count: { select: { reposts: true } },
-      ...(viewer ? { likes: { where: { userId: viewer.id }, select: { userId: true } } } : {}),
-    },
+  const { rows, hasMore } = await feedPage({
+    tokens: audience.tokens,
+    limit,
+    before: cursorTime ? new Date(cursorTime) : null,
+    universityId: narrowUniversityId,
+    authorIds: followedAuthors,
+    tagSlug: tag ? tag.toLowerCase() : null,
   });
 
-  const hasMore = posts.length > limit;
-  const page = hasMore ? posts.slice(0, limit) : posts;
-  const last = page.at(-1);
+  /**
+   * The authors, their universities, and the viewer's likes - three batched
+   * reads that replace what Prisma expressed as one `include`.
+   *
+   * Firestore has no joins, so decorating a page is: collect the ids, fetch
+   * them in batches of 30, and index the results. That is a fixed handful of
+   * round trips per page rather than one per post, which is the N+1 the old
+   * `include` was avoiding.
+   */
+  const authors = await findUsersByIds(rows.map((p) => p.authorId));
+
+  const [universities, liked] = await Promise.all([
+    findUniversitiesByIds(
+      [...authors.values()].map((a) => a.universityId).filter((id): id is string => Boolean(id)),
+    ),
+    viewer ? likedPostIds(rows.map((p) => p.id), viewer.id) : Promise.resolve(new Set<string>()),
+  ]);
+
+  /**
+   * Content from banned accounts disappears without a separate cleanup job.
+   *
+   * This was `author: { accountStatus: { in: [...] } }` on the SQL join.
+   * Firestore cannot filter a query by a field on a different document, so it
+   * is applied here, after the authors are loaded. The page can therefore come
+   * back shorter than `limit` - which is why `nextCursor` is derived from the
+   * LAST ROW READ rather than from the last row shown: the cursor must
+   * describe where the scan reached, not where the filtered list ended, or a
+   * page whose posts were all filtered out would loop forever on the same
+   * cursor.
+   */
+  const visible = rows.filter((post) => {
+    const author = authors.get(post.authorId);
+    return Boolean(
+      author &&
+        !author.deletedAt &&
+        (author.accountStatus === 'ACTIVE' || author.accountStatus === 'RESTRICTED'),
+    );
+  });
+
+  const lastScanned = rows.at(-1);
 
   return NextResponse.json(
     {
       // One serialiser for both routes - see src/lib/feed/serialize.ts for why
       // hand-spreading the row here was the source of the `tags is undefined`
       // crash on newly created posts.
-      posts: page.map((p) => serializePost(p, { viewerId: viewer?.id, shareCount: p._count.reposts })),
-      nextCursor: hasMore && last ? `${last.createdAt.toISOString()}_${last.id}` : null,
+      posts: visible.map((post) => {
+        const author = authors.get(post.authorId) ?? null;
+        return serializePost(post, {
+          author,
+          university: author?.universityId
+            ? universities.get(author.universityId) ?? null
+            : null,
+          viewerId: viewer?.id,
+          likedByViewer: liked.has(post.id),
+        });
+      }),
+      nextCursor:
+        hasMore && lastScanned
+          ? `${lastScanned.createdAt.toISOString()}_${lastScanned.id}`
+          : null,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );
@@ -128,7 +150,7 @@ export async function GET(request: NextRequest) {
 const createSchema = z.object({
   body: z.string().trim().min(1).max(2000),
   visibility: z.nativeEnum(PostVisibility).default(PostVisibility.PUBLIC),
-  universityId: z.string().cuid().optional(),
+  universityId: z.string().min(1).max(64).optional(),
   tags: z.array(z.string().regex(/^[\p{L}\p{N}_]{2,40}$/u)).max(5).default([]),
   /**
    * Images, as keys returned by POST /api/media.
@@ -198,10 +220,10 @@ export async function POST(request: NextRequest) {
 
   // UNIVERSITY_ONLY must resolve to the author's own university; accepting a
   // client-supplied id would let anyone post into any university's feed.
-  const author = await db.user.findUniqueOrThrow({
-    where: { id: userId },
-    select: { universityId: true },
-  });
+  const author = await findUserById(userId);
+  if (!author) {
+    return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
+  }
 
   /**
    * The tags are attached INSIDE the transaction, then the finished row is
@@ -235,78 +257,59 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'feed.image.errors.invalidKey' }, { status: 400 });
   }
 
-  const assets = requestedIds.length
-    ? await db.mediaAsset.findMany({
-        where: { id: { in: requestedIds }, ownerId: userId, attachedAt: null },
-        select: { id: true, mime: true, width: true, height: true, altText: true },
-      })
-    : [];
-
-  if (assets.length !== requestedIds.length) {
+  /**
+   * Claim the assets BEFORE the post is written.
+   *
+   * Under Postgres this happened inside the same transaction as the insert, so
+   * an asset could not be claimed by a post that then rolled back. Firestore
+   * cannot span the two, so the order is chosen for the failure that is
+   * recoverable rather than the one that is not:
+   *
+   *   claim-then-create  -> a crash strands an asset marked attached with no
+   *                         post. The image is orphaned; nobody is harmed and
+   *                         a sweep can reclaim it.
+   *   create-then-claim  -> a crash leaves an UNCLAIMED asset already visible
+   *                         in a published post, so a second request could
+   *                         attach the same image to a second post. That is
+   *                         the race the claim exists to prevent.
+   *
+   * claimMediaAssets is a transaction over the asset documents themselves, so
+   * two concurrent posts cannot both claim the same asset.
+   */
+  const claim = await claimMediaAssets(requestedIds, userId);
+  if (!claim.ok) {
     // Deliberately one message for "no such asset", "not yours" and "already
     // used". Distinguishing them tells a caller which keys exist.
     return NextResponse.json({ error: 'feed.image.errors.invalidKey' }, { status: 400 });
   }
+  const orderedAssets = claim.assets;
 
-  // Preserve the order the user arranged them in, which findMany does not.
-  const assetById = new Map(assets.map((a) => [a.id, a]));
-  const orderedAssets = requestedIds.map((id) => assetById.get(id)!);
+  /**
+   * Tags are upserted first so the post can embed their resolved labels.
+   * Blocked tags are dropped, exactly as the SQL version skipped creating the
+   * join row for them.
+   */
+  const tags = await upsertTags(input.tags);
 
-  const post = await db.$transaction(async (tx) => {
-    const created = await tx.post.create({
-      data: {
-        authorId: userId,
-        body: input.body,
-        visibility: input.visibility,
-        universityId:
-          input.visibility === PostVisibility.UNIVERSITY_ONLY ? author.universityId : null,
-        media: {
-          createMany: {
-            data: orderedAssets.map((asset, i) => ({
-              storageKey: `db://media/${asset.id}`,
-              // The encoder's own values, not the client's claim.
-              mimeType: asset.mime,
-              width: asset.width,
-              height: asset.height,
-              altText: input.media[i]?.altText ?? asset.altText,
-              position: i,
-            })),
-          },
-        },
-      },
-      select: { id: true },
-    });
-
-    /**
-     * Claim the assets in the SAME transaction.
-     *
-     * Marking them attached afterwards would leave a window where a second
-     * request could attach the same asset to a second post, and a rolled-back
-     * post would strand assets marked as used.
-     */
-    if (orderedAssets.length > 0) {
-      await tx.mediaAsset.updateMany({
-        where: { id: { in: orderedAssets.map((a) => a.id) } },
-        data: { attachedAt: new Date() },
-      });
-    }
-
-    for (const raw of input.tags) {
-      const slug = raw.toLocaleLowerCase('az');
-      const tag = await tx.tag.upsert({
-        where: { slug },
-        create: { slug, label: raw },
-        update: { usageCount: { increment: 1 } },
-      });
-      if (!tag.isBlocked) {
-        await tx.postTag.create({ data: { postId: created.id, tagId: tag.id } });
-      }
-    }
-
-    return tx.post.findUniqueOrThrow({
-      where: { id: created.id },
-      include: POST_INCLUDE,
-    });
+  const postId = newPostId();
+  const post = await createPost({
+    id: postId,
+    authorId: userId,
+    body: input.body,
+    visibility: input.visibility,
+    universityId:
+      input.visibility === PostVisibility.UNIVERSITY_ONLY ? author.universityId : null,
+    tags,
+    media: orderedAssets.map((asset, i) => ({
+      id: asset.id,
+      storageKey: `db://media/${asset.id}`,
+      // The encoder's own values, not the client's claim.
+      mimeType: asset.mime,
+      width: asset.width,
+      height: asset.height,
+      altText: input.media[i]?.altText ?? asset.altText,
+      position: i,
+    })),
   });
 
   /**
@@ -316,8 +319,21 @@ export async function POST(request: NextRequest) {
    * shareCount is 0 rather than undefined. A brand-new post has no reposts,
    * hence the literal.
    */
+  const university = author.universityId
+    ? (await findUniversitiesByIds([author.universityId])).get(author.universityId) ?? null
+    : null;
+
   return NextResponse.json(
-    { post: serializePost(post, { viewerId: userId, shareCount: 0 }) },
+    {
+      post: serializePost(post, {
+        author,
+        university,
+        viewerId: userId,
+        // A brand-new post has no reposts and cannot already be liked.
+        shareCount: 0,
+        likedByViewer: false,
+      }),
+    },
     { status: 201, headers: { 'Cache-Control': 'no-store' } },
   );
 }

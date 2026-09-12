@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import type { Prisma } from '@prisma/client';
-import { db } from '@/lib/db';
+import { listUsers } from '@/lib/firebase/repositories/users';
+import { findUniversitiesByIds, findFacultyById } from '@/lib/firebase/repositories/reference';
 import { freezeState } from '@/lib/auth/freeze';
 import { facultyLabel } from '@/lib/faculties';
 import { withAdmin } from '@/lib/auth/admin';
@@ -16,10 +16,17 @@ export const dynamic = 'force-dynamic';
  * ---------------------------------------------------------------------------
  * WHAT THIS ENDPOINT WILL NOT RETURN
  * ---------------------------------------------------------------------------
- * The `select` below is an allow-list, not an omission list, and that is the
- * whole point. `passwordHash`, `emailHash` and `phoneHash` live on the same
- * model; a `select` that enumerates what it wants cannot leak them, whereas an
- * omit-list silently starts leaking the next sensitive column somebody adds.
+ * The projection below is an allow-list, not an omission list, and that is the
+ * whole point: enumerating what a response WANTS cannot leak a new sensitive
+ * field, whereas an omit-list silently starts leaking the next one somebody
+ * adds.
+ *
+ * That property is now doubly load-bearing. Under Postgres `passwordHash`,
+ * `emailHash` and `phoneHash` were columns on the same table, and a `select`
+ * was what kept them out. In Firestore they are not in the user document at
+ * all - they live in a separate `credentials` collection that findUserById()
+ * never reads (see the header of the users repository). So a leak here would
+ * take two mistakes rather than one, and this allow-list is still the first.
  *
  * Phone numbers are MASKED here. FieldVisibility.PRIVATE is documented as
  * "the owner and platform moderators only", so staff are permitted to see one -
@@ -41,92 +48,113 @@ export async function GET(request: NextRequest) {
     }
     const input = parsed.data;
 
-    const where: Prisma.UserWhereInput = {};
-    if (!input.includeDeleted) where.deletedAt = null;
-    if (input.role) where.role = input.role;
-    if (input.accountStatus) where.accountStatus = input.accountStatus;
-    if (input.verificationStatus) where.verificationStatus = input.verificationStatus;
-    if (input.universityId) where.universityId = input.universityId;
-
-    if (input.createdFrom || input.createdTo) {
-      where.createdAt = {};
-      if (input.createdFrom) where.createdAt.gte = input.createdFrom;
-      // A date-only `to` means "through the end of that day". Without this a
-      // range of 01→01 returns nothing, which reads as a broken filter.
-      if (input.createdTo) {
-        const to = new Date(input.createdTo);
-        if (to.getHours() === 0 && to.getMinutes() === 0 && to.getSeconds() === 0) {
-          to.setHours(23, 59, 59, 999);
-        }
-        where.createdAt.lte = to;
+    /**
+     * The date-range upper bound.
+     *
+     * A date-only `to` means "through the end of that day". Without this a
+     * range of 01 to 01 returns nothing, which reads as a broken filter.
+     */
+    let createdTo: Date | undefined;
+    if (input.createdTo) {
+      createdTo = new Date(input.createdTo);
+      if (
+        createdTo.getHours() === 0 &&
+        createdTo.getMinutes() === 0 &&
+        createdTo.getSeconds() === 0
+      ) {
+        createdTo.setHours(23, 59, 59, 999);
       }
     }
 
-    if (input.q) {
-      // Searchable fields only: readable identity columns the admin already
-      // sees in the table. Searching a hash column would let a caller confirm
-      // whether a given address exists without ever being shown it.
-      where.OR = [
-        { fullName: { contains: input.q, mode: 'insensitive' } },
-        { nickname: { contains: input.q, mode: 'insensitive' } },
-        { email: { contains: input.q, mode: 'insensitive' } },
-        { id: input.q },
-      ];
-    }
+    /**
+     * Filtering, sorting and paging all happen in listUsers().
+     *
+     * The free-text box matches fullName, nickname OR email simultaneously,
+     * which is a cross-field `OR` that Firestore cannot express - so the
+     * repository pushes the indexable equality filters into the query and
+     * applies the text match to what comes back, under a scan ceiling. Its
+     * header explains why that trade is right for an administrative table and
+     * wrong for a user-facing feed.
+     *
+     * The searchable fields are unchanged and deliberately readable ones:
+     * searching a hash field would let a caller confirm whether a given
+     * address exists without ever being shown it.
+     *
+     * `sort` is a z.enum, so it cannot become an arbitrary field name.
+     */
+    const { users: rows, total } = await listUsers(
+      {
+        q: input.q,
+        role: input.role,
+        accountStatus: input.accountStatus,
+        verificationStatus: input.verificationStatus,
+        universityId: input.universityId,
+        includeDeleted: input.includeDeleted,
+        createdFrom: input.createdFrom ? new Date(input.createdFrom) : undefined,
+        createdTo,
+      },
+      input.page,
+      input.pageSize,
+      input.sort,
+      input.order,
+    );
 
-    // `sort` is a z.enum, so this cannot become an arbitrary column name.
-    // Secondary id sort keeps pagination stable when the primary key ties -
-    // otherwise rows shuffle between pages and records get skipped.
-    const orderBy: Prisma.UserOrderByWithRelationInput[] = [
-      { [input.sort]: input.order } as Prisma.UserOrderByWithRelationInput,
-      { id: 'asc' },
-    ];
-
-    const [total, rows] = await db.$transaction([
-      db.user.count({ where }),
-      db.user.findMany({
-        where,
-        orderBy,
-        skip: (input.page - 1) * input.pageSize,
-        take: input.pageSize,
-        select: {
-          id: true,
-          fullName: true,
-          nickname: true,
-          email: true,
-          phone: true,
-          role: true,
-          accountStatus: true,
-          verificationStatus: true,
-          isVerified: true,
-          graduationYear: true,
-          graduationMonth: true,
-          createdAt: true,
-          updatedAt: true,
-          lastLoginAt: true,
-          deletedAt: true,
-          frozenUntil: true,
-          frozenReason: true,
-          frozenAt: true,
-          facultySlug: true,
-          facultyOther: true,
-          university: { select: { id: true, code: true, nameEn: true } },
-          faculty: { select: { id: true, nameEn: true } },
-        },
-      }),
-    ]);
+    // The university and faculty decorations Prisma resolved with joins. One
+    // batched read for the universities; faculties are looked up individually
+    // because only a handful of rows on a page carry one.
+    const universities = await findUniversitiesByIds(
+      rows.map((u) => u.universityId).filter((id): id is string => Boolean(id)),
+    );
+    const facultyIds = [...new Set(rows.map((u) => u.facultyId).filter(Boolean))] as string[];
+    const faculties = new Map(
+      (await Promise.all(facultyIds.map((id) => findFacultyById(id))))
+        .filter((f) => f !== null)
+        .map((f) => [f.id, f]),
+    );
 
     return NextResponse.json(
       {
-        users: rows.map((u) => ({
-          ...u,
-          phone: maskPhone(u.phone),
-          // Same serialiser the detail modal and /api/me use, so the row badge
-          // and the modal can never disagree about whether an account is
-          // frozen - which is how a stale badge outlives the freeze itself.
-          freeze: freezeState(u),
-          facultyLabel: facultyLabel(u.facultySlug, u.facultyOther) ?? u.faculty?.nameEn ?? null,
-        })),
+        users: rows.map((u) => {
+          const university = u.universityId ? universities.get(u.universityId) : null;
+          const faculty = u.facultyId ? faculties.get(u.facultyId) : null;
+          return {
+            id: u.id,
+            fullName: u.fullName,
+            nickname: u.nickname,
+            email: u.email,
+            // MASKED here. FieldVisibility.PRIVATE is documented as "the owner
+            // and platform moderators only", so staff may see one - but a bulk
+            // listing is browsing, not investigation. The full number is on
+            // the detail endpoint, where fetching it writes an audit row
+            // against a single named account.
+            phone: maskPhone(u.phone),
+            role: u.role,
+            accountStatus: u.accountStatus,
+            verificationStatus: u.verificationStatus,
+            isVerified: u.isVerified,
+            graduationYear: u.graduationYear,
+            graduationMonth: u.graduationMonth,
+            createdAt: u.createdAt,
+            updatedAt: u.updatedAt,
+            lastLoginAt: u.lastLoginAt,
+            deletedAt: u.deletedAt,
+            frozenUntil: u.frozenUntil,
+            frozenReason: u.frozenReason,
+            frozenAt: u.frozenAt,
+            facultySlug: u.facultySlug,
+            facultyOther: u.facultyOther,
+            university: university
+              ? { id: university.id, code: university.code, nameEn: university.nameEn }
+              : null,
+            faculty: faculty ? { id: faculty.id, nameEn: faculty.nameEn } : null,
+            // Same serialiser the detail modal and /api/me use, so the row
+            // badge and the modal can never disagree about whether an account
+            // is frozen - which is how a stale badge outlives the freeze.
+            freeze: freezeState(u),
+            facultyLabel:
+              facultyLabel(u.facultySlug, u.facultyOther) ?? faculty?.nameEn ?? null,
+          };
+        }),
         page: {
           page: input.page,
           pageSize: input.pageSize,

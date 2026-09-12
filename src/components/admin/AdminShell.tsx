@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   Building2,
+  ClipboardCheck,
   LayoutDashboard,
   Menu as MenuIcon,
   LogOut,
@@ -29,6 +30,7 @@ const NAV: { href: string; icon: LucideIcon; labelKey: string }[] = [
   { href: '/admin', icon: LayoutDashboard, labelKey: 'admin.nav.dashboard' },
   { href: '/admin/users', icon: Users, labelKey: 'admin.nav.users' },
   { href: '/admin/verifications', icon: BadgeCheck, labelKey: 'admin.nav.verifications' },
+  { href: '/admin/reviews', icon: ClipboardCheck, labelKey: 'admin.nav.reviews' },
   { href: '/admin/universities', icon: Building2, labelKey: 'admin.nav.universities' },
   { href: '/admin/audit-logs', icon: ScrollText, labelKey: 'admin.nav.auditLogs' },
 ];

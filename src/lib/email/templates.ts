@@ -1,4 +1,5 @@
 import { appUrl, renderEmail, type EmailContent } from './layout';
+import type { EmailAttachment } from './assets';
 
 /**
  * Every transactional message the platform sends, as data.
@@ -39,10 +40,40 @@ export type TemplateName =
   | 'roleAssigned'
   | 'noteUploaded'
   | 'notePurchased'
-  | 'noteSold';
+  | 'noteSold'
+  | 'newDeviceLogin'
+  | 'profileUpdated'
+  | 'passwordChanged'
+  | 'passwordReset'
+  | 'accountSuspended'
+  | 'accountReactivated'
+  | 'accountDeleted'
+  | 'newNotification'
+  | 'mentorApplicationSubmitted'
+  | 'mentorApplicationApproved'
+  | 'mentorApplicationRejected'
+  | 'balanceToppedUp'
+  | 'noteApproved'
+  | 'noteRejected';
 
 /** Greeting line. Nickname, never the legal name - see the User model. */
 const hi = (nickname: string) => `Hi @${nickname},`;
+
+/** Friendly names for the profile fields PATCH /api/me can change. */
+const PROFILE_FIELD_LABELS: Record<string, string> = {
+  fullName: 'Name',
+  headline: 'Headline',
+  bio: 'Bio',
+  locale: 'Language',
+  timezone: 'Time zone',
+  facultySlug: 'Faculty',
+  showRealName: 'Privacy settings',
+  showEmail: 'Privacy settings',
+  showPhone: 'Privacy settings',
+  showUniversity: 'Privacy settings',
+  showFaculty: 'Privacy settings',
+  showGraduationYear: 'Privacy settings',
+};
 
 export const TEMPLATES = {
   welcome: (p: { nickname: string; university?: string | null; faculty?: string | null }): EmailContent => ({
@@ -50,6 +81,10 @@ export const TEMPLATES = {
     heading: 'Your account is ready',
     preheader: 'Verify your student status to unlock selling, mentoring and payouts.',
     blocks: [
+      // Hero: opt-in, and this is one of the three messages that earns one.
+      // See the 'hero' block comment in layout.ts for why the account and
+      // security templates deliberately do not carry an image.
+      { kind: 'hero', image: 'hero.jpg', alt: 'Students on campus' },
       { kind: 'paragraph', text: hi(p.nickname) },
       {
         kind: 'paragraph',
@@ -108,6 +143,7 @@ export const TEMPLATES = {
     heading: 'Verification approved',
     preheader: 'Selling, mentoring and payouts are now unlocked.',
     blocks: [
+      { kind: 'hero', image: 'hero.jpg', alt: 'Verified student account' },
       { kind: 'paragraph', text: hi(p.nickname) },
       { kind: 'callout', tone: 'success', title: 'Your student status is confirmed' },
       {
@@ -165,7 +201,7 @@ export const TEMPLATES = {
         kind: 'paragraph',
         // Matches ALWAYS_ALLOWED in src/lib/permissions.ts exactly: a frozen
         // account keeps the read-only escape hatch.
-        text: 'You can still sign in, read the feed, and browse notes and mentors. Posting, buying, selling, messaging and withdrawals are paused for the duration.',
+        text: 'You can still sign in, read the feed, and browse notes and mentors. Posting, buying, selling and withdrawals are paused for the duration.',
       },
       {
         kind: 'paragraph',
@@ -262,15 +298,257 @@ export const TEMPLATES = {
       { kind: 'button', label: 'Open wallet', href: appUrl('/wallet') },
     ],
   }),
+
+  newDeviceLogin: (p: { nickname: string; device: string; when: string }): EmailContent => ({
+    subject: 'New sign-in to your UniPath account',
+    heading: 'New device signed in',
+    preheader: 'Your account was just signed in to from a device we have not seen before.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: 'Your account was just signed in to from a new device.' },
+      {
+        kind: 'facts',
+        rows: [
+          { label: 'Device', value: p.device },
+          { label: 'Time', value: p.when },
+        ],
+      },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Was this not you?',
+        body: 'Contact support right away so we can end the session and secure your account.',
+      },
+      { kind: 'button', label: 'Open settings', href: appUrl('/settings') },
+    ],
+  }),
+
+  profileUpdated: (p: { nickname: string; fields: string[] }): EmailContent => {
+    const changed = [...new Set(p.fields.map((f) => PROFILE_FIELD_LABELS[f] ?? f))];
+    return {
+      subject: 'Your UniPath profile was updated',
+      heading: 'Profile updated',
+      preheader: 'Changes were saved to your profile.',
+      blocks: [
+        { kind: 'paragraph', text: hi(p.nickname) },
+        { kind: 'paragraph', text: 'The following changes were saved to your profile.' },
+        { kind: 'facts', rows: [{ label: 'Changed', value: changed.join(', ') || '-' }] },
+        {
+          kind: 'callout',
+          tone: 'neutral',
+          title: 'Did not make this change?',
+          body: 'Contact support so we can secure your account.',
+        },
+        { kind: 'button', label: 'Open settings', href: appUrl('/settings') },
+      ],
+    };
+  },
+
+  passwordChanged: (p: { nickname: string }): EmailContent => ({
+    subject: 'Your UniPath password was changed',
+    heading: 'Password changed',
+    preheader: 'The password on your account was just changed.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: 'The password on your UniPath account was just changed. Every other session was signed out.' },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Did not change it?',
+        body: 'Contact support immediately - someone else may have access to your account.',
+      },
+    ],
+  }),
+
+  passwordReset: (p: { nickname: string }): EmailContent => ({
+    subject: 'Your UniPath password was reset',
+    heading: 'Password reset',
+    preheader: 'An administrator reset the password on your account.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: 'The password on your UniPath account was reset by an administrator, and every active session was signed out. Sign in with the new password you were given.',
+      },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Did not request this?',
+        body: 'Contact support right away.',
+      },
+      { kind: 'button', label: 'Sign in', href: appUrl('/login') },
+    ],
+  }),
+
+  accountSuspended: (p: {
+    nickname: string;
+    level: 'suspended' | 'banned' | 'restricted';
+    reason?: string | null;
+  }): EmailContent => ({
+    subject:
+      p.level === 'banned'
+        ? 'Your UniPath account has been suspended'
+        : p.level === 'restricted'
+          ? 'Your UniPath account has been restricted'
+          : 'Your UniPath account has been suspended',
+    heading: p.level === 'restricted' ? 'Account restricted' : 'Account suspended',
+    preheader: 'A moderator changed the status of your account.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text:
+          p.level === 'restricted'
+            ? 'Some features of your account have been restricted by a moderator.'
+            : p.level === 'banned'
+              ? 'Your account has been suspended by a moderator and you can no longer sign in.'
+              : 'Your account has been suspended by a moderator. You can browse, but posting, selling and bookings are paused.',
+      },
+      ...(p.reason ? [{ kind: 'facts' as const, rows: [{ label: 'Reason', value: p.reason }] }] : []),
+      {
+        kind: 'callout',
+        tone: 'neutral',
+        title: 'Think this is a mistake?',
+        body: 'Reply to this email or contact support with your handle and we will review it.',
+      },
+    ],
+  }),
+
+  accountReactivated: (p: { nickname: string }): EmailContent => ({
+    subject: 'Your UniPath account is active again',
+    heading: 'Account reactivated',
+    preheader: 'Your account has been restored.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: 'Your account has been reactivated. Everything is available again.' },
+      { kind: 'button', label: 'Open UniPath', href: appUrl('/dashboard') },
+    ],
+  }),
+
+  accountDeleted: (p: { nickname: string }): EmailContent => ({
+    subject: 'Your UniPath account was deleted',
+    heading: 'Account deleted',
+    preheader: 'Your account has been deleted.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: 'Your UniPath account has been deleted and every session was signed out. You will not receive further emails about it.',
+      },
+      {
+        kind: 'callout',
+        tone: 'neutral',
+        title: 'Did not expect this?',
+        body: 'Contact support and include your handle.',
+      },
+    ],
+  }),
+
+  newNotification: (p: { nickname: string; title: string; body?: string | null; linkUrl?: string | null }): EmailContent => ({
+    subject: p.title,
+    heading: p.title,
+    preheader: p.body || 'You have a new notification on UniPath.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      ...(p.body ? [{ kind: 'paragraph' as const, text: p.body }] : []),
+      { kind: 'button', label: 'Open', href: appUrl(p.linkUrl || '/notifications') },
+    ],
+  }),
+
+  mentorApplicationSubmitted: (p: { nickname: string }): EmailContent => ({
+    subject: 'We received your mentor application',
+    heading: 'Application received',
+    preheader: 'A moderator will review your PocketMentor application.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: 'Thanks for applying to mentor on PocketMentor. A moderator reviews every application; you will get an email with the decision.',
+      },
+      { kind: 'button', label: 'Check status', href: appUrl('/mentors/apply') },
+    ],
+  }),
+
+  mentorApplicationApproved: (p: { nickname: string; profileUrl: string }): EmailContent => ({
+    subject: 'You are now a PocketMentor mentor',
+    heading: 'Application approved',
+    preheader: 'Your mentor profile is live.',
+    blocks: [
+      { kind: 'hero', image: 'hero.jpg', alt: 'Approved PocketMentor mentor' },
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: 'Your mentor application was approved and your profile is now listed in PocketMentor.' },
+      { kind: 'button', label: 'View my profile', href: appUrl(p.profileUrl) },
+    ],
+  }),
+
+  mentorApplicationRejected: (p: { nickname: string; reason?: string | null }): EmailContent => ({
+    subject: 'Your mentor application was not approved',
+    heading: 'Application not approved',
+    preheader: 'A moderator reviewed your PocketMentor application.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: 'A moderator reviewed your mentor application and could not approve it this time.' },
+      ...(p.reason ? [{ kind: 'facts' as const, rows: [{ label: 'Reason', value: p.reason }] }] : []),
+      { kind: 'paragraph', text: 'You can update your details and apply again.' },
+      { kind: 'button', label: 'Apply again', href: appUrl('/mentors/apply') },
+    ],
+  }),
+
+  balanceToppedUp: (p: { nickname: string; amountLabel: string; balanceLabel: string }): EmailContent => ({
+    subject: 'Balance topped up: ' + p.amountLabel,
+    heading: 'Balance topped up',
+    preheader: p.amountLabel + ' was added to your wallet.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'facts',
+        rows: [
+          { label: 'Added', value: p.amountLabel },
+          { label: 'Available balance', value: p.balanceLabel },
+        ],
+      },
+      { kind: 'button', label: 'Open wallet', href: appUrl('/wallet') },
+    ],
+  }),
+
+  noteApproved: (p: { nickname: string; title: string }): EmailContent => ({
+    subject: 'Your note is published: ' + p.title,
+    heading: 'Note approved',
+    preheader: 'Your note is now listed in UniNotes.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: 'Your note "' + p.title + '" was approved and is now listed in UniNotes.' },
+      { kind: 'button', label: 'View UniNotes', href: appUrl('/notes') },
+    ],
+  }),
+
+  noteRejected: (p: { nickname: string; title: string; reason?: string | null }): EmailContent => ({
+    subject: 'Your note was not approved: ' + p.title,
+    heading: 'Note not approved',
+    preheader: 'A moderator reviewed your note.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: 'A moderator reviewed "' + p.title + '" and could not approve it.' },
+      ...(p.reason ? [{ kind: 'facts' as const, rows: [{ label: 'Reason', value: p.reason }] }] : []),
+      { kind: 'button', label: 'Upload a new version', href: appUrl('/notes/new') },
+    ],
+  }),
 } satisfies Record<TemplateName, (params: never) => EmailContent>;
 
-/** Renders a template to the subject/html/text triple the transport wants. */
+/**
+ * Renders a template to what the transport needs.
+ *
+ * `attachments` carries the inline images in CID mode and is empty otherwise.
+ * It is produced HERE, at send time, rather than stored anywhere: the email
+ * outbox persists only `to`, `template` and `params`, so a retry re-reads the
+ * image files from disk and no Buffer ever goes into Firestore.
+ */
 export function buildEmail<K extends TemplateName>(
   name: K,
   params: Parameters<(typeof TEMPLATES)[K]>[0],
-): { subject: string; html: string; text: string } {
+): { subject: string; html: string; text: string; attachments: EmailAttachment[] } {
   const template = TEMPLATES[name] as (p: unknown) => EmailContent;
   const content = template(params);
-  const { html, text } = renderEmail(content);
-  return { subject: content.subject, html, text };
+  const { html, text, attachments } = renderEmail(content);
+  return { subject: content.subject, html, text, attachments };
 }

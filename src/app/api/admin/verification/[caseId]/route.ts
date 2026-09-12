@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { VerificationStatus, UserRole } from '@prisma/client';
+import { VerificationStatus, UserRole } from '@/lib/enums';
 import { z } from 'zod';
-import { db } from '@/lib/db';
+import { findCaseById, updateCase } from '@/lib/firebase/repositories/verification';
+import { findUserById, updateUser } from '@/lib/firebase/repositories/users';
+import { findUniversityById } from '@/lib/firebase/repositories/reference';
+import { listUserDevices, revokeUserSessions } from '@/lib/firebase/repositories/sessions';
+import { writeAuditLog } from '@/lib/firebase/repositories/audit';
+import { writeModerationAction } from '@/lib/firebase/repositories/moderation';
 import { requireSession } from '@/lib/auth/session';
 import { retrieve, destroy } from '@/lib/verification/reviewBuffer';
 import { applyBan } from '@/lib/security/blocklist';
@@ -37,15 +42,13 @@ class ForbiddenError extends Error {
 }
 
 /**
- * GET /api/admin/verification/:caseId?secret=...
+ * GET /api/admin/verification/:caseId
  *
  * Returns the buffered document images as base64 for the review UI.
  *
- * The `secret` is the per-case decryption key produced when the buffer was
- * stashed. It is NOT stored in Postgres - it lives only in the moderator queue
- * entry. That means a database compromise alone does not let an attacker read
- * pending review documents out of Redis, and it means we can hand out review
- * access per-case rather than granting blanket decrypt rights.
+ * The images are authenticated Cloudinary assets: this handler fetches them
+ * server-side through signed URLs, so no deliverable Cloudinary URL ever
+ * reaches the browser - see src/lib/verification/reviewBuffer.ts.
  */
 export async function GET(
   request: NextRequest,
@@ -59,45 +62,31 @@ export async function GET(
   }
 
   const { caseId } = await params;
-  /**
-   * Optional now. The buffer key is derived server-side from the application
-   * secret (see deriveKey in reviewBuffer.ts), so a moderator does not have to
-   * carry one. This used to hard-fail with a 400 whenever the parameter was
-   * absent - which was always, because nothing ever produced a secret to send,
-   * and it is why the review panel never displayed a single document.
-   *
-   * An explicitly supplied secret is still honoured, so an out-of-band key
-   * distribution can be layered back on without touching this handler.
-   */
-  const secret = request.nextUrl.searchParams.get('secret') ?? undefined;
 
-  const kase = await db.verificationCase.findUnique({
-    where: { id: caseId },
-    select: {
-      id: true,
-      status: true,
-      reviewBufferKey: true,
-      reviewExpiresAt: true,
-      confidence: true,
-      failureCodes: true,
-      checkScores: true,
-      user: {
-        select: {
-          id: true,
-          fullName: true,
-          createdAt: true,
-          university: { select: { code: true, nameEn: true } },
-          devices: { select: { fingerprint: true, label: true, firstSeenAt: true } },
-        },
-      },
-    },
-  });
+  const kase = await findCaseById(caseId);
 
   if (!kase || kase.status !== VerificationStatus.NEEDS_REVIEW || !kase.reviewBufferKey) {
     return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
   }
 
-  const documents = await retrieve(kase.reviewBufferKey, secret);
+  // The applicant, their institution and their devices: three reads where
+  // Prisma had a nested include. Fetched only after the case has been
+  // confirmed reviewable, so a 404 costs one read rather than four.
+  const applicant = await findUserById(kase.userId);
+  if (!applicant) {
+    return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
+  }
+
+  const [university, devices] = await Promise.all([
+    applicant.universityId ? findUniversityById(applicant.universityId) : Promise.resolve(null),
+    listUserDevices(applicant.id),
+  ]);
+
+  const documents = await retrieve({
+    key: kase.reviewBufferKey,
+    expiresAt: kase.reviewExpiresAt,
+    documents: kase.reviewDocuments,
+  });
   if (!documents) {
     // Normal outcome once the TTL lapses - not an error condition.
     return NextResponse.json(
@@ -108,14 +97,12 @@ export async function GET(
 
   // Written BEFORE the response so a crash mid-stream still leaves the access
   // recorded. An audit row that only appears on success is not an audit row.
-  await db.auditLog.create({
-    data: {
-      actorId: moderatorId,
-      action: 'KYC_DOCUMENTS_VIEWED',
-      entityType: 'verification_case',
-      entityId: caseId,
-      after: { documentCount: documents.length },
-    },
+  await writeAuditLog({
+    actorId: moderatorId,
+    action: 'KYC_DOCUMENTS_VIEWED',
+    entityType: 'verification_case',
+    entityId: caseId,
+    after: { documentCount: documents.length },
   });
 
   try {
@@ -129,11 +116,15 @@ export async function GET(
           expiresAt: kase.reviewExpiresAt,
         },
         applicant: {
-          id: kase.user.id,
-          fullName: kase.user.fullName,
-          memberSince: kase.user.createdAt,
-          university: kase.user.university,
-          devices: kase.user.devices,
+          id: applicant.id,
+          fullName: applicant.fullName,
+          memberSince: applicant.createdAt,
+          university: university ? { code: university.code, nameEn: university.nameEn } : null,
+          devices: devices.map((d) => ({
+            fingerprint: d.fingerprint,
+            label: d.label,
+            firstSeenAt: d.firstSeenAt,
+          })),
         },
         documents: documents.map((doc) => ({
           kind: doc.kind,
@@ -212,179 +203,175 @@ export async function POST(
   }
   const { decision, reason, codes, role } = parsed.data;
 
-  const kase = await db.verificationCase.findUnique({
-    where: { id: caseId },
-    select: {
-      id: true,
-      userId: true,
-      status: true,
-      reviewBufferKey: true,
-      attempt: true,
-      // Needed to address the outcome email and to record what the role was
-      // before this decision changed it.
-      user: { select: { email: true, nickname: true, role: true } },
-    },
-  });
+  const kase = await findCaseById(caseId);
 
   if (!kase || kase.status !== VerificationStatus.NEEDS_REVIEW) {
     return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
   }
 
+  // Needed to address the outcome email and to record what the role was before
+  // this decision changed it.
+  const applicant = await findUserById(kase.userId);
+  if (!applicant) {
+    return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
+  }
+
   // Destroy the documents FIRST, before writing the decision.
   //
-  // Ordering matters and is counter-intuitive: if the database write then
+  // Ordering matters and is counter-intuitive: if the decision write then
   // fails, the resulting state is "documents gone, case still open" - the user
   // resubmits, which is annoying but safe. The reverse ordering would risk
-  // "decision recorded, documents still sitting in Redis", which is a
+  // "decision recorded, documents still sitting in the buffer", which is a
   // retention violation that nothing would ever clean up.
+  //
+  // This ordering matters MORE than it used to. Redis expired the blob on its
+  // own, so a missed destroy() eventually corrected itself; Cloud Storage has
+  // no per-object TTL, so this call and the scheduled sweep are the only two
+  // things that remove it. See the header of reviewBuffer.ts.
   if (kase.reviewBufferKey) {
     await destroy(kase.reviewBufferKey);
   }
 
   const now = new Date();
 
-  await db.$transaction(async (tx) => {
-    await tx.moderationAction.create({
-      data: {
-        moderatorId,
-        targetType: 'verification_case',
-        targetId: caseId,
-        action: decision.toLowerCase(),
-        reason,
-        metadata: { codes },
-      },
+  /**
+   * ===========================================================================
+   * NO LONGER ONE TRANSACTION - AND THE ORDER IS WHAT CARRIES THE SAFETY
+   * ===========================================================================
+   * These writes shared a Postgres transaction. They cannot share a Firestore
+   * one for two independent reasons, and both are structural rather than
+   * stylistic:
+   *
+   *   - applyBan() revokes every live session, which is an unbounded number of
+   *     documents and chunks its own batches to stay under the 500-write cap;
+   *   - a Firestore transaction cannot be passed across a module boundary the
+   *     way a Prisma client could, so applyBan() and enqueueNotification()
+   *     open their own.
+   *
+   * So the writes are sequenced deliberately: the moderation record first
+   * (this decision was made, by this named person), then the case outcome,
+   * then the account. A failure part-way leaves an over-documented decision
+   * rather than an under-documented one - the log always says at least as much
+   * as actually happened, never less.
+   */
+  await writeModerationAction({
+    moderatorId,
+    targetType: 'verification_case',
+    targetId: caseId,
+    action: decision.toLowerCase(),
+    reason,
+    metadata: { codes },
+  });
+
+  if (decision === 'APPROVE') {
+    await updateCase(caseId, {
+      status: VerificationStatus.VERIFIED,
+      decidedAt: now,
+      decidedByModeratorId: moderatorId,
+      moderatorNote: reason,
+      reviewBufferKey: null,
+      reviewExpiresAt: null,
+      reviewDocuments: null,
+      publicMessageKey: 'verification.badge.verified',
     });
 
-    if (decision === 'APPROVE') {
-      await tx.verificationCase.update({
-        where: { id: caseId },
-        data: {
-          status: VerificationStatus.VERIFIED,
-          decidedAt: now,
-          decidedByModeratorId: moderatorId,
-          moderatorNote: reason,
-          reviewBufferKey: null,
-          reviewExpiresAt: null,
-          publicMessageKey: 'verification.badge.verified',
-        },
-      });
-      await tx.user.update({
-        where: { id: kase.userId },
-        data: {
-          verificationStatus: VerificationStatus.VERIFIED,
-          isVerified: true,
-          verifiedAt: now,
-          studentStatusConfirmed: true,
-          identityConfirmed: true,
-          // Only written when the moderator actually chose one - see the note
-          // on the schema for why there is no default.
-          ...(role ? { role } : {}),
-        },
-      });
+    await updateUser(kase.userId, {
+      verificationStatus: VerificationStatus.VERIFIED,
+      isVerified: true,
+      verifiedAt: now,
+      studentStatusConfirmed: true,
+      identityConfirmed: true,
+      // Only written when the moderator actually chose one - see the note on
+      // the schema for why there is no default.
+      ...(role ? { role } : {}),
+    });
 
-      /**
-       * A grant that crosses the staff boundary revokes the account's live
-       * sessions, so the new privilege level is picked up from a freshly
-       * minted token rather than by a tab that is still carrying the old one.
-       * This mirrors the role handler in /api/admin/users/:userId; the two must
-       * behave the same or the guarantee depends on which screen was used.
-       */
-      if (role && PRIVILEGED_ROLES.has(role) !== PRIVILEGED_ROLES.has(kase.user.role)) {
-        await tx.session.updateMany({
-          where: { userId: kase.userId, revokedAt: null },
-          data: { revokedAt: now },
-        });
-      }
-
-      if (role && role !== kase.user.role) {
-        await tx.auditLog.create({
-          data: {
-            actorId: moderatorId,
-            action: 'ADMIN_USER_ROLE_CHANGED',
-            entityType: 'user',
-            entityId: kase.userId,
-            before: { role: kase.user.role },
-            after: { role, viaCaseId: caseId, privileged: PRIVILEGED_ROLES.has(role) },
-            result: 'SUCCESS',
-            userAgent: request.headers.get('user-agent')?.slice(0, 512),
-          },
-        });
-      }
-      await enqueueNotification(tx, {
-        userId: kase.userId,
-        type: 'VERIFICATION_APPROVED',
-        titleKey: 'notifications.types.VERIFICATION_APPROVED',
-        bodyKey: 'verification.submitted.body',
-        linkUrl: '/dashboard',
-      });
-      return;
+    /**
+     * A grant that crosses the staff boundary revokes the account's live
+     * sessions, so the new privilege level is picked up from a freshly minted
+     * token rather than by a tab that is still carrying the old one. This
+     * mirrors the role handler in /api/admin/users/:userId; the two must
+     * behave the same or the guarantee depends on which screen was used.
+     */
+    if (role && PRIVILEGED_ROLES.has(role) !== PRIVILEGED_ROLES.has(applicant.role)) {
+      await revokeUserSessions(kase.userId);
     }
 
-    if (decision === 'REJECT') {
-      // Not fraud - a bad submission. The user may try again.
-      await tx.verificationCase.update({
-        where: { id: caseId },
-        data: {
-          status: VerificationStatus.REJECTED,
-          decidedAt: now,
-          decidedByModeratorId: moderatorId,
-          moderatorNote: reason,
-          failureCodes: codes,
-          reviewBufferKey: null,
-          reviewExpiresAt: null,
-          publicMessageKey: 'verification.banner.rejected',
-        },
+    if (role && role !== applicant.role) {
+      await writeAuditLog({
+        actorId: moderatorId,
+        action: 'ADMIN_USER_ROLE_CHANGED',
+        entityType: 'user',
+        entityId: kase.userId,
+        before: { role: applicant.role },
+        after: { role, viaCaseId: caseId, privileged: PRIVILEGED_ROLES.has(role) },
+        result: 'SUCCESS',
+        userAgent: request.headers.get('user-agent')?.slice(0, 512),
       });
-      await tx.user.update({
-        where: { id: kase.userId },
-        data: { verificationStatus: VerificationStatus.UNVERIFIED },
-      });
-      await enqueueNotification(tx, {
-        userId: kase.userId,
-        type: 'VERIFICATION_REJECTED',
-        titleKey: 'notifications.types.VERIFICATION_REJECTED',
-        bodyKey: 'verification.banner.rejected',
-        linkUrl: '/register',
-      });
-      return;
     }
 
+    await enqueueNotification({ skipEmail: true,
+      userId: kase.userId,
+      type: 'VERIFICATION_APPROVED',
+      titleKey: 'notifications.types.VERIFICATION_APPROVED',
+      bodyKey: 'verification.submitted.body',
+      linkUrl: '/dashboard',
+    });
+  } else if (decision === 'REJECT') {
+    // Not fraud - a bad submission. The user may try again.
+    await updateCase(caseId, {
+      status: VerificationStatus.REJECTED,
+      decidedAt: now,
+      decidedByModeratorId: moderatorId,
+      moderatorNote: reason,
+      failureCodes: codes,
+      reviewBufferKey: null,
+      reviewExpiresAt: null,
+      reviewDocuments: null,
+      publicMessageKey: 'verification.banner.rejected',
+    });
+
+    await updateUser(kase.userId, { verificationStatus: VerificationStatus.UNVERIFIED });
+
+    await enqueueNotification({ skipEmail: true,
+      userId: kase.userId,
+      type: 'VERIFICATION_REJECTED',
+      titleKey: 'notifications.types.VERIFICATION_REJECTED',
+      bodyKey: 'verification.banner.rejected',
+      linkUrl: '/verify',
+    });
+  } else {
     // BAN - confirmed fraud, decided by a named human.
-    await tx.verificationCase.update({
-      where: { id: caseId },
-      data: {
-        status: VerificationStatus.BANNED,
-        decidedAt: now,
-        decidedByModeratorId: moderatorId,
-        moderatorNote: reason,
-        failureCodes: codes,
-        reviewBufferKey: null,
-        reviewExpiresAt: null,
-        publicMessageKey: 'verification.failure.generic',
-      },
+    await updateCase(caseId, {
+      status: VerificationStatus.BANNED,
+      decidedAt: now,
+      decidedByModeratorId: moderatorId,
+      moderatorNote: reason,
+      failureCodes: codes,
+      reviewBufferKey: null,
+      reviewExpiresAt: null,
+      reviewDocuments: null,
+      publicMessageKey: 'verification.failure.generic',
     });
 
     await applyBan({
-      tx,
       userId: kase.userId,
       moderatorId,
       reason,
       sourceCaseId: caseId,
     });
 
-    await tx.auditLog.create({
-      data: {
-        actorId: moderatorId,
-        action: 'USER_BANNED_FRAUD',
-        entityType: 'user',
-        entityId: kase.userId,
-        after: { caseId, codes, reason },
-      },
+    await writeAuditLog({
+      actorId: moderatorId,
+      action: 'USER_BANNED_FRAUD',
+      entityType: 'user',
+      entityId: kase.userId,
+      after: { caseId, codes, reason },
     });
-  });
+  }
 
   /**
-   * Outcome emails, sent only after the transaction has committed.
+   * Outcome emails, sent only after every write above has landed.
    *
    * A BAN deliberately sends nothing from here. Ban notices are a legal
    * communication with an appeal path attached, and the generic "we could not
@@ -394,20 +381,45 @@ export async function POST(
    *
    * The rejection email names no fraud signal - see the note in templates.ts.
    */
+  // Keyed on the case: a double-submitted decision must not mail twice.
   if (decision === 'APPROVE') {
-    sendEmailAsync(kase.user.email, 'verificationApproved', { nickname: kase.user.nickname });
-    if (role && role !== kase.user.role) {
-      sendEmailAsync(kase.user.email, 'roleAssigned', { nickname: kase.user.nickname, role });
+    sendEmailAsync(
+      applicant.email,
+      'verificationApproved',
+      { nickname: applicant.nickname },
+      { dedupeKey: `verification-decision:${caseId}` },
+    );
+    if (role && role !== applicant.role) {
+      sendEmailAsync(
+        applicant.email,
+        'roleAssigned',
+        { nickname: applicant.nickname, role },
+        { dedupeKey: `verification-role:${caseId}` },
+      );
     }
   } else if (decision === 'REJECT') {
-    sendEmailAsync(kase.user.email, 'verificationRejected', {
-      nickname: kase.user.nickname,
-      // Deliberately null: `reason` is the MODERATOR's internal note and may
-      // quote what they saw on the document. It belongs in the audit trail,
-      // not in an email.
-      reason: null,
-      canResubmit: kase.attempt < Number(process.env.VERIFICATION_MAX_ATTEMPTS ?? 3),
-    });
+    sendEmailAsync(
+      applicant.email,
+      'verificationRejected',
+      {
+        nickname: applicant.nickname,
+        // Deliberately null: `reason` is the MODERATOR's internal note and may
+        // quote what they saw on the document. It belongs in the audit trail,
+        // not in an email.
+        reason: null,
+        canResubmit: kase.attempt < Number(process.env.VERIFICATION_MAX_ATTEMPTS ?? 3),
+      },
+      { dedupeKey: `verification-decision:${caseId}` },
+    );
+  } else {
+    // BAN. The moderator reason stays out of the email for the same reason as
+    // above: it may quote the document. It is in the audit trail.
+    sendEmailAsync(
+      applicant.email,
+      'accountSuspended',
+      { nickname: applicant.nickname, level: 'banned', reason: null },
+      { dedupeKey: `verification-ban:${caseId}` },
+    );
   }
 
   return NextResponse.json({ ok: true, decision, role: role ?? null }, { status: 200 });

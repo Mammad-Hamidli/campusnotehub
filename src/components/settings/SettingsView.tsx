@@ -50,15 +50,21 @@ export type SettingsData = {
 };
 
 /**
- * BACKEND INTEGRATION
- * -------------------
- *   GET   /api/me/settings   -> SettingsData
- *   PATCH /api/me/settings   -> { ok: true }
+ * Backed by GET /api/me and PATCH /api/me.
  *
- * Changing `fullName` must reopen verification (the name has to match the ID),
- * so the server returns `{ reverify: true }` and the client shows the banner.
- * Changing `nickname` needs a uniqueness check — the DB has a case-insensitive
- * unique index, so a 409 here is expected and must map to the right field.
+ * There is no separate /api/me/settings, and there should not be: an account
+ * screen edits the same columns the profile does, with the same authorization
+ * ("are you signed in as this person"). A second endpoint would mean a second
+ * copy of the field allow-list that keeps `role` and `accountStatus`
+ * un-editable, and the copy is where a privilege-escalation bug appears.
+ *
+ * NOT editable here, by design:
+ *   email / phone - both carry unique HMAC companion columns documented as
+ *     surviving account deletion so a banned identity cannot be recycled.
+ *     Changing one without the other corrupts that pairing, so an address
+ *     change needs its own verified flow.
+ *   nickname      - case-insensitively unique at the database level; changing
+ *     it also rewrites every shared surface that renders it.
  */
 /**
  * An EMPTY record, not sample content.
@@ -105,6 +111,7 @@ export function SettingsView() {
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   /**
    * The real account, from GET /api/me. Both `data` and `baseline` are set
@@ -160,20 +167,99 @@ export function SettingsView() {
     return () => clearTimeout(timer);
   }, [savedAt]);
 
+  /**
+   * Persists the form through PATCH /api/me.
+   *
+   * This used to be a commented-out fetch followed by
+   * `await new Promise(r => setTimeout(r, 500))` - a simulated round trip. The
+   * form therefore ALWAYS reported success: it cleared the dirty flag and
+   * showed the green tick while nothing was written, so every change was gone
+   * on the next reload. That is the same simulated-success pattern the
+   * composer had, and it is the reason this screen looked finished.
+   *
+   * Only the fields /api/me actually accepts are sent. `email`, `phone` and
+   * `nickname` are deliberately NOT among them - see the allow-list note on
+   * that route: the first two have unique HMAC companion columns that must
+   * change together and need a verified flow, and they are rendered read-only
+   * here for the same reason.
+   */
   async function save() {
     if (!dirty || saving) return;
     setSaving(true);
+    setSaveError(null);
 
-    // await fetch('/api/me/settings', {
-    //   method: 'PATCH',
-    //   headers: { 'content-type': 'application/json' },
-    //   body: JSON.stringify(data),
-    // });
-    await new Promise((r) => setTimeout(r, 500));
+    try {
+      /**
+       * Only the fields that actually CHANGED are sent.
+       *
+       * Sending the whole form every time looks harmless and is not. The
+       * server validates each field it receives, so an account whose stored
+       * value no longer satisfies the current rules - a `fullName` containing
+       * a digit, say, which the name regex rejects because names on an ID
+       * document do not have them - would fail validation on a save the user
+       * made to something else entirely. The effect is a settings page that
+       * refuses every change with an opaque "validation failed" and no way to
+       * find out which field is at fault, for a value the user never touched.
+       *
+       * A diff also means a privacy-only change cannot trip a name rule, and
+       * it keeps the audit surface honest: the request describes what the user
+       * did, not everything the form happened to be holding.
+       */
+      const patch: Record<string, unknown> = {};
 
-    setBaseline(data);
-    setSaving(false);
-    setSavedAt(Date.now());
+      if (data.fullName.trim() !== baseline.fullName.trim()) patch.fullName = data.fullName.trim();
+      if (data.headline.trim() !== baseline.headline.trim()) patch.headline = data.headline.trim();
+      if (data.bio.trim() !== baseline.bio.trim()) patch.bio = data.bio.trim();
+
+      for (const key of [
+        'showRealName',
+        'showEmail',
+        'showPhone',
+        'showUniversity',
+        'showFaculty',
+        'showGraduationYear',
+      ] as const) {
+        if (data.privacy[key] !== baseline.privacy[key]) patch[key] = data.privacy[key];
+      }
+
+      // `dirty` is computed over the whole object, which includes fields this
+      // form cannot submit (email, phone, nickname). If none of the editable
+      // ones moved there is nothing to send, and PATCH would 400 on an empty
+      // body.
+      if (Object.keys(patch).length === 0) {
+        setBaseline(data);
+        setSavedAt(Date.now());
+        return;
+      }
+
+      const response = await fetch('/api/me', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        // The baseline is left alone, so the form stays dirty and the user can
+        // retry without retyping. Reporting success here is what the previous
+        // version did unconditionally.
+        //
+        // The server returns per-field errors; naming the offending field is
+        // the difference between a fixable message and a dead end.
+        const fields = payload?.fields as Record<string, string[]> | undefined;
+        const firstField = fields ? Object.keys(fields)[0] : undefined;
+        setSaveError(firstField ? `${firstField}: ${fields![firstField][0]}` : (payload?.error ?? 'errors.generic'));
+        return;
+      }
+
+      setBaseline(data);
+      setSavedAt(Date.now());
+    } catch {
+      setSaveError('errors.generic');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const patch = (next: Partial<SettingsData>) => setData((prev) => ({ ...prev, ...next }));
@@ -241,11 +327,15 @@ export function SettingsView() {
         people to hunt for it; one that appears on the first edit tells them
         there is something to save without them having to look.
       */}
-      {(dirty || savedAt !== null) && section !== 'appearance' && (
+      {(dirty || savedAt !== null || saveError !== null) && section !== 'appearance' && (
         <div className="sticky bottom-0 z-30 border-t border-edge bg-surface/95 backdrop-blur">
           <div className="mx-auto flex max-w-shell items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
             <p className="text-xs text-fg-muted" aria-live="polite">
-              {savedAt !== null ? (
+              {saveError ? (
+                // A failure must be visible. The previous version could not
+                // fail, so there was nowhere for this to go.
+                <span className="text-danger">{t(saveError)}</span>
+              ) : savedAt !== null ? (
                 <span className="flex items-center gap-1.5 text-verified">
                   <Check className="h-3.5 w-3.5" aria-hidden="true" />
                   {t('settings.saved')}

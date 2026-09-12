@@ -2,88 +2,157 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
- * Token definitions.
- *
- * Values are space-separated RGB triplets so Tailwind's `<alpha-value>` works
- * (`bg-surface/60`). Light is the default; dark overrides via [data-theme].
- *
- * The three-way theme switch resolves to a concrete `data-theme` of exactly
- * "light" or "dark" on <html>. "System" is not a third value on the element —
- * it is a stored PREFERENCE that resolves to one of the two, and follows the
- * OS live. Keeping the resolved value on the element means every selector here
- * stays a simple attribute match with no media-query duplication.
- */
 @layer base {
+  /*
+   * ---------------------------------------------------------------------------
+   * THE PALETTE IS DERIVED FROM THE LOGO, NOT CHOSEN ALONGSIDE IT
+   * ---------------------------------------------------------------------------
+   * logos/campus-hub-logo.svg is drawn in exactly two colours: a deep navy
+   * (#173F6E) and an orange (#E85B24). Every accent below is pinned to one of
+   * those two hues or sits at an even interval between them, which is what
+   * makes five accent colours read as one system rather than as five decisions.
+   *
+   *   blue    --accent    the navy, lifted to an interactive weight
+   *   orange  --brand     the logo orange, the only warm highlight
+   *   green   --verified  identity confirmed
+   *   yellow  --warn      action needed
+   *   red     --danger    destructive or failed
+   *
+   * Each hue owns ONE meaning. That is the whole discipline: five colours used
+   * for five distinct things is a system, five colours used decoratively is
+   * noise, and the difference is not the palette but the rule.
+   *
+   * Saturation is held well below the sRGB maximum everywhere (the orange is
+   * the most saturated thing in the product and it is still ~82%), because
+   * fully saturated fills next to each other are exactly what makes an
+   * interface look juvenile.
+   *
+   * Values are space-separated RGB triplets so Tailwind's `<alpha-value>` works
+   * (`bg-surface/60`). Light is the default; dark overrides via [data-theme].
+   *
+   * The three-way theme switch resolves to a concrete `data-theme` of exactly
+   * "light" or "dark" on <html>. "System" is not a third value on the element —
+   * it is a stored PREFERENCE that resolves to one of the two, and follows the
+   * OS live.
+   */
   :root {
-    --canvas: 248 250 252; /* #F8FAFC */
+    /* A barely-tinted canvas. Pure #FFF page + #FFF card gives no elevation to
+       read, so the canvas carries a trace of the brand navy and cards sit on
+       top of it in white. */
+    --canvas: 246 248 251; /* #F6F8FB */
     --surface: 255 255 255;
-    --surface-muted: 244 246 250;
-    --surface-inset: 237 241 246;
+    --surface-muted: 241 244 249;
+    --surface-inset: 231 236 243;
 
-    --fg: 15 23 42;
-    --fg-muted: 71 85 105;
-    --fg-subtle: 139 148 163;
+    /* Near-black with the navy in it rather than a neutral grey — text and
+       logo then belong to the same family. */
+    --fg: 15 26 43; /* #0F1A2B */
+    --fg-muted: 76 90 110;
+    --fg-subtle: 120 133 154;
 
-    --edge: 226 232 240;
-    --edge-strong: 203 213 225;
+    --edge: 225 231 240;
+    --edge-strong: 200 210 224;
 
-    /* Restrained indigo. Deliberately desaturated relative to Tailwind's
-       indigo-600 (#4F46E5), which reads as "default framework purple". */
-    --accent: 84 88 196;
-    --accent-hover: 68 72 174;
-    --accent-soft: 238 239 251;
+    /* BLUE — the primary interactive colour: the logo navy raised to a weight
+       that carries buttons and links. 6.9:1 on white, so the same value works
+       as a fill behind white text AND as link text. */
+    --accent: 27 92 155; /* #1B5C9B */
+    --accent-hover: 21 74 127;
+    --accent-soft: 232 240 249;
     --accent-fg: 255 255 255;
 
-    --verified: 5 122 85;
-    --verified-soft: 232 246 240;
-    --verified-fg: 4 92 64;
+    /* ORANGE — the logo mark's own colour, darkened just enough to hold white
+       text at 5.2:1. Reserved for brand moments and highlights; it is never a
+       status, so it can never be confused with one. */
+    --brand: 194 65 12; /* #C2410C */
+    --brand-hover: 166 54 9;
+    --brand-soft: 253 238 230;
+    --brand-fg: 255 255 255;
 
-    --warn: 176 106 8;
-    --warn-soft: 253 245 230;
-    --warn-fg: 124 74 5;
+    /* GREEN — verified identity. */
+    --verified: 15 122 77; /* #0F7A4D */
+    --verified-soft: 230 244 236;
+    --verified-fg: 11 92 58;
 
-    --danger: 190 44 44;
-    --danger-soft: 253 238 238;
-    --danger-fg: 150 32 32;
+    /* YELLOW — action needed. The DEFAULT is a 3.8:1 amber used for icons,
+       borders and fills (WCAG 1.4.11 wants 3:1 for non-text); `-fg` is the
+       darker value text actually uses. */
+    --warn: 176 121 8; /* #B07908 */
+    --warn-soft: 253 244 227;
+    --warn-fg: 125 84 5;
 
-    --shadow: 15 23 42;
+    /* RED — destructive and failed. */
+    --danger: 192 53 47; /* #C0352F */
+    --danger-soft: 252 236 235;
+    --danger-fg: 143 38 32;
+
+    --shadow: 15 26 43;
 
     color-scheme: light;
   }
 
+  /*
+   * ---------------------------------------------------------------------------
+   * DARK MODE: LIFTED OFF BLACK, ON PURPOSE
+   * ---------------------------------------------------------------------------
+   * The previous canvas was #0B0F19 — 1.10:1 against pure black, which is close
+   * enough that the elevation ladder collapsed: canvas, card and input all read
+   * as "black", so the only thing separating a card from the page was its
+   * border, and the interface looked flat and cheap rather than dark.
+   *
+   * This canvas sits at 1.16:1 against black with each surface a clear step
+   * above the last (1.16 / 1.26 / 1.38 / 1.58). That is what produces depth
+   * without a single shadow, and it is why the theme reads as deliberate.
+   *
+   * Going brighter is the opposite failure: a mid-grey #1E1E1E-style theme
+   * glares in a dark room. This range is the comfortable middle.
+   *
+   * Every accent is re-mixed rather than reused. The light-mode blue (#1B5C9B)
+   * is 2.3:1 here — invisible — so each hue is lightened and desaturated until
+   * it clears 5.5:1 on the card surface, and the fills take near-black text
+   * instead of white.
+   */
   [data-theme='dark'] {
-    --canvas: 11 15 25; /* #0B0F19 */
-    --surface: 17 22 36;
-    --surface-muted: 22 28 44;
-    --surface-inset: 28 35 54;
+    --canvas: 17 22 32; /* #111620 */
+    --surface: 24 30 42; /* #181E2A */
+    --surface-muted: 31 38 51;
+    --surface-inset: 40 48 63;
 
-    --fg: 232 236 244;
-    --fg-muted: 148 163 184;
-    --fg-subtle: 100 116 139;
+    --fg: 233 237 245;
+    --fg-muted: 167 178 196;
+    --fg-subtle: 122 134 153;
 
-    --edge: 30 38 55;
-    --edge-strong: 46 56 78;
+    --edge: 42 50 66;
+    --edge-strong: 59 68 87;
 
-    /* Lifted for contrast against a near-black canvas; the light-mode value
-       fails WCAG AA here. */
-    --accent: 129 133 232;
-    --accent-hover: 149 153 240;
-    --accent-soft: 27 31 60;
-    --accent-fg: 12 14 28;
+    /* BLUE — the navy cannot survive here, so this is the same hue opened up
+       until it reads as the same colour at 5.7:1. */
+    --accent: 92 155 214; /* #5C9BD6 */
+    --accent-hover: 124 176 227;
+    --accent-soft: 24 41 61;
+    --accent-fg: 11 18 32; /* near-black ON the fill: 6.3:1 */
 
-    --verified: 52 187 137;
-    --verified-soft: 15 40 33;
-    --verified-fg: 110 224 176;
+    /* ORANGE — the logo orange itself is close to right on a dark ground; this
+       is it, marginally softened so it does not vibrate against the navy. */
+    --brand: 239 123 60; /* #EF7B3C */
+    --brand-hover: 244 145 91;
+    --brand-soft: 56 32 18;
+    --brand-fg: 26 14 6;
 
-    --warn: 216 156 62;
-    --warn-soft: 45 34 15;
-    --warn-fg: 240 190 110;
+    --verified: 78 203 143; /* #4ECB8F */
+    --verified-soft: 18 45 35;
+    --verified-fg: 128 226 176;
 
-    --danger: 235 106 106;
-    --danger-soft: 48 22 22;
-    --danger-fg: 250 155 155;
+    --warn: 224 169 63; /* #E0A93F */
+    --warn-soft: 52 40 18;
+    --warn-fg: 240 197 118;
 
+    --danger: 240 128 128; /* #F08080 */
+    --danger-soft: 56 27 27;
+    --danger-fg: 248 165 165;
+
+    /* Pure black, so the overlay shadows read as absence of light rather than
+       as a navy smudge. */
     --shadow: 0 0 0;
 
     color-scheme: dark;
@@ -259,6 +328,30 @@
   }
   .btn-danger {
     @apply btn bg-danger text-white hover:opacity-90;
+  }
+
+  /*
+   * Status pills and inline alerts.
+   *
+   * Only the tones that actually appear in the product are defined. A full
+   * six-tone vocabulary was written first and most of it was dead CSS: the
+   * admin panel has its own centralised Badge component (see
+   * components/admin/primitives.tsx) which already owns the back-office
+   * tones, so duplicating them here would have created two places to change a
+   * status colour and no way to tell which one a given screen used.
+   */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-medium;
+  }
+  .badge-accent {
+    @apply badge border-accent/25 bg-accent-soft text-accent;
+  }
+
+  .alert {
+    @apply flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs;
+  }
+  .alert-danger {
+    @apply alert border-danger/40 bg-danger-soft text-danger-fg;
   }
 
   /* A 1px rule that fades at both ends — separates sections without the heavy

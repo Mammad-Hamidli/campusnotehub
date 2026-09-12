@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 159 194" width="159" height="194" role="img" aria-label="Campus Hub icon">
+  <title>Campus Hub icon</title>
+  <g transform="translate(-20.5 -6.0)">
+    <g>
+    <path d="M42 120 A58 58 0 0 0 158 120" fill="none" stroke="#E85B24" stroke-width="15"/>
+    <circle cx="100" cy="120" r="32" fill="#173F6E"/>
+    <path d="M70 47 Q100 58 130 47 L127 74 Q100 84.5 73 74 Z" fill="#173F6E"/>
+    <path d="M100 20 L164 42 L100 64 L36 42 Z" fill="#173F6E"/>
+    <path d="M45 43 L45 77" stroke="#173F6E" stroke-width="3.6" stroke-linecap="round" fill="none"/>
+    <circle cx="45" cy="79.5" r="3.9" fill="#173F6E"/>
+    <path d="M40.2 83 L49.8 83 L51.3 95 Q45 100 38.7 95 Z" fill="#173F6E"/>
+  </g>
+  </g>
+</svg>

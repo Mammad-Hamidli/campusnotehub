@@ -39,11 +39,9 @@
     "languageSwitcher": "Dili dəyiş",
     "theme": "Mövzu",
     "help": "Kömək",
-    "messages": "Mesajlar",
     "bookmarks": "Yadda saxlanılanlar",
     "explore": "Kəşf et",
-    "admin": "Admin",
-    "messagesPage": "Mesajlar"
+    "admin": "Admin"
   },
   "auth": {
     "register": {
@@ -85,7 +83,47 @@
       "facultyPlaceholder": "Fakültənizi axtarın…",
       "facultyNoMatch": "Uyğun fakültə tapılmadı. Öz variantınızı yazmaq üçün “Digər” seçin.",
       "facultyOther": "Fakültəniz",
-      "facultyOtherPlaceholder": "Fakültə və ya ixtisasınızı yazın"
+      "facultyOtherPlaceholder": "Fakültə və ya ixtisasınızı yazın",
+      "firstName": "Ad",
+      "lastName": "Soyad",
+      "dateOfBirth": "Doğum tarixi",
+      "documentNotice": "Şəxsiyyət vəsiqəsində olduğu kimi yazın. Məlumatlar sənədlə yoxlanılacaq.",
+      "accountType": "Hesab növü",
+      "accountTypeHint": "Bu, UniPath-də nə edə biləcəyinizi və hansı sənədləri istəyəcəyimizi müəyyən edir.",
+      "detailsTitle": "Məlumatlarınız",
+      "detailsStudentHint": "Harada təhsil aldığınızı bildirin.",
+      "detailsTeacherHint": "Harada dərs dediyinizi bildirin.",
+      "detailsMentorHint": "Harada işlədiyinizi və nə iş gördüyünüzü bildirin.",
+      "studentNumber": "Tələbə nömrəsi",
+      "studentNumberPlaceholder": "məs. 20231234",
+      "department": "Kafedra",
+      "departmentPlaceholder": "məs. Kompüter elmləri",
+      "academicTitle": "Akademik vəzifə",
+      "academicTitlePlaceholder": "məs. Dosent",
+      "organisation": "Təşkilat",
+      "organisationPlaceholder": "məs. Azercell",
+      "position": "Vəzifə",
+      "positionPlaceholder": "məs. Baş Məhsul Meneceri",
+      "types": {
+        "student": {
+          "title": "Tələbə",
+          "body": "Hazırda universitetdə oxuyan tələbələr üçün.",
+          "point1": "Təsdiqdən sonra konspekt sata və mentor sifariş edə bilərsiniz",
+          "point2": "Şəxsiyyət vəsiqəsi və tələbə bileti tələb olunur"
+        },
+        "teacher": {
+          "title": "Müəllim",
+          "body": "Universitetdə dərs deyən heyət üçün.",
+          "point1": "Təsdiqdən sonra mentorluq sessiyaları təklif edə bilərsiniz",
+          "point2": "Yalnız şəxsiyyət vəsiqəsi tələb olunur"
+        },
+        "mentor": {
+          "title": "Mentor",
+          "body": "UniPath-də tələbələrə yol göstərəcək peşəkarlar üçün.",
+          "point1": "Təsdiq və moderator təsdiqindən sonra mentorluq sessiyaları təklif edə bilərsiniz",
+          "point2": "Yalnız şəxsiyyət vəsiqəsi tələb olunur"
+        }
+      }
     },
     "login": {
       "title": "Xoş gəlmisiniz",
@@ -113,7 +151,12 @@
       "phoneTaken": "Bu nömrə artıq istifadə olunur",
       "consentRequired": "Sənədlərin emalına razılıq verməlisiniz",
       "credentialsUnavailable": "Bu məlumatlarla hesab yaratmaq mümkün deyil. Başqa e-poçt və ya nömrə yoxlayın.",
-      "facultyOtherRequired": "Zəhmət olmasa fakültənizi yazın"
+      "facultyOtherRequired": "Zəhmət olmasa fakültənizi yazın",
+      "dobInvalid": "Düzgün doğum tarixi daxil edin",
+      "dobImplausible": "Bu doğum tarixi düzgün görünmür",
+      "studentNumberRequired": "Tələbə nömrəsi tələb olunur",
+      "departmentRequired": "Kafedra tələb olunur",
+      "academicTitleRequired": "Akademik vəzifə tələb olunur"
     }
   },
   "verification": {
@@ -245,6 +288,17 @@
         "uploadFailed": "Şəkil yüklənmədi. Yenidən cəhd edin.",
         "invalidKey": "Bu şəkil artıq mövcud deyil. Yenidən əlavə edin."
       }
+    },
+    "menu": {
+      "label": "Paylaşım əməliyyatları",
+      "delete": "Sil",
+      "deleteConfirm": "Bu paylaşım silinsin? Bu əməliyyat geri qaytarıla bilməz.",
+      "deleteFailed": "Paylaşım silinmədi.",
+      "report": "Şikayət et",
+      "reported": "Təşəkkürlər — paylaşım moderatorlara bildirildi.",
+      "reportFailed": "Şikayət göndərilmədi.",
+      "copyLink": "Linki kopyala",
+      "linkCopied": "Link kopyalandı."
     }
   },
   "notes": {
@@ -281,8 +335,8 @@
     },
     "upload": {
       "title": "Yeni konspekt",
-      "file": "PDF faylı",
-      "fileHint": "Maksimum 50 MB, yalnız PDF",
+      "file": "PDF və ya Word faylı",
+      "fileHint": "10 MB-a qədər, PDF və ya Word",
       "noteTitle": "Başlıq",
       "description": "Təsvir",
       "subject": "Fənn",
@@ -290,9 +344,9 @@
       "priceHint": "0 yazsanız pulsuz olacaq. Maksimum 50 AZN.",
       "processing": "Fayl emal olunur: önizləmə yaradılır...",
       "pendingReview": "Konspekt moderasiyada. Təsdiqdən sonra dərc olunacaq.",
-      "subtitle": "PDF, Word, Excel, PowerPoint və ya şəkil ixracı. Maksimum 50 MB.",
+      "subtitle": "PDF və ya Word (.pdf, .doc, .docx). Maksimum 10 MB.",
       "choose": "Fayl seçin",
-      "accepted": "PDF · DOC/DOCX · XLS/XLSX · PPT/PPTX · PNG/JPG — 50 MB-a qədər",
+      "accepted": "PDF · DOC · DOCX — 10 MB-a qədər",
       "remove": "Faylı sil",
       "submit": "Yüklə",
       "draftNote": "Siyahıya düşməzdən əvvəl baxış üçün qaralama kimi saxlanılır.",
@@ -308,8 +362,8 @@
         "missing": "Yükləmək üçün fayl seçin.",
         "empty": "Bu fayl boşdur.",
         "tooSmall": "Bu fayl sənəd olmaq üçün çox kiçikdir.",
-        "tooLarge": "Bu fayl 50 MB-dan böyükdür.",
-        "typeNotAllowed": "Bu fayl tipi qəbul edilmir. PDF, Word, Excel, PowerPoint, PNG və ya JPG istifadə edin.",
+        "tooLarge": "Fayl 10 MB-dan böyükdür.",
+        "typeNotAllowed": "Bu fayl növü qəbul edilmir. PDF və ya Word (.pdf, .doc, .docx) istifadə edin.",
         "mimeMismatch": "Faylın məzmunu tipinə uyğun gəlmir. Yenidən ixrac edib cəhd edin.",
         "extensionMismatch": "Fayl uzantısı əsl məzmuna uyğun gəlmir.",
         "executable": "İcra olunan və skript faylları qəbul edilmir.",
@@ -318,20 +372,26 @@
         "duplicate": "Bu faylı artıq yükləmisiniz.",
         "txtOnly": "Bu fayl növü dəstəklənmir.",
         "cancelled": "Yükləmə dayandırıldı.",
-        "network": "Yükləmə alınmadı. Bağlantınızı yoxlayıb yenidən cəhd edin."
+        "network": "Yükləmə alınmadı. Bağlantınızı yoxlayıb yenidən cəhd edin.",
+        "storageFailed": "Fayl saxlanılmadı. Yenidən cəhd edin."
       },
       "progress": "Yüklənir… {percent}%",
       "cancel": "Yükləməni dayandır",
       "retry": "Yenidən cəhd et",
       "success": "Konspekt yükləndi",
-      "maxSize": "{mb} MB-a qədər. PDF, Word, PowerPoint, Excel, mətn və ya şəkil.",
+      "maxSize": "{mb} MB-a qədər. PDF və ya Word (.pdf, .doc, .docx).",
+      "verifyFirstTitle": "Əvvəlcə şəxsiyyətinizi təsdiqləyin",
+      "verifyFirstBody": "Konspekt satmaq üçün təsdiqlənmiş şəxsiyyət tələb olunur. Təsdiq tamamlandıqdan sonra konspekt yükləyə bilərsiniz.",
       "selected": "{name} ({size})"
     },
     "errors": {
       "notVerified": "Konspekt satmaq üçün hesabınız doğrulanmalıdır",
       "insufficientFunds": "Balansınız kifayət etmir",
       "duplicate": "Eyni fayl artıq platformada mövcuddur",
-      "encrypted": "Şifrələnmiş PDF qəbul edilmir"
+      "encrypted": "Şifrələnmiş PDF qəbul edilmir",
+      "notForSale": "Bu konspekt satışda deyil.",
+      "cannotBuyOwn": "Öz konspektinizi ala bilməzsiniz.",
+      "alreadyOwned": "Bu konspekt artıq sizdədir."
     },
     "free": "Pulsuz",
     "download": "Yüklə",
@@ -340,7 +400,20 @@
       "purchases": "{n} alış"
     },
     "empty": "Hələ heç bir konspekt yüklənməyib.",
-    "addNote": "Konspekt əlavə et"
+    "addNote": "Konspekt əlavə et",
+    "purchases": {
+      "subtitle": "Aldığınız konspektlər",
+      "empty": "Hələ alış yoxdur",
+      "emptyHint": "Aldığınız konspektlər burada yüklənməyə hazır görünəcək.",
+      "browse": "UniNotes-a bax",
+      "download": "Yüklə",
+      "refunded": "Geri qaytarılıb"
+    },
+    "buy": "Al",
+    "buyFree": "Pulsuz götür",
+    "buying": "Alınır…",
+    "owned": "Sizdədir",
+    "bought": "Alış tamamlandı"
   },
   "mentors": {
     "title": "PocketMentor",
@@ -384,7 +457,9 @@
         "joinCall": "Zəngə qoşul"
       },
       "cancel": "Görüşü ləğv et",
-      "cancelPolicy": "24 saatdan əvvəl ləğv edilərsə tam məbləğ qaytarılır"
+      "cancelPolicy": "24 saatdan əvvəl ləğv edilərsə tam məbləğ qaytarılır",
+      "menteeNote": "Əlavə qeyd (istəyə bağlı)",
+      "menteeNotePlaceholder": "Mentorunuzun hazırlaşmasına kömək edəcək məlumat"
     },
     "errors": {
       "slotTaken": "Bu vaxt artıq tutulub. Başqa vaxt seçin.",
@@ -396,7 +471,6 @@
     "emptyHint": "Təsdiqlənmiş tələbələr və məzunlar mentorluq edə bilər. Sonra yenidən baxın.",
     "loading": "Mentorlar yüklənir…",
     "book": "Sessiya istə",
-    "message": "Mesaj",
     "viewProfile": "Profilə bax",
     "sessions": "{count} sessiya",
     "rate": "{price} / sessiya",
@@ -420,7 +494,61 @@
     "sessionLength": "{minutes} dəq",
     "years": "{count} il",
     "editProfile": "Mentor profilimi redaktə et",
-    "notAccepting": "Sifariş qəbul etmir"
+    "notAccepting": "Sifariş qəbul etmir",
+    "filters": {
+      "university": "Universitet",
+      "allUniversities": "Bütün universitetlər",
+      "experience": "Təcrübə",
+      "anyExperience": "İstənilən təcrübə",
+      "yearsPlus": "{years}+ il",
+      "price": "Qiymət",
+      "anyPrice": "İstənilən qiymət",
+      "upTo": "{price}-a qədər",
+      "acceptingOnly": "Rezerv qəbul edənlər"
+    },
+    "apply": {
+      "title": "Mentor ol",
+      "subtitle": "Tələbələrə təcrübəniz haqqında danışın. Hər müraciəti moderator yoxlayır.",
+      "headline": "Başlıq",
+      "bio": "Haqqınızda",
+      "bioHint": "Ən azı 50 simvol.",
+      "expertise": "İxtisas sahələri",
+      "expertiseHint": "Vergüllə ayırın, məs. React, Karyera məsləhəti",
+      "experience": "İş təcrübəsi",
+      "addExperience": "Vəzifə əlavə et",
+      "company": "Şirkət / iş yeri",
+      "role": "Vəzifə",
+      "years": "İl",
+      "education": "Təhsil",
+      "addEducation": "Təhsil əlavə et",
+      "educationHint": "İstəyə bağlı.",
+      "institution": "Təhsil müəssisəsi",
+      "degree": "Dərəcə",
+      "field": "İxtisas",
+      "year": "İl",
+      "languages": "Dillər",
+      "rate": "Saatlıq qiymət (AZN, 0 = pulsuz)",
+      "sessionLength": "Sessiya müddəti",
+      "minutes": "{minutes} dəq",
+      "linkedin": "LinkedIn (istəyə bağlı)",
+      "remove": "Sil",
+      "submit": "Müraciəti göndər",
+      "pending": "Müraciətiniz yoxlanılır. Moderator qərar verəndə sizə e-poçt göndərəcəyik.",
+      "approved": "Siz təsdiqlənmiş mentorsunuz.",
+      "rejected": "Əvvəlki müraciətiniz təsdiqlənmədi.",
+      "verifyFirst": "Mentor olmaq üçün müraciət etməzdən əvvəl şəxsiyyətinizi təsdiqləyin.",
+      "guest": {
+        "title": "Mentor hesabı yaradın",
+        "body": "Mentor kimi müraciət etmək üçün hesab lazımdır. Mentor hesabını sıfırdan yarada bilərsiniz — tələbə hesabı tələb olunmur.",
+        "cta": "Mentor hesabı yarat",
+        "haveAccount": "Artıq hesabınız var?",
+        "signIn": "Daxil olun"
+      },
+      "errors": {
+        "pending": "Artıq yoxlanılan müraciətiniz var.",
+        "alreadyMentor": "Siz artıq təsdiqlənmiş mentorsunuz."
+      }
+    }
   },
   "wallet": {
     "title": "Balans",
@@ -441,7 +569,22 @@
       "PLATFORM_FEE": "Platforma komissiyası",
       "ADJUSTMENT": "Düzəliş"
     },
-    "empty": "Hələ əməliyyat yoxdur"
+    "empty": "Hələ əməliyyat yoxdur",
+    "subtitle": "Balansınız və son əməliyyatlar",
+    "availableHint": "Konspekt və sessiyalara xərcləməyə hazırdır",
+    "frozen": "Bu pul kisəsi dondurulub. Dəstəklə əlaqə saxlayın.",
+    "topUpForm": {
+      "title": "Balansı artır",
+      "hint": "{min}–{max} AZN arasında məbləğ əlavə edin.",
+      "amount": "Məbləğ (AZN)",
+      "submit": "Balansı artır",
+      "success": "Balansınıza {amount} AZN əlavə olundu.",
+      "providerNote": "Test ödəniş rejimi: ödəniş provayderi qoşulana qədər kartdan pul tutulmur.",
+      "errors": {
+        "amount": "{min} ilə {max} AZN arasında məbləğ daxil edin.",
+        "declined": "Ödəniş rədd edildi."
+      }
+    }
   },
   "notifications": {
     "title": "Bildirişlər",
@@ -492,6 +635,25 @@
     "accountUnfrozen": {
       "title": "Hesab bərpa olundu",
       "body": "Hesabınızdakı dondurma götürüldü"
+    },
+    "noteSold": {
+      "body": "Kimsə \"{title}\" konspektini aldı"
+    },
+    "mentor": {
+      "approvedTitle": "Mentor müraciəti təsdiqləndi",
+      "approvedBody": "Artıq PocketMentor siyahısındasınız.",
+      "rejectedTitle": "Mentor müraciəti təsdiqlənmədi",
+      "rejectedBody": "Səbəbi e-poçtunuzda görə bilərsiniz."
+    },
+    "note": {
+      "approvedTitle": "Qeyd dərc edildi",
+      "approvedBody": "\"{title}\" artıq UniNotes-da siyahıdadır.",
+      "rejectedTitle": "Qeyd təsdiqlənmədi",
+      "rejectedBody": "\"{title}\" təsdiqlənmədi."
+    },
+    "wallet": {
+      "topUpTitle": "Balans artırıldı",
+      "topUpBody": "Pul kisənizə {amount} əlavə olundu."
     }
   },
   "errors": {
@@ -598,6 +760,8 @@
   "register": {
     "steps": {
       "account": "Hesab",
+      "type": "Hesab növü",
+      "details": "Məlumatlar",
       "documents": "Sənədlər",
       "review": "Yoxlama"
     },
@@ -650,6 +814,11 @@
   "dashboard": {
     "greeting": "Salam, {name}",
     "subtitle": "Kampusda bu gün nə baş verir",
+    "mentorPrompt": {
+      "title": "Mentor profilinizi tamamlayın",
+      "body": "Hesabınız hazırdır. Kataloqda görünmək üçün mentor profilinizi göndərin — moderator hər müraciətə baxır.",
+      "cta": "Mentor profilini tamamla"
+    },
     "graduation": {
       "title": "Məzuniyyətə sayğac",
       "months": "{count} ay qalıb",
@@ -700,7 +869,8 @@
       "universities": "Universitetlər",
       "auditLogs": "Audit jurnalı",
       "backToApp": "Tətbiqə qayıt",
-      "skipToContent": "Məzmuna keç"
+      "skipToContent": "Məzmuna keç",
+      "reviews": "Yoxlamalar"
     },
     "common": {
       "all": "Hamısı",
@@ -985,6 +1155,31 @@
       "sessionsHint": "Buradan çıxış bu sessiyanı hər yerdə bitirir.",
       "dangerZone": "Sessiya",
       "signOutAll": "Çıxış"
+    },
+    "reviews": {
+      "title": "Yoxlamalar",
+      "subtitle": "Qərar gözləyən mentor müraciətləri və yüklənmiş qeydlər.",
+      "tabs": {
+        "mentors": "Mentor müraciətləri",
+        "notes": "Qeydlər"
+      },
+      "reason": "Səbəb (rədd üçün vacibdir)",
+      "reasonHint": "Müraciət edənə göstərilir",
+      "approve": "Təsdiqlə",
+      "reject": "Rədd et",
+      "approved": "Təsdiqləndi.",
+      "rejected": "Rədd edildi.",
+      "emptyMentors": "Gözləyən mentor müraciəti yoxdur.",
+      "emptyNotes": "Yoxlama gözləyən qeyd yoxdur.",
+      "download": "Faylı aç",
+      "experience": "Təcrübə (il)",
+      "education": "Təhsil",
+      "submitted": "Göndərilib",
+      "rate": "Qiymət",
+      "errors": {
+        "reasonRequired": "Ən azı 5 simvolluq səbəb yazın.",
+        "alreadyDecided": "Bu barədə artıq qərar verilib."
+      }
     }
   },
   "settings": {
@@ -1090,26 +1285,5 @@
     },
     "headline": "Başlıq",
     "bio": "Haqqınızda"
-  },
-  "messages": {
-    "title": "Mesajlar",
-    "subtitle": "Söhbətləriniz",
-    "empty": "Hələ söhbət yoxdur",
-    "emptyHint": "Söhbətə kiminsə profilindən başlayın.",
-    "selectPrompt": "Oxumaq üçün söhbət seçin",
-    "placeholder": "Mesaj yazın…",
-    "send": "Göndər",
-    "sending": "Göndərilir…",
-    "loading": "Yüklənir…",
-    "loadOlder": "Köhnə mesajları yüklə",
-    "you": "Siz",
-    "deleted": "Mesaj silinib",
-    "newConversation": "Yeni söhbət",
-    "backToList": "Söhbətlərə qayıt",
-    "errors": {
-      "cannotMessageSelf": "Özünüzə mesaj göndərə bilməzsiniz",
-      "sendFailed": "Mesaj göndərilmədi. Yenidən cəhd edin.",
-      "loadFailed": "Söhbətlər yüklənmədi."
-    }
   }
 }

@@ -1,13 +1,22 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createHash } from 'node:crypto';
-import { NoteStatus, Prisma } from '@prisma/client';
+import { NoteStatus } from '@/lib/enums';
 import { z } from 'zod';
-import { db } from '@/lib/db';
+import {
+  createNote,
+  findNoteBySellerAndHash,
+  listNotes,
+  newNoteId,
+} from '@/lib/firebase/repositories/notes';
+import { findUserById, findUsersByIds } from '@/lib/firebase/repositories/users';
+import { findUniversitiesByIds } from '@/lib/firebase/repositories/reference';
+import { writeAuditLog } from '@/lib/firebase/repositories/audit';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { can } from '@/lib/permissions';
 import {
   MAX_NOTE_BYTES,
+  NOTE_UPLOAD_MIME,
   REJECTION_KEY,
   validateNoteFile,
 } from '@/lib/notes/fileTypes';
@@ -43,48 +52,65 @@ export async function GET(request: NextRequest) {
   }
   const { sort, limit, universityId, subject } = parsed.data;
 
-  const notes = await db.note.findMany({
-    where: {
-      status: NoteStatus.PUBLISHED,
-      ...(universityId ? { universityId } : {}),
-      ...(subject ? { subject } : {}),
-    },
-    orderBy:
-      sort === 'trending'
-        ? [{ purchaseCount: 'desc' }, { ratingAvg: 'desc' }, { publishedAt: 'desc' }]
-        : [{ publishedAt: 'desc' }, { id: 'desc' }],
-    take: limit,
-    select: {
-      id: true,
-      title: true,
-      subject: true,
-      courseCode: true,
-      language: true,
-      priceMinor: true,
-      currency: true,
-      ratingAvg: true,
-      ratingCount: true,
-      purchaseCount: true,
-      downloadCount: true,
-      pageCount: true,
-      publishedAt: true,
-      createdAt: true,
-      university: { select: { id: true, code: true, nameEn: true } },
-      seller: { select: { id: true, nickname: true, isVerified: true } },
-      // The bytes are NOT selected. Listing notes must never pull a 50 MB
-      // column through the connection pool - the whole reason the file lives
-      // in its own table.
-      attachment: { select: { fileName: true, mime: true, sizeBytes: true } },
-    },
-  });
+  const notes = await listNotes(
+    { status: NoteStatus.PUBLISHED, universityId, subject },
+    sort,
+    limit,
+  );
+
+  /**
+   * The seller and university decorations, as TWO batched reads.
+   *
+   * Prisma resolved these with a join. Firestore cannot, and the naive
+   * translation - a lookup per row - would turn a 20-item listing into 41
+   * round trips. Collecting the distinct ids first and fetching them in one
+   * `getAll` keeps it at three reads regardless of page size, which is the
+   * same shape the feed serialiser already uses.
+   */
+  const [sellers, universities] = await Promise.all([
+    findUsersByIds(notes.map((n) => n.sellerId)),
+    findUniversitiesByIds(
+      notes.map((n) => n.universityId).filter((id): id is string => Boolean(id)),
+    ),
+  ]);
 
   return NextResponse.json(
     {
-      notes: notes.map((n) => ({
-        ...n,
-        ratingAvg: Number(n.ratingAvg),
-        priceMinor: n.priceMinor,
-      })),
+      notes: notes.map((n) => {
+        const seller = sellers.get(n.sellerId);
+        const university = n.universityId ? universities.get(n.universityId) : null;
+        return {
+          id: n.id,
+          title: n.title,
+          subject: n.subject,
+          courseCode: n.courseCode,
+          language: n.language,
+          priceMinor: n.priceMinor,
+          currency: n.currency,
+          ratingAvg: Number(n.ratingAvg),
+          ratingCount: n.ratingCount,
+          purchaseCount: n.purchaseCount,
+          downloadCount: n.downloadCount,
+          pageCount: n.pageCount,
+          publishedAt: n.publishedAt,
+          createdAt: n.createdAt,
+          university: university
+            ? { id: university.id, code: university.code, nameEn: university.nameEn }
+            : null,
+          seller: seller
+            ? { id: seller.id, nickname: seller.nickname, isVerified: seller.isVerified }
+            : null,
+          // Metadata only. The bytes are a Storage object and are served by
+          // /api/notes/[noteId]/file after an authorization check.
+          attachment: n.attachment
+            ? {
+                fileName: n.attachment.fileName,
+                mime: n.attachment.mime,
+                sizeBytes: n.attachment.sizeBytes,
+              }
+            : null,
+        };
+      }),
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );
@@ -189,14 +215,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Upload policy: PDF and Word only. Decided from the sniffed type, never
+  // from the extension or the browser's claim.
+  if (!NOTE_UPLOAD_MIME.includes(verdict.mime)) {
+    return NextResponse.json(
+      { error: 'notes.upload.errors.typeNotAllowed', reason: 'MIME_NOT_ALLOWED' },
+      { status: 400 },
+    );
+  }
+
   const sha256 = createHash('sha256').update(bytes).digest('hex');
 
   // Same file, same seller, already uploaded. Cheap duplicate guard that also
   // stops a double-submitted form creating two identical listings.
-  const duplicate = await db.note.findFirst({
-    where: { sellerId: userId, fileSha256: sha256 },
-    select: { id: true },
-  });
+  const duplicate = await findNoteBySellerAndHash(userId, sha256);
   if (duplicate) {
     return NextResponse.json(
       { error: 'notes.upload.errors.duplicate', noteId: duplicate.id },
@@ -207,66 +239,52 @@ export async function POST(request: NextRequest) {
   const safeName = entry.name.replace(/[^\w.\-]+/g, '_').slice(-255);
 
   try {
-    const note = await db.$transaction(async (tx) => {
-      const created = await tx.note.create({
-        data: {
-          sellerId: userId,
-          title: fields.data.title,
-          description: fields.data.description,
-          subject: fields.data.subject,
-          courseCode: fields.data.courseCode,
-          academicYear: fields.data.academicYear,
-          language: fields.data.language,
-          priceMinor: fields.data.priceMinor,
-          universityId: fields.data.universityId,
-          // `fileKey` stays the logical locator the rest of the code talks in.
-          // Today it addresses a row in note_attachments; if this moves to S3
-          // it becomes an object key and nothing else has to change.
-          fileKey: `db://note_attachments/${sha256}`,
-          fileSha256: sha256,
-          sizeBytes: bytes.length,
-          status: NoteStatus.DRAFT,
-        },
-        select: { id: true, title: true, status: true },
-      });
+    /**
+     * The note and its file, then the audit entry.
+     *
+     * This was one Postgres transaction covering three tables. Firestore
+     * cannot span a Storage write, so createNote() writes the object first and
+     * the document second - the failure that leaves behind is an unreferenced
+     * object, which is invisible and collectable, rather than a listing whose
+     * download 404s for a buyer who paid.
+     *
+     * The audit entry follows rather than joining an atomic unit with them. An
+     * audit row describing a note that does not exist would be worse than a
+     * note whose upload was not logged, so it goes last and only on success.
+     */
+    const note = await createNote({
+      id: newNoteId(),
+      sellerId: userId,
+      title: fields.data.title,
+      description: fields.data.description,
+      subject: fields.data.subject,
+      courseCode: fields.data.courseCode,
+      academicYear: fields.data.academicYear,
+      language: fields.data.language,
+      priceMinor: fields.data.priceMinor,
+      universityId: fields.data.universityId,
+      // Listed once a moderator approves it in the admin panel (Reviews).
+      status: NoteStatus.PENDING_REVIEW,
+      fileName: safeName,
+      mime: verdict.mime,
+      sha256,
+      bytes,
+    });
 
-      await tx.noteAttachment.create({
-        data: {
-          noteId: created.id,
-          fileName: safeName,
-          mime: verdict.mime,
-          sizeBytes: bytes.length,
-          sha256,
-          bytes,
-        },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          actorId: userId,
-          action: 'NOTE_UPLOADED',
-          entityType: 'note',
-          entityId: created.id,
-          after: { mime: verdict.mime, sizeBytes: bytes.length, sha256 },
-          userAgent: request.headers.get('user-agent')?.slice(0, 512),
-        },
-      });
-
-      return created;
+    await writeAuditLog({
+      actorId: userId,
+      action: 'NOTE_UPLOADED',
+      entityType: 'note',
+      entityId: note.id,
+      after: { mime: verdict.mime, sizeBytes: bytes.length, sha256 },
+      userAgent: request.headers.get('user-agent')?.slice(0, 512),
     });
 
     /**
-     * Upload confirmation, after the transaction commits.
-     *
-     * The seller's address is read here rather than carried through the
-     * transaction: it is one indexed lookup by primary key, and doing it
-     * inside would hold the transaction open across a query it does not need.
-     * Fire-and-forget - a mail failure must not undo a stored note.
+     * Upload confirmation. One keyed read, and fire-and-forget - a mail
+     * failure must not undo a stored note.
      */
-    const seller = await db.user.findUnique({
-      where: { id: userId },
-      select: { email: true, nickname: true },
-    });
+    const seller = await findUserById(userId);
     if (seller) {
       sendEmailAsync(seller.email, 'noteUploaded', {
         nickname: seller.nickname,
@@ -276,16 +294,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        note,
+        note: { id: note.id, title: note.title, status: note.status },
         file: { fileName: safeName, mime: verdict.mime, sizeBytes: bytes.length },
       },
       { status: 201 },
     );
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ error: 'notes.upload.errors.duplicate' }, { status: 409 });
-    }
-    throw error;
+    console.error('[notes] upload failed', error);
+    return NextResponse.json({ error: 'notes.upload.errors.storageFailed' }, { status: 502 });
   } finally {
     // The plaintext copy is not needed once it is committed. This is ordinary
     // user content rather than KYC material, so this is hygiene, not the

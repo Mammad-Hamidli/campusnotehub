@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { BookOpen, UserRoundSearch, Wallet } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { mediaUrlFromKey } from '@/lib/media/constants';
@@ -10,8 +11,8 @@ import { Composer } from './Composer';
 import { PostCard, type Post } from './PostCard';
 import { GraduationCountdown, TrendingNotes, type TrendingNote } from './RightPanel';
 
-const UNIVERSITY_FILTERS = ['all', 'UNEC', 'ADA', 'BDU', 'ADNSU'] as const;
-type UniversityFilter = (typeof UNIVERSITY_FILTERS)[number];
+/** 'all' or a university code. The codes are loaded from /api/universities. */
+type UniversityFilter = string;
 
 /**
  * BACKEND INTEGRATION — feed
@@ -30,11 +31,14 @@ type UniversityFilter = (typeof UNIVERSITY_FILTERS)[number];
  */
 
 type Viewer = {
+  id: string;
   nickname: string;
   name: string;
   initials: string;
   university: string;
   verified: boolean;
+  /** Drives the mentor onboarding prompt below; see mentorTodo. */
+  role: string;
   graduationYear?: number;
   graduationMonth?: number;
 };
@@ -124,6 +128,7 @@ function toPost(row: ApiPost): Post {
   const nickname = row.author.nickname;
   return {
     id: row.id,
+    authorId: row.author.id,
     author: {
       // The public handle, never fullName - the feed is a shared surface.
       nickname,
@@ -169,6 +174,23 @@ export function DashboardShell({
   const [trending, setTrending] = useState<TrendingNote[]>([]);
   const [viewer, setViewer] = useState<Viewer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [universityCodes, setUniversityCodes] = useState<string[]>([]);
+
+  /**
+   * Filter chips come from the database on every load - no hardcoded list -
+   * so a university added or removed in the admin panel shows up here on the
+   * next visit without a deploy.
+   */
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/universities', { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : { universities: [] }))
+      .then((data: { universities: { code: string }[] }) =>
+        setUniversityCodes(data.universities.map((u) => u.code)),
+      )
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
 
   /**
    * Everything on this screen is loaded from the database.
@@ -195,14 +217,27 @@ export function DashboardShell({
           fetch('/api/notes?sort=trending&limit=4', { signal: controller.signal }),
         ]);
 
+        // The JWT passed the edge middleware but the server-side session is
+        // gone (revoked, expired, wiped). Rendering an empty dashboard would
+        // trap the user: /login bounces straight back here while the cookie
+        // lives. /logout clears it and forwards to the sign-in page.
+        if (meRes.status === 401) {
+          window.location.replace(
+            `/logout?next=${encodeURIComponent('/login?next=/dashboard')}`,
+          );
+          return;
+        }
+
         if (meRes.ok) {
           const { user } = await meRes.json();
           setViewer({
+            id: user.id,
             nickname: user.nickname,
             name: user.fullName,
             initials: user.initials,
             university: user.university?.code ?? '—',
             verified: user.isVerified,
+            role: user.role,
             graduationYear: user.graduationYear ?? undefined,
             graduationMonth: user.graduationMonth ?? undefined,
           });
@@ -243,6 +278,37 @@ export function DashboardShell({
     () => (filter === 'all' ? posts : posts.filter((p) => p.author.university === filter)),
     [posts, filter],
   );
+
+  /**
+   * The remaining step for a freshly registered MENTOR.
+   *
+   * Registering as a mentor creates the ACCOUNT; it does not create the mentor
+   * PROFILE, and it cannot - the headline, bio, expertise, experience and rate
+   * are reviewed by a moderator before the account appears in the directory.
+   * Without this prompt a new mentor lands on a feed with no indication that
+   * anything is outstanding, and silently never becomes bookable.
+   *
+   * Asked only for MENTOR accounts, and only until there is something to show
+   * for it: `isMentor` covers an approved profile and `application` covers one
+   * already awaiting review, so the card disappears as soon as either is true.
+   */
+  const [mentorTodo, setMentorTodo] = useState(false);
+
+  useEffect(() => {
+    if (viewer?.role !== 'MENTOR') return;
+    const controller = new AbortController();
+
+    fetch('/api/mentors/apply', { signal: controller.signal, cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((status) => {
+        if (status) setMentorTodo(!status.isMentor && !status.application);
+      })
+      .catch(() => {
+        // A failed status read must not invent an onboarding step.
+      });
+
+    return () => controller.abort();
+  }, [viewer?.role]);
 
   /**
    * Posts through the real endpoint instead of pushing an object into local
@@ -350,6 +416,20 @@ export function DashboardShell({
           <div className="min-w-0 flex-1">
             <VerificationBanner state={verificationState} />
 
+            {mentorTodo && (
+              <div className="card animate-rise mb-5 border-accent/30 bg-accent-soft p-4">
+                <h2 className="text-sm font-semibold text-fg">
+                  {t('dashboard.mentorPrompt.title')}
+                </h2>
+                <p className="mt-1 text-sm leading-relaxed text-fg-muted">
+                  {t('dashboard.mentorPrompt.body')}
+                </p>
+                <Link href="/mentors/apply" className="btn-primary mt-3.5 px-4 py-2 text-sm">
+                  {t('dashboard.mentorPrompt.cta')}
+                </Link>
+              </div>
+            )}
+
             <header className="mb-5">
               <h1 className="text-xl font-bold tracking-tight text-fg">
                 {t('dashboard.greeting', { name: viewer.nickname })}
@@ -369,7 +449,7 @@ export function DashboardShell({
                   role="group"
                   aria-label={t('notes.filters.university')}
                 >
-                  {UNIVERSITY_FILTERS.map((option) => {
+                  {['all', ...universityCodes].map((option) => {
                     const active = option === filter;
                     return (
                       <button
@@ -403,7 +483,15 @@ export function DashboardShell({
                 {visiblePosts.length === 0 ? (
                   <p className="card p-10 text-center text-sm text-fg-muted">{t('feed.empty')}</p>
                 ) : (
-                  visiblePosts.map((post, i) => <PostCard key={post.id} post={post} index={i} />)
+                  visiblePosts.map((post, i) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      index={i}
+                      viewerId={viewer.id}
+                      onDeleted={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))}
+                    />
+                  ))
                 )}
               </div>
             ) : (

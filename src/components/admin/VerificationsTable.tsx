@@ -35,6 +35,12 @@ type Case = {
     fullName: string;
     nickname: string;
     verificationStatus: string;
+    /** STUDENT or TEACHER - decides which documents the case should carry. */
+    role: string;
+    studentNumber: string | null;
+    department: string | null;
+    academicTitle: string | null;
+    dateOfBirth: string | null;
     university: { code: string; nameEn: string } | null;
   };
   reviewer: { id: string; nickname: string } | null;
@@ -207,6 +213,7 @@ export function VerificationsTable() {
             <thead className="border-b border-edge bg-surface-muted text-2xs uppercase tracking-wide">
               <tr>
                 <th scope="col" className="px-3 py-2 text-left font-medium text-fg-muted">{t('admin.verifications.columns.user')}</th>
+                <th scope="col" className="px-3 py-2 text-left font-medium text-fg-muted">{t('auth.register.accountType')}</th>
                 <th scope="col" className="px-3 py-2 text-left font-medium text-fg-muted">{t('admin.verifications.columns.university')}</th>
                 <SortHeader label={t('admin.verifications.columns.submitted')} field="submittedAt" sort={sort} order={order} onSort={onSort} />
                 <th scope="col" className="px-3 py-2 text-left font-medium text-fg-muted">{t('admin.verifications.columns.status')}</th>
@@ -219,11 +226,11 @@ export function VerificationsTable() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={9} className="p-0"><TableSkeleton rows={8} cols={7} /></td></tr>
+                <tr><td colSpan={10} className="p-0"><TableSkeleton rows={8} cols={7} /></td></tr>
               )}
 
               {!loading && data?.cases.length === 0 && (
-                <tr><td colSpan={9}><EmptyState title={t('admin.verifications.empty')} hint={t('admin.verifications.emptyHint')} /></td></tr>
+                <tr><td colSpan={10}><EmptyState title={t('admin.verifications.empty')} hint={t('admin.verifications.emptyHint')} /></td></tr>
               )}
 
               {!loading && data?.cases.map((kase) => (
@@ -241,6 +248,23 @@ export function VerificationsTable() {
                     {kase.dismissedAt && (
                       <Badge tone="neutral">{t('admin.verifications.dismissed')}</Badge>
                     )}
+                  </td>
+                  {/* The account type decides which documents this case
+                      should contain, so it belongs next to the person rather
+                      than buried in the detail view. */}
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <StatusBadge kind="role" value={kase.user.role} />
+                    {kase.user.role === 'TEACHER' || kase.user.role === 'MENTOR'
+                      ? kase.user.department && (
+                          <span className="mt-0.5 block text-2xs text-fg-subtle">
+                            {kase.user.department}
+                          </span>
+                        )
+                      : kase.user.studentNumber && (
+                          <span className="mt-0.5 block font-mono text-2xs text-fg-subtle">
+                            {kase.user.studentNumber}
+                          </span>
+                        )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-fg-muted">{kase.user.university?.code ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2 tabular-nums text-2xs text-fg-muted">{formatDateTime(kase.submittedAt)}</td>

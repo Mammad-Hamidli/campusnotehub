@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { getViewer } from '@/lib/auth/session';
+import { UserRole } from '@/lib/enums';
 import { RegisterAside } from '@/components/register/RegisterAside';
 import { RegisterWizard } from '@/components/register/RegisterWizard';
 
@@ -8,6 +11,9 @@ export const metadata: Metadata = {
   // index, including link previews.
   robots: { index: false, follow: false },
 };
+
+/** The signed-in check below reads live session state, so nothing here is cacheable. */
+export const dynamic = 'force-dynamic';
 
 /**
  * Two-pane registration.
@@ -20,7 +26,24 @@ export const metadata: Metadata = {
  * The aside collapses on mobile to a compact strip above the form so the
  * reasoning survives the smaller viewport instead of being hidden entirely.
  */
-export default function RegisterPage() {
+export default async function RegisterPage() {
+  /**
+   * The middleware used to bounce a signed-in visitor away from here on the
+   * strength of the JWT signature alone. It cannot see a revoked session, so
+   * that check moved to where live account state is readable - the same change
+   * made on /login, and for the same reason. A visitor whose session is merely
+   * REVOKED must reach the form, not be redirected into an app they have
+   * signed out of.
+   */
+  const viewer = await getViewer();
+  if (viewer) {
+    redirect(
+      viewer.role === UserRole.ADMIN || viewer.role === UserRole.MODERATOR
+        ? '/admin'
+        : '/dashboard',
+    );
+  }
+
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
       <RegisterAside />

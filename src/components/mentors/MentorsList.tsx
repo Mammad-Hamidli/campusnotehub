@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { BadgeCheck, MessageSquare, Search, Star, UserRoundSearch } from 'lucide-react';
+import { BadgeCheck, Search, Star, UserRoundSearch } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 
 /**
@@ -48,7 +47,7 @@ type Mentor = {
 /**
  * Mirrors the MentorIndustry enum in prisma/schema.prisma exactly.
  *
- * Written out rather than imported because importing @prisma/client into a
+ * Written out rather than imported because pulling a server module into a
  * client component pulls the query engine types into the browser bundle. The
  * server re-validates every value against the real enum, so a drift here costs
  * a rejected filter rather than bad data - but it MUST match, or the dropdown
@@ -78,7 +77,6 @@ function formatPrice(minor: number, locale: string): string | null {
 
 export function MentorsList() {
   const t = useT();
-  const router = useRouter();
 
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [canBook, setCanBook] = useState(false);
@@ -88,7 +86,21 @@ export function MentorsList() {
 
   const [query, setQuery] = useState('');
   const [industry, setIndustry] = useState('');
-  const [messaging, setMessaging] = useState<string | null>(null);
+  const [university, setUniversity] = useState('');
+  const [minYears, setMinYears] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [acceptingOnly, setAcceptingOnly] = useState(false);
+  const [universities, setUniversities] = useState<string[]>([]);
+
+  // Universities come from the database, so the filter tracks the admin panel.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/universities', { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : { universities: [] }))
+      .then((d: { universities: { code: string }[] }) => setUniversities(d.universities.map((u) => u.code)))
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
 
   const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'az' : 'az';
 
@@ -100,6 +112,10 @@ export function MentorsList() {
         const params = new URLSearchParams();
         if (query.trim()) params.set('q', query.trim());
         if (industry) params.set('industry', industry);
+        if (university) params.set('university', university);
+        if (minYears) params.set('minYears', minYears);
+        if (maxPrice) params.set('maxPrice', maxPrice);
+        if (acceptingOnly) params.set('accepting', '1');
 
         const response = await fetch(`/api/mentors?${params.toString()}`, { signal });
         if (!response.ok) {
@@ -117,7 +133,7 @@ export function MentorsList() {
         setLoading(false);
       }
     },
-    [query, industry],
+    [query, industry, university, minYears, maxPrice, acceptingOnly],
   );
 
   /**
@@ -133,32 +149,6 @@ export function MentorsList() {
       controller.abort();
     };
   }, [load]);
-
-  /**
-   * Opens a conversation with a mentor and navigates to it.
-   *
-   * Reuses the messaging feature rather than inventing a mentor-specific
-   * enquiry inbox: POST /api/messages is idempotent on the pair, so pressing
-   * this twice lands in the same thread instead of creating a second one.
-   */
-  async function message(mentorUserId: string) {
-    if (messaging) return;
-    setMessaging(mentorUserId);
-    try {
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: mentorUserId }),
-      });
-      if (response.ok) {
-        router.push('/messages');
-        return;
-      }
-      if (response.status === 401) router.push('/login?next=/mentors');
-    } finally {
-      setMessaging(null);
-    }
-  }
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
@@ -212,6 +202,48 @@ export function MentorsList() {
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-2xs font-medium text-fg-muted">{t('mentors.filters.university')}</span>
+          <select value={university} onChange={(e) => setUniversity(e.target.value)} className="input py-1.5 text-sm">
+            <option value="">{t('mentors.filters.allUniversities')}</option>
+            {universities.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-2xs font-medium text-fg-muted">{t('mentors.filters.experience')}</span>
+          <select value={minYears} onChange={(e) => setMinYears(e.target.value)} className="input py-1.5 text-sm">
+            <option value="">{t('mentors.filters.anyExperience')}</option>
+            {[1, 3, 5, 10].map((years) => (
+              <option key={years} value={years}>
+                {t('mentors.filters.yearsPlus', { years })}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-2xs font-medium text-fg-muted">{t('mentors.filters.price')}</span>
+          <select value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="input py-1.5 text-sm">
+            <option value="">{t('mentors.filters.anyPrice')}</option>
+            <option value="0">{t('mentors.free')}</option>
+            {[1000, 2500, 5000].map((minor) => (
+              <option key={minor} value={minor}>
+                {t('mentors.filters.upTo', { price: String(minor / 100) + ' ₼' })}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex items-center gap-2 self-center pt-4 text-sm text-fg-muted">
+          <input type="checkbox" checked={acceptingOnly} onChange={(e) => setAcceptingOnly(e.target.checked)} />
+          {t('mentors.filters.acceptingOnly')}
         </label>
       </div>
 
@@ -281,7 +313,7 @@ export function MentorsList() {
                     {mentor.specialties.slice(0, 3).map((tag) => (
                       <span
                         key={tag}
-                        className="rounded-full bg-accent-soft px-2 py-0.5 text-2xs font-medium text-accent"
+                        className="badge-accent"
                       >
                         {tag}
                       </span>
@@ -330,15 +362,6 @@ export function MentorsList() {
                       {t('mentors.viewProfile')}
                     </Link>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => void message(mentor.user.id)}
-                    disabled={messaging === mentor.user.id}
-                    className="btn-secondary shrink-0 px-3 py-1.5 text-sm"
-                    aria-label={t('mentors.message')}
-                  >
-                    <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
                 </div>
               </li>
             );

@@ -1,14 +1,12 @@
-import type { NotificationType, Prisma } from '@prisma/client';
-import { Queue } from 'bullmq';
-import { getRedis } from '@/lib/queue/connection';
-
-// Lazily constructed - see src/lib/queue/connection.ts for why nothing here
-// may open a socket at module scope.
-let queue: Queue | null = null;
-export function getNotificationQueue(): Queue {
-  queue ??= new Queue('notifications', { connection: getRedis() });
-  return queue;
-}
+import type { DocumentReference, Transaction, WriteBatch } from 'firebase-admin/firestore';
+import type { NotificationType } from '@/lib/enums';
+import { adminDb } from '@/lib/firebase/admin.core';
+import { COLLECTIONS } from '@/lib/firebase/collections';
+import { forFirestore } from '@/lib/firebase/convert';
+import { createNotification } from '@/lib/firebase/repositories/notifications';
+import { findUserById } from '@/lib/firebase/repositories/users';
+import { sendEmailAsync } from '@/lib/email/send';
+import { DEFAULT_LOCALE, DICTIONARIES, isLocale, translate } from '@/lib/i18n/dictionaries';
 
 export type NotificationInput = {
   userId: string;
@@ -18,6 +16,8 @@ export type NotificationInput = {
   bodyKey: string;
   params?: Record<string, string | number>;
   linkUrl?: string;
+  /** Set when the caller sends a dedicated email for the same event. */
+  skipEmail?: boolean;
 };
 
 /**
@@ -34,35 +34,78 @@ export type NotificationInput = {
  * The cost is that changing a message wording retroactively rewrites history.
  * That is the right trade here - these are transactional notices, not a record
  * of what was said to whom.
+ *
+ * ===========================================================================
+ * THE QUEUE IS GONE, AND THE IN-APP ROW IS WHAT WAS ALWAYS LOAD-BEARING
+ * ===========================================================================
+ * This used to write the row and then push a `fanout` job onto a BullMQ queue
+ * backed by Redis, for a worker (src/server/queue/notifications.worker.ts) to
+ * pick up and deliver web push and email. That worker did not exist - the
+ * package.json script pointed at a file that was never written - so every job
+ * ever enqueued sat in Redis unconsumed.
+ *
+ * With Redis removed, the durable in-app notification is written directly and
+ * nothing is enqueued. That is not a reduction in delivered behaviour: it is
+ * the same behaviour, minus a queue that fed nothing.
+ *
+ * Push and email fan-out, when it is built, belongs in a Cloud Function
+ * triggered on document creation in `notifications` - which is the Firebase
+ * shape of exactly what the worker was going to do, and needs no broker.
+ * channelsFor() below is kept intact for that consumer.
  */
-export async function enqueueNotification(
-  tx: Prisma.TransactionClient,
+export async function enqueueNotification(input: NotificationInput) {
+  const record = await createNotification({
+    userId: input.userId,
+    type: input.type,
+    titleKey: input.titleKey,
+    bodyKey: input.bodyKey,
+    params: input.params ?? null,
+    linkUrl: input.linkUrl ?? null,
+  });
+  if (!input.skipEmail) emailNotification(input);
+  return record;
+}
+
+/**
+ * The same write, inside a caller's atomic unit.
+ *
+ * Callers that notify as part of a larger change - a moderator's verdict, a
+ * booking, a graduation sweep - need the notification to commit with it, or
+ * not at all. A user told "you are verified" by a write that then rolled back
+ * is worse than no notification.
+ *
+ * Accepts a Transaction OR a WriteBatch, because both are atomic and the
+ * choice between them is the caller's: a batch when the writes depend on
+ * nothing that must be read under conflict detection, a transaction when they
+ * do. Both expose the same `set`, so this helper does not need to care.
+ *
+ * Issues no reads, so it is safe to call at any point after a transaction's
+ * final read. Returns the id rather than the record, because nothing has
+ * committed yet and handing back a "created" object would be a lie.
+ */
+type AtomicWriter = {
+  set(ref: DocumentReference, data: FirebaseFirestore.DocumentData): unknown;
+};
+
+export function enqueueNotificationTx(
+  tx: AtomicWriter | Transaction | WriteBatch,
   input: NotificationInput,
-) {
-  const row = await tx.notification.create({
-    data: {
+): string {
+  const ref = adminDb().collection(COLLECTIONS.notifications).doc();
+  (tx as AtomicWriter).set(
+    ref,
+    forFirestore({
       userId: input.userId,
       type: input.type,
       titleKey: input.titleKey,
       bodyKey: input.bodyKey,
-      params: input.params as Prisma.InputJsonValue,
-      linkUrl: input.linkUrl,
-    },
-  });
-
-  // Enqueued after the DB row so the fan-out worker can never deliver a push
-  // for a notification the transaction later rolled back.
-  void getNotificationQueue().add(
-    'fanout',
-    { notificationId: row.id },
-    {
-      attempts: 5,
-      backoff: { type: 'exponential', delay: 2000 },
-      removeOnComplete: 1000,
-    },
+      params: input.params ?? null,
+      linkUrl: input.linkUrl ?? null,
+      readAt: null,
+      createdAt: new Date(),
+    }),
   );
-
-  return row;
+  return ref.id;
 }
 
 /**
@@ -93,4 +136,35 @@ export function channelsFor(
   const SOCIAL: NotificationType[] = ['POST_LIKE', 'POST_REPLY', 'NEW_FOLLOWER'];
   if (enabled('EMAIL') && !SOCIAL.includes(type)) out.push('EMAIL');
   return out;
+}
+
+/**
+ * Notification types that already send their own dedicated email, and social
+ * noise that is never emailed (see channelsFor above). Everything else gets a
+ * "new notification" email in the recipient's language.
+ */
+const DEDICATED_EMAIL: ReadonlySet<string> = new Set([
+  'VERIFICATION_APPROVED',
+  'VERIFICATION_REJECTED',
+  'VERIFICATION_NEEDS_REVIEW',
+  'NOTE_SOLD',
+  'NOTE_MODERATION',
+  'WALLET_CREDIT',
+]);
+const SOCIAL: ReadonlySet<string> = new Set(['POST_LIKE', 'POST_REPLY', 'NEW_FOLLOWER']);
+
+/** Fire-and-forget: a mail problem never fails the notification. */
+function emailNotification(input: NotificationInput): void {
+  if (DEDICATED_EMAIL.has(input.type) || SOCIAL.has(input.type)) return;
+  void (async () => {
+    const user = await findUserById(input.userId);
+    if (!user || user.deletedAt) return;
+    const dictionary = DICTIONARIES[isLocale(user.locale) ? user.locale : DEFAULT_LOCALE];
+    sendEmailAsync(user.email, 'newNotification', {
+      nickname: user.nickname,
+      title: translate(dictionary, input.titleKey, input.params),
+      body: translate(dictionary, input.bodyKey, input.params),
+      linkUrl: input.linkUrl ?? '/notifications',
+    });
+  })().catch((error) => console.error('[notifications] email failed', error));
 }

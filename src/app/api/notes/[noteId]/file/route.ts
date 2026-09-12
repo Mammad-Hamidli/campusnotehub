@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { NoteStatus, OrderStatus } from '@prisma/client';
-import { db } from '@/lib/db';
+import { NoteStatus } from '@/lib/enums';
+import {
+  findNoteById,
+  hasPaidOrder,
+  incrementDownloadCount,
+  readNoteBytes,
+} from '@/lib/firebase/repositories/notes';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 
 export const runtime = 'nodejs';
@@ -38,16 +43,7 @@ export async function GET(
 
   const { noteId } = await params;
 
-  const note = await db.note.findUnique({
-    where: { id: noteId },
-    select: {
-      id: true,
-      sellerId: true,
-      status: true,
-      priceMinor: true,
-      attachment: { select: { fileName: true, mime: true, sizeBytes: true, bytes: true } },
-    },
-  });
+  const note = await findNoteById(noteId);
 
   if (!note || !note.attachment) {
     return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
@@ -59,27 +55,31 @@ export async function GET(
 
   let hasPurchased = false;
   if (!isSeller && !isStaff && !isFreeAndPublished) {
-    const order = await db.order.findFirst({
-      where: { noteId: note.id, buyerId: userId, status: OrderStatus.PAID },
-      select: { id: true },
-    });
-    hasPurchased = Boolean(order);
+    // A keyed read: the order id is derived from (buyer, note), so the
+    // "did you pay for this" question needs no query.
+    hasPurchased = await hasPaidOrder(userId, note.id);
   }
 
   if (!isSeller && !isStaff && !isFreeAndPublished && !hasPurchased) {
     return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
   }
 
+  /**
+   * The bytes are fetched only AFTER the authorization decision.
+   *
+   * That ordering was free when the file was a column selected alongside the
+   * row; now it is a separate Storage download, and doing it first would mean
+   * pulling a 20 MB object for every caller who is about to be refused.
+   */
+  const bytes = await readNoteBytes(note);
+
   // Counted only for a genuine reader, so the figure on the listing means
   // something. The seller re-downloading their own upload is not a download.
   if (!isSeller && !isStaff) {
-    await db.note.update({
-      where: { id: note.id },
-      data: { downloadCount: { increment: 1 } },
-    });
+    await incrementDownloadCount(note.id);
   }
 
-  const { fileName, mime, bytes } = note.attachment;
+  const { fileName, mime } = note.attachment;
 
   return new NextResponse(new Uint8Array(bytes), {
     status: 200,
@@ -90,7 +90,7 @@ export async function GET(
       // stripped of path characters on upload; quoting it here stops a comma
       // or semicolon from splitting the header.
       'Content-Disposition': `attachment; filename="${fileName.replace(/["\\]/g, '')}"`,
-      'Content-Length': String(note.attachment.sizeBytes),
+      'Content-Length': String(bytes.length),
       'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'private, no-store',
       'Content-Security-Policy': "default-src 'none'; sandbox",

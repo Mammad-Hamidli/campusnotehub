@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AccountStatus, UserRole } from '@prisma/client';
+import { AccountStatus, UserRole } from '@/lib/enums';
 import {
   adminUserListSchema,
   adminStatusChangeSchema,

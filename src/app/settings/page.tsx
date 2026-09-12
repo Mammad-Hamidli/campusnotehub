@@ -1,10 +1,14 @@
 import type { Metadata } from 'next';
 import { SettingsView } from '@/components/settings/SettingsView';
+import { requirePageSession } from '@/lib/auth/page-guard';
 
 export const metadata: Metadata = {
   title: 'Settings',
   robots: { index: false, follow: false },
 };
+
+/** Session state is per-request; this page must never be prerendered or cached. */
+export const dynamic = 'force-dynamic';
 
 /**
  * Settings.
@@ -21,7 +25,9 @@ export const metadata: Metadata = {
  * see prisma/schema.prisma. They are enforced server-side in every profile
  * serialiser; the picker here only records the preference.
  */
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  await requirePageSession('/settings');
+
   return (
     <main id="main">
       <SettingsView />

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { UserRole } from '@/lib/enums';
 import { UNIVERSITIES } from '@/lib/universities';
 import { FACULTY_OTHER, FACULTY_SLUGS } from '@/lib/faculties';
 
@@ -36,16 +37,98 @@ const password = z
   .max(200)
   .refine((v) => new Set(v).size >= 5, 'auth.errors.weakPassword');
 
+/**
+ * The two account types a person can register as.
+ *
+ * Deliberately a SUBSET of UserRole rather than a new enum. UserRole already
+ * has STUDENT and TEACHER, already drives permissions, and is already what the
+ * admin panel reads - so registration writes into the existing concept instead
+ * of adding a parallel `accountType` that could disagree with it.
+ *
+ * MENTOR is self-service because a mentor has to be able to create an account
+ * from zero - requiring them to register as a student first and then apply was
+ * the bug that sent every signed-out mentor applicant to /login. Claiming the
+ * role at signup grants NOTHING on its own: a MENTOR account still has to pass
+ * identity verification, and it only becomes listable in the directory once a
+ * moderator approves its application (POST /api/mentors/apply).
+ *
+ * ALUMNI, MODERATOR and ADMIN remain absent on purpose: those are granted by an
+ * administrator or by the graduation cron, never claimed at signup.
+ */
+export const ACCOUNT_TYPES = [UserRole.STUDENT, UserRole.TEACHER, UserRole.MENTOR] as const;
+export type AccountType = (typeof ACCOUNT_TYPES)[number];
+
+/**
+ * The account types that describe a professional rather than an enrolled
+ * student. Both state where they work and what they do there, and neither has a
+ * student card or a graduation date - so they share one branch of the
+ * refinements below and one document set in requiredKindsFor().
+ */
+const PROFESSIONAL_TYPES: ReadonlySet<AccountType> = new Set([UserRole.TEACHER, UserRole.MENTOR]);
+
+/** One half of a legal name, as printed on an identity document. */
+const nameHalf = z
+  .string()
+  .trim()
+  .min(2, 'errors.validationFailed')
+  .max(60)
+  // Latin-ext covers Azerbaijani diacritics; Cyrillic covers Russian names.
+  // Digits and punctuation are rejected because they never appear on an ID.
+  .regex(/^[\p{L}\s'-]+$/u, 'errors.validationFailed');
+
+const MIN_AGE_YEARS = 16;
+const MAX_AGE_YEARS = 100;
+
+/**
+ * Date of birth, as a calendar date.
+ *
+ * Accepted as YYYY-MM-DD and converted to a Date here, so nothing downstream
+ * parses a string. The bounds are a plausibility check rather than a policy:
+ * a university applicant younger than 16 or older than 100 is a typo far more
+ * often than a real person, and the value is about to be compared against an
+ * identity document.
+ *
+ * Constructed at UTC midnight. Using `new Date('2001-05-04')` alone is already
+ * UTC, but a local-time constructor would shift the day backwards for anyone
+ * east of Greenwich - which is everyone using this product.
+ */
+const dateOfBirth = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'auth.errors.dobInvalid')
+  .transform((value) => new Date(`${value}T00:00:00.000Z`))
+  .refine((d) => !Number.isNaN(d.getTime()), 'auth.errors.dobInvalid')
+  .refine((d) => {
+    const years = (Date.now() - d.getTime()) / (365.2425 * 86_400_000);
+    return years >= MIN_AGE_YEARS && years <= MAX_AGE_YEARS;
+  }, 'auth.errors.dobImplausible');
+
 export const registerSchema = z
   .object({
+    /**
+     * The account type, chosen in step 2 of the wizard.
+     *
+     * Everything type-specific below is validated CONDITIONALLY against this
+     * value in the refinements at the bottom, which is what stops a client
+     * claiming STUDENT while omitting the student fields.
+     */
+    accountType: z.enum(ACCOUNT_TYPES),
+
+    firstName: nameHalf,
+    lastName: nameHalf,
+    dateOfBirth,
+
+    /**
+     * Retained and still accepted so nothing that already posts a fullName
+     * breaks. When absent it is derived from firstName + lastName in the
+     * route, which is now the normal path.
+     */
     fullName: z
       .string()
       .trim()
       .min(3)
       .max(120)
-      // Latin-ext covers Azerbaijani diacritics; Cyrillic covers Russian names.
-      // Digits and punctuation are rejected because they never appear on an ID.
-      .regex(/^[\p{L}\s'-]+$/u, 'errors.validationFailed'),
+      .regex(/^[\p{L}\s'-]+$/u, 'errors.validationFailed')
+      .optional(),
     /**
      * Public handle. Everything social renders this, never fullName - which is
      * what lets a student take part without publishing the legal name that has
@@ -64,7 +147,17 @@ export const registerSchema = z
       .string()
       .trim()
       .refine((v) => UNIVERSITY_CODES.has(v), 'errors.validationFailed'),
-    facultyId: z.string().cuid().optional(),
+    /**
+     * A Firestore document id, NOT a cuid.
+     *
+     * `.cuid()` was wrong here even before the migration - it is the same
+     * mistake documented on UNIVERSITY_CODES above, where a format check
+     * rejected every real submission. It is now doubly wrong: Firestore mints
+     * 20-character alphanumeric ids that no cuid matcher accepts, so this
+     * would refuse every faculty the app itself created. The route confirms
+     * the faculty exists; this only bounds the shape.
+     */
+    facultyId: z.string().trim().min(1).max(128).optional(),
     /**
      * Faculty, from the catalogue in src/lib/faculties.ts.
      *
@@ -84,14 +177,33 @@ export const registerSchema = z
       .optional(),
     /** The typed value when the catalogue choice is 'other'. */
     facultyOther: z.string().trim().min(2).max(120).optional(),
+
+    // ---- STUDENT-specific --------------------------------------------------
+    /**
+     * University-issued student number, cross-checked against the student card.
+     * Required for a STUDENT registration; see the refinement below.
+     */
+    studentNumber: z.string().trim().min(3).max(40).optional(),
+
+    // ---- TEACHER-specific --------------------------------------------------
+    /** Department or faculty the teacher works in. */
+    department: z.string().trim().min(2).max(120).optional(),
+    /** Academic position, e.g. "Lecturer", "Assistant Professor". */
+    academicTitle: z.string().trim().min(2).max(120).optional(),
+    /**
+     * Graduation date. Required for a STUDENT, meaningless for a TEACHER.
+     *
+     * Optional at the field level and required by the refinement below, which
+     * is what lets one schema serve both account types without a teacher being
+     * asked when they graduate.
+     */
     graduationYear: z
       .number()
       .int()
       .min(CURRENT_YEAR - 15)
-      .max(CURRENT_YEAR + 10),
-    // Required, not optional: the 1 May graduation sweep needs both halves of
-    // the date to decide whether someone has actually graduated yet.
-    graduationMonth: z.number().int().min(1).max(12),
+      .max(CURRENT_YEAR + 10)
+      .optional(),
+    graduationMonth: z.number().int().min(1).max(12).optional(),
     /**
      * Azerbaijani mobile number. REQUIRED - it is the strongest ban anchor the
      * platform has, because SIM registration here is identity-linked, so a
@@ -112,6 +224,42 @@ export const registerSchema = z
   .refine((d) => d.password === d.passwordConfirm, {
     path: ['passwordConfirm'],
     message: 'auth.errors.passwordMismatch',
+  })
+  /**
+   * ---------------------------------------------------------------------
+   * THE TYPE-SPECIFIC REQUIREMENTS, ENFORCED SERVER-SIDE
+   * ---------------------------------------------------------------------
+   * These refinements are the reason a malicious client cannot post
+   * `accountType: 'STUDENT'` while omitting the student fields, or register as
+   * a TEACHER without the teacher fields. The wizard asks for the right things
+   * per branch, but the wizard is a convenience - this is the control.
+   *
+   * Each refinement names its own `path`, so the error lands on the offending
+   * field rather than at the form root where nobody can act on it.
+   */
+  .refine((d) => d.accountType !== UserRole.STUDENT || Boolean(d.studentNumber), {
+    path: ['studentNumber'],
+    message: 'auth.errors.studentNumberRequired',
+  })
+  .refine((d) => d.accountType !== UserRole.STUDENT || d.graduationYear !== undefined, {
+    path: ['graduationYear'],
+    message: 'errors.fieldRequired',
+  })
+  .refine((d) => d.accountType !== UserRole.STUDENT || d.graduationMonth !== undefined, {
+    path: ['graduationMonth'],
+    message: 'errors.fieldRequired',
+  })
+  .refine((d) => d.accountType !== UserRole.STUDENT || Boolean(d.facultySlug), {
+    path: ['facultySlug'],
+    message: 'errors.fieldRequired',
+  })
+  .refine((d) => !PROFESSIONAL_TYPES.has(d.accountType) || Boolean(d.department), {
+    path: ['department'],
+    message: 'auth.errors.departmentRequired',
+  })
+  .refine((d) => !PROFESSIONAL_TYPES.has(d.accountType) || Boolean(d.academicTitle), {
+    path: ['academicTitle'],
+    message: 'auth.errors.academicTitleRequired',
   })
   /**
    * The two faculty columns are only coherent together, and the same pairing

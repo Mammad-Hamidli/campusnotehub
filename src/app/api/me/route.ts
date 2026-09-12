@@ -1,8 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { FieldVisibility, Locale, Prisma } from '@prisma/client';
+import { FieldVisibility, Locale } from '@/lib/enums';
 import { z } from 'zod';
-import { db } from '@/lib/db';
+import {
+  findUserById,
+  profileCounts,
+  updateUser,
+  type UserRecord,
+} from '@/lib/firebase/repositories/users';
+import {
+  findFacultyById,
+  findUniversityById,
+} from '@/lib/firebase/repositories/reference';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
+import { sendEmailAsync } from '@/lib/email/send';
 import { freezeState } from '@/lib/auth/freeze';
 import { FACULTIES, FACULTY_OTHER, facultyLabel } from '@/lib/faculties';
 
@@ -23,6 +33,66 @@ export const dynamic = 'force-dynamic';
  * the same model and naming what we want is what keeps them out as the model
  * grows.
  */
+/**
+ * The allow-list, now enforced in code rather than by the query.
+ *
+ * ===========================================================================
+ * THIS IS A SECURITY CONTROL, NOT A FORMATTING STEP
+ * ===========================================================================
+ * Under Prisma the `select` clause did two jobs at once: it said what to fetch
+ * AND what to return, so a field that was never selected could not reach the
+ * response even by accident. Firestore has no projection - `get()` returns the
+ * WHOLE document - so half of that guarantee disappeared in the move, and the
+ * obvious `...user` spread would have published every field on the record.
+ *
+ * The list below restores it. It is the same set the old `select` named, and
+ * it is an allow-list for the same reason: a field added to the user model
+ * later stays invisible here until somebody adds it deliberately.
+ *
+ * The credential fields this used to guard against - passwordHash, emailHash,
+ * phoneHash - are no longer on the user document at all; they live in
+ * `credentials/{userId}`, which this route never reads. That makes the leak
+ * structurally impossible rather than merely prevented. The projection stays
+ * anyway: it is what keeps internal columns like failedLoginCount, lockedUntil
+ * and nicknameLower out of a response, and defence in depth on the endpoint
+ * that returns a user's own email and phone is worth the few lines.
+ */
+function selfProjection(user: UserRecord) {
+  return {
+    id: user.id,
+    fullName: user.fullName,
+    nickname: user.nickname,
+    email: user.email,
+    phone: user.phone,
+    avatarUrl: user.avatarUrl,
+    headline: user.headline,
+    bio: user.bio,
+    locale: user.locale,
+    timezone: user.timezone,
+    role: user.role,
+    accountStatus: user.accountStatus,
+    frozenUntil: user.frozenUntil,
+    frozenReason: user.frozenReason,
+    frozenAt: user.frozenAt,
+    facultySlug: user.facultySlug,
+    facultyOther: user.facultyOther,
+    verificationStatus: user.verificationStatus,
+    isVerified: user.isVerified,
+    verifiedAt: user.verifiedAt,
+    graduationYear: user.graduationYear,
+    graduationMonth: user.graduationMonth,
+    emailVerifiedAt: user.emailVerifiedAt,
+    lastLoginAt: user.lastLoginAt,
+    createdAt: user.createdAt,
+    showRealName: user.showRealName,
+    showEmail: user.showEmail,
+    showPhone: user.showPhone,
+    showUniversity: user.showUniversity,
+    showFaculty: user.showFaculty,
+    showGraduationYear: user.showGraduationYear,
+  };
+}
+
 export async function GET(request: NextRequest) {
   let userId: string;
   try {
@@ -34,45 +104,7 @@ export async function GET(request: NextRequest) {
     throw error;
   }
 
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      fullName: true,
-      nickname: true,
-      email: true,
-      phone: true,
-      avatarUrl: true,
-      headline: true,
-      bio: true,
-      locale: true,
-      timezone: true,
-      role: true,
-      accountStatus: true,
-      frozenUntil: true,
-      frozenReason: true,
-      frozenAt: true,
-      facultySlug: true,
-      facultyOther: true,
-      verificationStatus: true,
-      isVerified: true,
-      verifiedAt: true,
-      graduationYear: true,
-      graduationMonth: true,
-      emailVerifiedAt: true,
-      lastLoginAt: true,
-      createdAt: true,
-      showRealName: true,
-      showEmail: true,
-      showPhone: true,
-      showUniversity: true,
-      showFaculty: true,
-      showGraduationYear: true,
-      university: { select: { id: true, code: true, nameAz: true, nameEn: true, nameRu: true, city: true } },
-      faculty: { select: { id: true, nameAz: true, nameEn: true, nameRu: true } },
-      _count: { select: { posts: true, notes: true, followers: true, following: true } },
-    },
-  });
+  const user = await findUserById(userId);
 
   if (!user) {
     // requireSession already rejects deleted and banned accounts, so reaching
@@ -88,10 +120,44 @@ export async function GET(request: NextRequest) {
    */
   const initials = user.nickname.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '??';
 
+  /**
+   * The relations and the counts, fetched alongside rather than joined.
+   *
+   * Firestore has no joins, so what Prisma expressed as nested `select`s
+   * becomes explicit reads. They run concurrently because none depends on
+   * another, so this costs one round trip's latency rather than three.
+   * `university` and `faculty` are null when unset, exactly as the relation
+   * was - the response shape the client already parses does not change.
+   */
+  const [university, faculty, counts] = await Promise.all([
+    user.universityId ? findUniversityById(user.universityId) : null,
+    user.facultyId ? findFacultyById(user.facultyId) : null,
+    profileCounts(userId),
+  ]);
+
   return NextResponse.json(
     {
       user: {
-        ...user,
+        ...selfProjection(user),
+        university: university
+          ? {
+              id: university.id,
+              code: university.code,
+              nameAz: university.nameAz,
+              nameEn: university.nameEn,
+              nameRu: university.nameRu,
+              city: university.city,
+            }
+          : null,
+        faculty: faculty
+          ? {
+              id: faculty.id,
+              nameAz: faculty.nameAz,
+              nameEn: faculty.nameEn,
+              nameRu: faculty.nameRu,
+            }
+          : null,
+        _count: counts,
         initials,
         /**
          * The resolved faculty label, so no consumer has to re-implement the
@@ -184,7 +250,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const input = parsed.data;
-  const data: Prisma.UserUpdateInput = {};
+  const data: Record<string, unknown> = {};
 
   if (input.fullName !== undefined) data.fullName = input.fullName;
   // An emptied optional text field means "clear it", which is null in the
@@ -218,30 +284,49 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'errors.validationFailed' }, { status: 400 });
   }
 
-  const user = await db.user.update({
-    where: { id: userId },
-    data,
-    select: {
-      id: true,
-      fullName: true,
-      nickname: true,
-      headline: true,
-      bio: true,
-      locale: true,
-      timezone: true,
-      facultySlug: true,
-      facultyOther: true,
-      showRealName: true,
-      showEmail: true,
-      showPhone: true,
-      showUniversity: true,
-      showFaculty: true,
-      showGraduationYear: true,
-    },
+  await updateUser(userId, data);
+
+  /**
+   * Read back rather than echoing the patch.
+   *
+   * Prisma's update returned the stored row, so the response was necessarily
+   * the truth. A Firestore update returns nothing, and echoing `data` back
+   * would report what we ASKED for - which diverges silently the moment a
+   * value is normalised on the way in. The extra read keeps the old guarantee
+   * that the client is told the state that actually persisted.
+   */
+  const user = await findUserById(userId);
+  if (!user) {
+    return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
+  }
+
+  sendEmailAsync(user.email, 'profileUpdated', {
+    nickname: user.nickname,
+    fields: Object.keys(data).filter((key) => key !== 'facultyOther'),
   });
 
+  // Narrowed to the editable set - the same fields the old `select` returned.
   return NextResponse.json(
-    { user: { ...user, facultyLabel: facultyLabel(user.facultySlug, user.facultyOther) } },
+    {
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        nickname: user.nickname,
+        headline: user.headline,
+        bio: user.bio,
+        locale: user.locale,
+        timezone: user.timezone,
+        facultySlug: user.facultySlug,
+        facultyOther: user.facultyOther,
+        showRealName: user.showRealName,
+        showEmail: user.showEmail,
+        showPhone: user.showPhone,
+        showUniversity: user.showUniversity,
+        showFaculty: user.showFaculty,
+        showGraduationYear: user.showGraduationYear,
+        facultyLabel: facultyLabel(user.facultySlug, user.facultyOther),
+      },
+    },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }

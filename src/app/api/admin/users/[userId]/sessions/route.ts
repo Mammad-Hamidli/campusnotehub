@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { findUserById } from '@/lib/firebase/repositories/users';
+import { revokeUserSessions } from '@/lib/firebase/repositories/sessions';
+import { writeModerationAction } from '@/lib/firebase/repositories/moderation';
 import { withAdmin, adminAudit } from '@/lib/auth/admin';
 import { adminRevokeSessionsSchema } from '@/server/validators/admin';
 
@@ -35,41 +37,44 @@ export async function DELETE(
       );
     }
 
-    const target = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const target = await findUserById(userId);
     if (!target) {
       return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
     }
 
-    const now = new Date();
-    let revoked = 0;
+    /**
+     * REVOKE FIRST, THEN RECORD - and no longer in one atomic unit.
+     *
+     * The three writes shared a Postgres transaction. They cannot share a
+     * Firestore one: revokeUserSessions() may touch an unbounded number of
+     * session documents and would blow the 500-write ceiling on a long-lived
+     * account, so it chunks its own batches.
+     *
+     * The ordering is what makes that acceptable. The revocation is the ACT;
+     * the moderation entry and the audit row are the RECORD of it. If a later
+     * write fails, the residue is a completed force-logout that is
+     * under-documented - recoverable, and visible in the session state itself.
+     * The reverse order would leave a record of a logout that never happened,
+     * which is a lie in the audit log.
+     */
+    const revoked = await revokeUserSessions(userId);
 
-    await db.$transaction(async (tx) => {
-      const result = await tx.session.updateMany({
-        where: { userId, revokedAt: null },
-        data: { revokedAt: now },
-      });
-      revoked = result.count;
+    await writeModerationAction({
+      moderatorId: actor.id,
+      targetType: 'user',
+      targetId: userId,
+      action: 'sessions:revoke',
+      reason: parsed.data.reason,
+      metadata: { revoked },
+    });
 
-      await tx.moderationAction.create({
-        data: {
-          moderatorId: actor.id,
-          targetType: 'user',
-          targetId: userId,
-          action: 'sessions:revoke',
-          reason: parsed.data.reason,
-          metadata: { revoked },
-        },
-      });
-
-      await adminAudit({
-        tx,
-        actorId: actor.id,
-        action: 'ADMIN_SESSIONS_REVOKED',
-        entityType: 'user',
-        entityId: userId,
-        after: { revoked, reason: parsed.data.reason },
-        request,
-      });
+    await adminAudit({
+      actorId: actor.id,
+      action: 'ADMIN_SESSIONS_REVOKED',
+      entityType: 'user',
+      entityId: userId,
+      after: { revoked, reason: parsed.data.reason },
+      request,
     });
 
     return NextResponse.json({ ok: true, revoked });

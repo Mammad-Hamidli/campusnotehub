@@ -36,7 +36,11 @@ const TONE_CLASS: Record<Tone, string> = {
   positive: 'border-verified/30 bg-verified/10 text-verified-fg',
   warning: 'border-warn/30 bg-warn/10 text-warn-fg',
   danger: 'border-danger/30 bg-danger/10 text-danger-fg',
-  accent: 'border-accent/30 bg-accent/10 text-accent-fg',
+  // `text-accent`, NOT `text-accent-fg`: the -fg token is the colour that sits
+  // ON a solid accent fill (white in light, near-black in dark), and this tone
+  // is a 10% tint. Pairing them rendered the ADMIN and MODERATOR role pills at
+  // 1.16:1 - white on pale blue - in both themes.
+  accent: 'border-accent/30 bg-accent/10 text-accent',
 };
 
 /**

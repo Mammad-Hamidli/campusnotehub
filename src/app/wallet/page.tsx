@@ -1,15 +1,28 @@
 import type { Metadata } from 'next';
-import { StubPage } from '@/components/ui/UnderConstruction';
+import { WalletView } from '@/components/wallet/WalletView';
+import { requirePageSession } from '@/lib/auth/page-guard';
 
-export const metadata: Metadata = { title: 'Wallet' };
+export const metadata: Metadata = {
+  title: 'Wallet',
+  robots: { index: false, follow: false },
+};
+
+/** A balance is per-account and must never be cached or prerendered. */
+export const dynamic = 'force-dynamic';
 
 /**
- * Stub route. Returns 200 with an honest "not built yet" state.
+ * Replaces the previous StubPage.
  *
- * Every link in the navigation resolves to a real page, so a 404 in the logs
- * is always a genuine bug rather than a known gap. See
- * src/components/ui/UnderConstruction.tsx for the reasoning.
+ * /wallet is already in the middleware's PROTECTED and NO_STORE lists, and
+ * /api/wallet scopes every row to the caller's own wallet - the page guard is
+ * convenience, the query is the control.
  */
-export default function Page() {
-  return <StubPage titleKey="nav.wallet" />;
+export default async function WalletPage() {
+  await requirePageSession('/wallet');
+
+  return (
+    <main id="main" className="min-h-dvh bg-surface-muted">
+      <WalletView />
+    </main>
+  );
 }

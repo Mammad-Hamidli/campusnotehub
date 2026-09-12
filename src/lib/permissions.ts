@@ -1,4 +1,4 @@
-import { AccountStatus, UserRole, VerificationStatus } from '@prisma/client';
+import { AccountStatus, UserRole, VerificationStatus } from '@/lib/enums';
 
 export type Capability =
   | 'feed:read'
@@ -12,7 +12,6 @@ export type Capability =
   | 'mentors:offer'
   | 'wallet:topup'
   | 'wallet:withdraw'
-  | 'messages:send'
   | 'moderation:review';
 
 export type Viewer = {
@@ -70,12 +69,6 @@ export function can(viewer: Viewer | null, capability: Capability): boolean {
 
   if (capability === 'moderation:review') {
     return viewer.role === UserRole.MODERATOR || viewer.role === UserRole.ADMIN;
-  }
-  // Messaging needs a live account but not a verified identity: a first-year
-  // asking a question is the point of the product. Frozen accounts are already
-  // excluded above, because 'messages:send' is not in ALWAYS_ALLOWED.
-  if (capability === 'messages:send') {
-    return true;
   }
   if (capability === 'mentors:offer') {
     return (

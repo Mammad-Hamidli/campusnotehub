@@ -1,11 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { NotificationType } from '@prisma/client';
+import { NotificationType } from '@/lib/enums';
 import { z } from 'zod';
-import { db } from '@/lib/db';
 import { getViewer, requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { can, ForbiddenError } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { findVisiblePost } from '@/lib/feed/visibility';
+import {
+  createComment,
+  findCommentById,
+  listComments,
+  type CommentRecord,
+} from '@/lib/firebase/repositories/posts';
+import { findUserById, findUsersByIds } from '@/lib/firebase/repositories/users';
+import { createNotification } from '@/lib/firebase/repositories/notifications';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,37 +49,27 @@ const listSchema = z.object({
 const createSchema = z.object({
   body: z.string().trim().min(1, 'errors.validationFailed').max(1000),
   /** Optional parent for a one-level reply. */
-  parentId: z.string().cuid().optional(),
+  parentId: z.string().min(1).max(64).optional(),
 });
 
-/** Shape returned for one comment. Kept in one place so both routes agree. */
-const COMMENT_SELECT = {
-  id: true,
-  body: true,
-  createdAt: true,
-  parentId: true,
-  isDeleted: true,
-  author: {
-    select: { id: true, nickname: true, avatarUrl: true, isVerified: true, headline: true },
-  },
-} as const;
-
-type CommentRow = {
+/**
+ * The author fields a comment renders.
+ *
+ * This replaced a Prisma `select`, which did double duty as "what to fetch"
+ * and "what to return". Firestore returns whole documents, so the narrowing
+ * has to happen here - and it is a narrowing that matters: the author's email,
+ * phone and legal name are on the same record and none of them belongs in a
+ * comment thread.
+ */
+type CommentAuthor = {
   id: string;
-  body: string;
-  createdAt: Date;
-  parentId: string | null;
-  isDeleted: boolean;
-  author: {
-    id: string;
-    nickname: string;
-    avatarUrl: string | null;
-    isVerified: boolean;
-    headline: string | null;
-  };
+  nickname: string;
+  avatarUrl: string | null;
+  isVerified: boolean;
+  headline: string | null;
 };
 
-function serialize(row: CommentRow) {
+function serialize(row: CommentRecord, author: CommentAuthor | null) {
   return {
     id: row.id,
     // A deleted comment keeps its row so replies beneath it do not vanish, but
@@ -82,7 +79,15 @@ function serialize(row: CommentRow) {
     isDeleted: row.isDeleted,
     createdAt: row.createdAt.toISOString(),
     parentId: row.parentId,
-    author: row.author,
+    author: author ?? {
+      // Firestore has no foreign keys, so an author document can genuinely be
+      // absent. The contract stays "author is always an object".
+      id: row.authorId,
+      nickname: 'unknown',
+      avatarUrl: null,
+      isVerified: false,
+      headline: null,
+    },
   };
 }
 
@@ -109,38 +114,62 @@ export async function GET(
   const post = await findVisiblePost(postId, viewer);
   if (!post) return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
 
-  const [cursorTime, cursorId] = cursor ? cursor.split('_') : [];
+  const [cursorTime] = cursor ? cursor.split('_') : [];
 
-  const rows = await db.comment.findMany({
-    where: {
-      postId,
-      // Content from banned accounts disappears without a separate cleanup
-      // job, matching how the feed listing treats posts.
-      author: { accountStatus: { in: ['ACTIVE', 'RESTRICTED'] } },
-      ...(cursorTime && cursorId
-        ? {
-            OR: [
-              { createdAt: { gt: new Date(cursorTime) } },
-              { createdAt: new Date(cursorTime), id: { gt: cursorId } },
-            ],
-          }
-        : {}),
-    },
-    // Ascending: a conversation reads oldest first, which is also the order
-    // the (postId, createdAt) index already provides.
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    take: limit + 1,
-    select: COMMENT_SELECT,
+  // Ascending: a conversation reads oldest first, which is also the order the
+  // (postId, createdAt) composite index provides.
+  const rows = await listComments(postId, limit + 1, cursorTime ? new Date(cursorTime) : null);
+
+  /**
+   * The authors, in one batched read.
+   *
+   * This is what replaced the `author` join. Collecting the ids and fetching
+   * them in batches of 30 is a fixed handful of round trips per page rather
+   * than one per comment.
+   */
+  const authors = await findUsersByIds(rows.map((c) => c.authorId));
+
+  /**
+   * Content from banned accounts disappears without a separate cleanup job,
+   * matching how the feed listing treats posts. Applied after the read because
+   * Firestore cannot filter one collection by a field on another.
+   */
+  const visible = rows.filter((row) => {
+    const author = authors.get(row.authorId);
+    return Boolean(
+      author &&
+        !author.deletedAt &&
+        (author.accountStatus === 'ACTIVE' || author.accountStatus === 'RESTRICTED'),
+    );
   });
 
   const hasMore = rows.length > limit;
-  const page = hasMore ? rows.slice(0, limit) : rows;
-  const last = page.at(-1);
+  const page = hasMore ? visible.slice(0, limit) : visible;
+  // Derived from the last row SCANNED, not the last shown: a page whose
+  // comments were all filtered out would otherwise loop on the same cursor.
+  const lastScanned = (hasMore ? rows.slice(0, limit) : rows).at(-1);
 
   return NextResponse.json(
     {
-      comments: page.map(serialize),
-      nextCursor: hasMore && last ? `${last.createdAt.toISOString()}_${last.id}` : null,
+      comments: page.map((row) => {
+        const author = authors.get(row.authorId);
+        return serialize(
+          row,
+          author
+            ? {
+                id: author.id,
+                nickname: author.nickname,
+                avatarUrl: author.avatarUrl,
+                isVerified: author.isVerified,
+                headline: author.headline,
+              }
+            : null,
+        );
+      }),
+      nextCursor:
+        hasMore && lastScanned
+          ? `${lastScanned.createdAt.toISOString()}_${lastScanned.id}`
+          : null,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );
@@ -202,57 +231,67 @@ export async function POST(
    */
   let parentId: string | null = null;
   if (parsed.data.parentId) {
-    const parent = await db.comment.findFirst({
-      where: { id: parsed.data.parentId, postId, isDeleted: false },
-      select: { id: true, parentId: true, authorId: true },
-    });
-    if (!parent) {
+    const parent = await findCommentById(parsed.data.parentId);
+    // The postId check is the important half and is done explicitly here:
+    // Firestore fetches by id alone, so without it a caller could graft a
+    // reply from one conversation onto another.
+    if (!parent || parent.postId !== postId || parent.isDeleted) {
       return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
     }
     // Flatten: a reply to a reply attaches to the same top-level parent.
     parentId = parent.parentId ?? parent.id;
   }
 
-  const comment = await db.$transaction(async (tx) => {
-    const created = await tx.comment.create({
-      data: { postId, authorId: userId, parentId, body: parsed.data.body },
-      select: COMMENT_SELECT,
+  /**
+   * The comment and the post's counter are written in ONE BATCH.
+   *
+   * The denormalised `commentCount` is what the feed card renders, so it must
+   * not be able to drift from the rows it describes - incrementing it in a
+   * second request leaves the count permanently low whenever that request
+   * fails. A Firestore batch commits atomically, which preserves exactly the
+   * guarantee the SQL transaction gave. See createComment().
+   */
+  const comment = await createComment({ postId, authorId: userId, parentId, body: parsed.data.body });
+
+  const author = await findUserById(userId);
+
+  /**
+   * Notify the post's author, unless they are commenting on themselves.
+   *
+   * Written directly rather than through enqueueNotification(): that helper
+   * also pushes onto a BullMQ queue, and a Redis outage would then fail a
+   * comment the user had already written. The in-app row is the part that must
+   * be durable; fan-out is best-effort. It is written after the comment for the
+   * same reason - a notification for a comment that does not exist would be a
+   * lie, while a comment without its bell is merely a missed ping.
+   */
+  if (post.authorId !== userId) {
+    await createNotification({
+      userId: post.authorId,
+      type: NotificationType.POST_REPLY,
+      titleKey: 'notifications.postReply.title',
+      bodyKey: 'notifications.postReply.body',
+      params: { nickname: author?.nickname ?? '' },
+      linkUrl: `/dashboard?post=${postId}`,
     });
-
-    // The denormalised counter on the post is what the feed card renders, so
-    // it is incremented in the SAME transaction. Doing it afterwards leaves
-    // the count permanently low whenever the second write fails.
-    await tx.post.update({
-      where: { id: postId },
-      data: { commentCount: { increment: 1 } },
-    });
-
-    /**
-     * Notify the post's author, unless they are commenting on themselves.
-     *
-     * Written directly rather than through enqueueNotification(): that helper
-     * also pushes onto a BullMQ queue, and a Redis outage would then roll this
-     * transaction back and lose a comment the user had already written. The
-     * in-app row is the part that must be durable; fan-out is best-effort.
-     */
-    if (post.authorId !== userId) {
-      await tx.notification.create({
-        data: {
-          userId: post.authorId,
-          type: NotificationType.POST_REPLY,
-          titleKey: 'notifications.postReply.title',
-          bodyKey: 'notifications.postReply.body',
-          params: { nickname: created.author.nickname },
-          linkUrl: `/dashboard?post=${postId}`,
-        },
-      });
-    }
-
-    return created;
-  });
+  }
 
   return NextResponse.json(
-    { comment: serialize(comment), commentCount: post.commentCount + 1 },
+    {
+      comment: serialize(
+        comment,
+        author
+          ? {
+              id: author.id,
+              nickname: author.nickname,
+              avatarUrl: author.avatarUrl,
+              isVerified: author.isVerified,
+              headline: author.headline,
+            }
+          : null,
+      ),
+      commentCount: post.commentCount + 1,
+    },
     { status: 201, headers: { 'Cache-Control': 'no-store' } },
   );
 }

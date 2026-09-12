@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { UserRole, AccountStatus, VerificationStatus } from '@prisma/client';
+import { UserRole, AccountStatus, VerificationStatus } from '@/lib/enums';
 
 /**
  * Authorization tests for the admin panel.
@@ -17,8 +17,17 @@ vi.mock('@/lib/auth/session', async () => {
   return { ...actual, requireSession: (...args: unknown[]) => requireSession(...args) };
 });
 
-const auditCreate = vi.fn();
-vi.mock('@/lib/db', () => ({ db: { auditLog: { create: auditCreate } } }));
+/**
+ * The audit sink is mocked at the REPOSITORY boundary, not at the database
+ * client. adminAudit() now writes through writeAuditLog() in the Firestore
+ * repository, so mocking `@/lib/db` here would assert against a module the
+ * code under test no longer touches - a test that passes while proving
+ * nothing.
+ */
+const writeAuditLog = vi.fn();
+vi.mock('@/lib/firebase/repositories/audit', () => ({
+  writeAuditLog: (...args: unknown[]) => writeAuditLog(...args),
+}));
 
 const { requireAdmin, withAdmin, adminAudit, ForbiddenError } = await import('@/lib/auth/admin');
 const { UnauthorizedError } = await import('@/lib/auth/session');
@@ -40,7 +49,7 @@ function sessionAs(role: UserRole) {
 
 beforeEach(() => {
   requireSession.mockReset();
-  auditCreate.mockReset();
+  writeAuditLog.mockReset();
 });
 
 describe('requireAdmin', () => {
@@ -146,8 +155,8 @@ describe('adminAudit', () => {
       before: { accountStatus: 'ACTIVE' },
       after: { accountStatus: 'SUSPENDED' },
     });
-    expect(auditCreate).toHaveBeenCalledTimes(1);
-    expect(auditCreate.mock.calls[0][0].data).toMatchObject({
+    expect(writeAuditLog).toHaveBeenCalledTimes(1);
+    expect(writeAuditLog.mock.calls[0][0]).toMatchObject({
       actorId: 'admin_1',
       action: 'ADMIN_USER_STATUS_CHANGED',
       entityType: 'user',
@@ -155,15 +164,26 @@ describe('adminAudit', () => {
     });
   });
 
-  it('uses the transaction client when one is supplied, so the row commits with the change', async () => {
-    const txCreate = vi.fn();
+  /**
+   * Replaces the old "uses the transaction client when one is supplied" case.
+   *
+   * That behaviour is genuinely gone rather than merely untested: a Firestore
+   * transaction handle cannot be passed across module boundaries, so adminAudit
+   * no longer accepts one and the audit row is always written on its own. This
+   * asserts the property that survived - the row still records the outcome -
+   * so a regression to a silently-dropped audit write is still caught.
+   */
+  it('defaults result to SUCCESS and records a stated failure', async () => {
+    await adminAudit({ actorId: 'admin_1', action: 'ADMIN_USER_DELETED', entityType: 'user' });
+    expect(writeAuditLog.mock.calls[0][0]).toMatchObject({ result: 'SUCCESS' });
+
     await adminAudit({
-      tx: { auditLog: { create: txCreate } } as never,
       actorId: 'admin_1',
       action: 'ADMIN_USER_DELETED',
       entityType: 'user',
+      result: 'DENIED',
     });
-    expect(txCreate).toHaveBeenCalledTimes(1);
-    expect(auditCreate).not.toHaveBeenCalled();
+    expect(writeAuditLog.mock.calls[1][0]).toMatchObject({ result: 'DENIED' });
+    expect(writeAuditLog).toHaveBeenCalledTimes(2);
   });
 });

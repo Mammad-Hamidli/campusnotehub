@@ -1,0 +1,288 @@
+rules_version = '2';
+
+// CampusHub Firestore security rules.
+//
+// =============================================================================
+// THE GOVERNING PRINCIPLE: DEFAULT DENY, AND THE SERVER IS NOT A CLIENT
+// =============================================================================
+// Every application write still goes through the Next.js API routes using the
+// Admin SDK, which BYPASSES these rules entirely. So these rules are not the
+// application's authorization logic - that lives in the route handlers, where
+// it already is, and where it can express things a rule language cannot (rate
+// limits, capability tables, double-entry balancing).
+//
+// What these rules are for is the direct-access path: a browser holding a
+// Firebase ID token talking to Firestore without going through our server.
+// Under Postgres that path did not exist, because nothing but the app had the
+// connection string. In Firestore it exists by default, so the rules have to
+// close it.
+//
+// The posture is therefore: deny everything, then open the narrowest possible
+// read paths for data the product genuinely renders client-side. There is no
+// client write path at all - every mutation goes through an audited route.
+//
+// =============================================================================
+// WHY SO MUCH IS DENIED OUTRIGHT
+// =============================================================================
+// Firestore grants are per DOCUMENT, not per field. "This user may read their
+// own user document" would expose every field in it. Under SQL those fields
+// were protected by never appearing in a SELECT list; that protection does not
+// survive the move. So collections holding anything sensitive - sessions,
+// audit logs, verification cases, the ledger, the blocklist - are denied to
+// clients completely and reached only through the server.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helpers -----------------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Staff, from a CUSTOM CLAIM rather than from a Firestore lookup.
+     *
+     * A claim is carried in the verified ID token, so checking it costs no
+     * read and cannot be spoofed. Reading the caller's own user document to
+     * find their role would cost a document read on EVERY rule evaluation and
+     * would still be a claim about themselves.
+     *
+     * The claim is set server-side when a role changes - see
+     * syncUserClaims() in src/lib/firebase/auth.ts.
+     */
+    function isStaff() {
+      return signedIn()
+        && request.auth.token.role in ['MODERATOR', 'ADMIN'];
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.role == 'ADMIN';
+    }
+
+    /** A live account. Frozen and banned accounts lose client read access. */
+    function activeAccount() {
+      return signedIn()
+        && request.auth.token.accountStatus in ['ACTIVE', 'RESTRICTED'];
+    }
+
+    // ---- users -------------------------------------------------------------
+    //
+    // A user document holds the email, the phone and the legal name. It is
+    // readable ONLY by its owner and by staff. Everything the product renders
+    // on a shared surface - the nickname, the avatar, the verified badge -
+    // is served by the API from a narrowed projection, exactly as it was
+    // under SQL.
+    //
+    // Writes are server-only without exception: a client that could write here
+    // could set its own `role`.
+    match /users/{userId} {
+      allow get: if isSelf(userId) || isStaff();
+      allow list: if isStaff();
+      allow write: if false;
+
+      // Notification preferences are the user's own settings and are safe to
+      // read directly; writing still goes through the API so a change is
+      // validated against the NotificationType enum.
+      match /notificationPreferences/{prefId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
+
+      // Follow graph. Public in the product, so readable; written server-side
+      // so the denormalised counters stay consistent with it.
+      match /followers/{followerId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+      match /following/{followeeId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
+    // ---- reference data ----------------------------------------------------
+    //
+    // Universities and faculties are a public catalogue - the registration
+    // form renders them before anyone has an account.
+    match /universities/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /faculties/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /tags/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---- feed --------------------------------------------------------------
+    //
+    // Post visibility (PUBLIC / UNIVERSITY_ONLY / VERIFIED_ONLY / FOLLOWERS)
+    // is enforced by the API, which can evaluate the follow graph and the
+    // viewer's university in one query. A rule cannot do that without several
+    // reads per document, so client reads are limited to genuinely PUBLIC
+    // posts and everything else is served by the server.
+    match /posts/{postId} {
+      allow get, list: if resource.data.visibility == 'PUBLIC'
+                       && resource.data.isDeleted == false;
+      allow write: if false;
+
+      // The document id is the liker, which reproduces the composite primary
+      // key the SQL table had.
+      match /likes/{userId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
+    match /comments/{commentId} {
+      allow read: if signedIn() && activeAccount();
+      allow write: if false;
+    }
+
+    // ---- marketplace -------------------------------------------------------
+    //
+    // A published note listing is a shop window and is public. The FILE is
+    // not - that is a Storage rule, and it is closed.
+    match /notes/{noteId} {
+      allow get, list: if resource.data.status == 'PUBLISHED';
+      allow write: if false;
+    }
+
+    match /noteReviews/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // An order is a purchase record: what someone bought and what they paid.
+    // Readable by the buyer alone.
+    match /orders/{orderId} {
+      allow get: if isSelf(resource.data.buyerId) || isStaff();
+      allow list: if isStaff();
+      allow write: if false;
+    }
+
+    // ---- mentors -----------------------------------------------------------
+    //
+    // Only APPROVED profiles are visible. An unreviewed profile is a set of
+    // unverified claims about someone's employer and seniority.
+    match /mentorProfiles/{mentorId} {
+      allow get, list: if resource.data.isApproved == true;
+      allow write: if false;
+
+      match /availability/{ruleId} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    // A booking is private to its two participants.
+    match /bookings/{bookingId} {
+      allow get: if isSelf(resource.data.menteeId)
+                 || isSelf(resource.data.mentorUserId)
+                 || isStaff();
+      allow list: if isStaff();
+      allow write: if false;
+    }
+
+    match /mentorReviews/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // ---- notifications -----------------------------------------------------
+    //
+    // Strictly the recipient's own.
+    match /notifications/{id} {
+      allow get: if isSelf(resource.data.userId);
+      allow list: if signedIn()
+                  && request.query.limit <= 100
+                  && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /pushSubscriptions/{id} {
+      allow read: if isSelf(resource.data.userId);
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // SERVER-ONLY. No client may read these at all.
+    // =========================================================================
+
+    // ---- credentials -------------------------------------------------------
+    //
+    // The argon2id password hash and the PII HMACs. DENIED TO EVERYONE,
+    // unconditionally and with no exception for staff.
+    //
+    // This collection exists precisely so that "a user may read their own
+    // profile" does not also mean "may read their own password hash" -
+    // Firestore grants are per document, so the only way to express a
+    // field-level boundary is a separate document. Only the Admin SDK, which
+    // bypasses rules, ever touches it.
+    match /credentials/{userId} { allow read, write: if false; }
+
+    // Session records are credentials-adjacent: the refresh token hash is the
+    // credential itself, and even the metadata is a login history.
+    match /sessions/{id}      { allow read, write: if false; }
+    match /userDevices/{id}   { allow read, write: if false; }
+
+    // Verification cases carry fraud signals and per-check scores. Naming the
+    // check that fired is free tuning feedback for whoever is forging a
+    // document - the same reason publicMessageKey() collapses them to one
+    // generic string.
+    match /verificationCases/{id} { allow read, write: if false; }
+
+    // The blocklist stores HMACs of emails and phones. A hash of a known
+    // plaintext is a lookup key for every other entry.
+    match /blocklist/{id} { allow read, write: if false; }
+
+    // Audit and moderation records are the account of who did what to whom.
+    // Append-only at the application layer; unreadable here.
+    match /auditLogs/{id}         { allow read, write: if false; }
+    match /moderationActions/{id} { allow read, write: if false; }
+    match /contentReports/{id}    { allow read, write: if false; }
+
+    // Money. The ledger is the record of truth and is never client-readable;
+    // a wallet balance is served by the API alongside its own activity.
+    match /wallets/{id}            { allow read, write: if false; }
+    match /ledgerAccounts/{id}     { allow read, write: if false; }
+    match /ledgerTransactions/{id} { allow read, write: if false; }
+    match /ledgerEntries/{id}      { allow read, write: if false; }
+
+    // Deferred work and raw media metadata are infrastructure.
+    match /scheduledTasks/{id} { allow read, write: if false; }
+
+    /**
+     * Rate-limit buckets. Denied for the obvious reason: a client that could
+     * read one would learn how close it is to a limit, and a client that could
+     * WRITE one could clear its own bucket and defeat the limiter entirely.
+     *
+     * Written only by the Admin SDK, which bypasses these rules. Documents
+     * expire by way of a Firestore TTL policy on `expiresAt` - see the header
+     * of src/lib/security/ratelimit.ts.
+     */
+    match /rateLimits/{id} { allow read, write: if false; }
+    match /mediaAssets/{id}    { allow read, write: if false; }
+    // Email dedupe keys (SHA-256 only) - see src/lib/email/send.ts.
+    match /emailDispatches/{id} { allow read, write: if false; }
+
+    // =========================================================================
+    // DEFAULT DENY
+    //
+    // Last, and unconditional. A collection added later is inaccessible until
+    // somebody writes a rule for it deliberately - the failure direction that
+    // does not leak.
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { AccountStatus, Prisma, UserRole } from '@prisma/client';
-import { db } from '@/lib/db';
+import { AccountStatus, UserRole } from '@/lib/enums';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
+import { writeAuditLog } from '@/lib/firebase/repositories/audit';
 import { clientIp } from '@/lib/security/ratelimit';
 import type { Viewer } from '@/lib/permissions';
 
@@ -127,10 +127,19 @@ export async function withAdmin<T>(
   try {
     return await handler(actor);
   } catch (error) {
-    // A Prisma error message can quote column values, so it is logged rather
-    // than returned. The client gets a code it can translate and nothing else.
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      console.error(`[admin] prisma ${error.code} on ${request.nextUrl.pathname}`);
+    /**
+     * A datastore error message can quote field values, so it is logged rather
+     * than returned. The client gets a code it can translate and nothing else.
+     *
+     * Firestore reports failures as a gRPC status code on the error rather
+     * than as a typed class, so the check is on that numeric code. 3 is
+     * INVALID_ARGUMENT, 5 NOT_FOUND, 6 ALREADY_EXISTS, 9 FAILED_PRECONDITION
+     * (which is also what a missing composite index reports) - all of them
+     * caller errors that deserve a 400 rather than a 500.
+     */
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === 'number' && [3, 5, 6, 9].includes(code)) {
+      console.error(`[admin] firestore code ${code} on ${request.nextUrl.pathname}`, error);
       return NextResponse.json({ error: 'errors.generic' }, { status: 400 });
     }
     console.error(`[admin] unhandled error on ${request.nextUrl.pathname}`, error);
@@ -147,8 +156,10 @@ export async function withAdmin<T>(
  * fields that actually changed - never a whole user record, which would copy
  * emails and phone numbers into a second table that outlives account deletion.
  *
- * Pass `tx` when the action is part of a transaction so the audit row commits
- * or rolls back with the change it describes.
+ * The `tx` parameter this used to accept is gone: a Firestore transaction
+ * handle cannot be passed across module boundaries, so the audit row is now
+ * always written on its own, immediately after the change it describes. See
+ * the note in src/lib/auth/freeze.ts for why that ordering is the safe one.
  */
 export type AuditResult = 'SUCCESS' | 'FAILURE' | 'DENIED';
 
@@ -174,13 +185,12 @@ function auditIp(request?: NextRequest): string | undefined {
 }
 
 export async function adminAudit(params: {
-  tx?: Prisma.TransactionClient;
   actorId: string;
   action: string;
   entityType: string;
   entityId?: string;
-  before?: Prisma.InputJsonValue;
-  after?: Prisma.InputJsonValue;
+  before?: unknown;
+  after?: unknown;
   /**
    * Outcome of the action. Defaults to SUCCESS because the overwhelming
    * majority of call sites write their row after the change committed - a
@@ -189,19 +199,16 @@ export async function adminAudit(params: {
   result?: AuditResult;
   request?: NextRequest;
 }): Promise<void> {
-  const client = params.tx ?? db;
-  await client.auditLog.create({
-    data: {
-      actorId: params.actorId,
-      action: params.action,
-      entityType: params.entityType,
-      entityId: params.entityId,
-      before: params.before,
-      after: params.after,
-      result: params.result ?? 'SUCCESS',
-      ip: auditIp(params.request),
-      userAgent: params.request?.headers.get('user-agent')?.slice(0, 512),
-    },
+  await writeAuditLog({
+    actorId: params.actorId,
+    action: params.action,
+    entityType: params.entityType,
+    entityId: params.entityId,
+    before: params.before,
+    after: params.after,
+    result: params.result ?? 'SUCCESS',
+    ip: auditIp(params.request),
+    userAgent: params.request?.headers.get('user-agent')?.slice(0, 512),
   });
 }
 

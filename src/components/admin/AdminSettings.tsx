@@ -78,7 +78,9 @@ export function AdminSettings({ nickname }: { nickname: string }) {
           <p className="mt-2 text-xs text-fg-subtle">
             {t('admin.profile.signedInAs')} <span className="font-medium text-fg">@{nickname}</span>
           </p>
-          <Link href="/logout" className="btn-danger mt-3 px-3 py-1.5 text-sm">
+          {/* prefetch={false}: /logout revokes the session, and a prefetch would
+              fire it on scroll rather than on click. See MenuItem in ui/Menu.tsx. */}
+          <Link href="/logout" prefetch={false} className="btn-danger mt-3 px-3 py-1.5 text-sm">
             <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
             {t('admin.settings.signOutAll')}
           </Link>

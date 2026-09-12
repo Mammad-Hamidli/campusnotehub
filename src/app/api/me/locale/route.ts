@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { Locale as PrismaLocale } from '@prisma/client';
-import { db } from '@/lib/db';
+import { type Locale } from '@/lib/enums';
+import { updateUser } from '@/lib/firebase/repositories/users';
 import { requireSession } from '@/lib/auth/session';
 import { isLocale } from '@/lib/i18n/dictionaries';
 
@@ -41,10 +41,7 @@ export async function PATCH(request: NextRequest) {
     return new NextResponse(null, { status: 204 });
   }
 
-  await db.user.update({
-    where: { id: userId },
-    data: { locale: locale as PrismaLocale },
-  });
+  await updateUser(userId, { locale: locale as Locale });
 
   return new NextResponse(null, { status: 204 });
 }

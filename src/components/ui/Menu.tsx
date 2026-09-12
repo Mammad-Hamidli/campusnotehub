@@ -301,6 +301,18 @@ export function MenuItem({
         href={href}
         role="menuitem"
         data-menu-item
+        /**
+         * Menu rows are never prefetched.
+         *
+         * Next.js prefetches a <Link> as soon as it enters the viewport, and an
+         * open account menu puts every row there at once. For an ordinary page
+         * that is just a warm cache, but /logout is a GET route handler that
+         * REVOKES THE SESSION - prefetching it signs the user out for merely
+         * opening the menu, before they have clicked anything. Nothing in a
+         * menu is hot enough to be worth a prefetch, so the whole component
+         * opts out rather than relying on each call site to remember.
+         */
+        prefetch={false}
         // Still fires so the menu closes on selection; navigation is the
         // link's own job and is not intercepted.
         onClick={onSelect}

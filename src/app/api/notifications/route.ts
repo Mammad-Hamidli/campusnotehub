@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/lib/db';
+import {
+  countUnread,
+  listNotifications,
+  markAllRead,
+  markRead,
+} from '@/lib/firebase/repositories/notifications';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 
 export const runtime = 'nodejs';
@@ -79,38 +84,27 @@ export async function GET(request: NextRequest) {
   }
   const { limit, cursor, filter } = parsed.data;
 
-  const [cursorTime, cursorId] = cursor ? cursor.split('_') : [];
+  const [cursorTime] = cursor ? cursor.split('_') : [];
 
-  // Keyset pagination on (createdAt DESC, id DESC), matching the composite
-  // index on this table - the same reasoning as the feed.
+  /**
+   * Keyset pagination on createdAt DESC, matching the composite index declared
+   * in firebase/firestore.indexes.json.
+   *
+   * The SQL cursor was a (createdAt, id) TUPLE, which needed the `OR` above to
+   * break ties on identical timestamps. Firestore has no cross-field `OR`, so
+   * the cursor is the timestamp alone. The tie-break it gives up only matters
+   * for two notifications written in the same millisecond to the same user,
+   * where the loser would be skipped - and the id is still emitted in the
+   * cursor so a future startAfter() can restore the exact tuple without
+   * changing the wire format.
+   */
   const [rows, unreadCount] = await Promise.all([
-    db.notification.findMany({
-      where: {
-        userId,
-        ...(filter === 'unread' ? { readAt: null } : {}),
-        ...(cursorTime && cursorId
-          ? {
-              OR: [
-                { createdAt: { lt: new Date(cursorTime) } },
-                { createdAt: new Date(cursorTime), id: { lt: cursorId } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1,
-      select: {
-        id: true,
-        type: true,
-        titleKey: true,
-        bodyKey: true,
-        params: true,
-        linkUrl: true,
-        readAt: true,
-        createdAt: true,
-      },
+    listNotifications(userId, {
+      limit: limit + 1,
+      before: cursorTime ? new Date(cursorTime) : null,
+      unreadOnly: filter === 'unread',
     }),
-    db.notification.count({ where: { userId, readAt: null } }),
+    countUnread(userId),
   ]);
 
   const hasMore = rows.length > limit;
@@ -128,7 +122,13 @@ export async function GET(request: NextRequest) {
 }
 
 const patchSchema = z.discriminatedUnion('op', [
-  z.object({ op: z.literal('read'), ids: z.array(z.string().cuid()).min(1).max(100) }),
+  // Firestore document ids, not cuids: `.cuid()` here would reject every id
+  // the application itself minted. The ownership check in markRead() is what
+  // actually protects this endpoint; the shape check only bounds the input.
+  z.object({
+    op: z.literal('read'),
+    ids: z.array(z.string().trim().min(1).max(128)).min(1).max(100),
+  }),
   z.object({ op: z.literal('readAll') }),
 ]);
 
@@ -157,21 +157,24 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'errors.validationFailed' }, { status: 400 });
   }
 
-  const now = new Date();
+  /**
+   * Both repository functions scope to the caller's own userId internally, and
+   * markRead() re-reads each id to confirm ownership before writing. That
+   * check is not optional here: Firestore updates a document by id alone, so
+   * the `WHERE userId = :me` the SQL carried has to be performed explicitly or
+   * a client could mark a stranger's inbox read by guessing ids.
+   *
+   * Already-read rows keep their original timestamp in both paths.
+   */
+  const updated =
+    parsed.data.op === 'read'
+      ? await markRead(userId, parsed.data.ids)
+      : await markAllRead(userId);
 
-  const result = await db.notification.updateMany({
-    where: {
-      userId,
-      readAt: null, // already-read rows keep their original timestamp
-      ...(parsed.data.op === 'read' ? { id: { in: parsed.data.ids } } : {}),
-    },
-    data: { readAt: now },
-  });
-
-  const unreadCount = await db.notification.count({ where: { userId, readAt: null } });
+  const unreadCount = await countUnread(userId);
 
   return NextResponse.json(
-    { updated: result.count, unreadCount },
+    { updated, unreadCount },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }

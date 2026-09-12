@@ -1,9 +1,12 @@
-import { VerificationStatus, FraudVerdict } from '@prisma/client';
-import { db } from '@/lib/db';
+import { VerificationStatus, FraudVerdict } from '@/lib/enums';
+import { adminDb } from '@/lib/firebase/admin';
+import { COLLECTIONS } from '@/lib/firebase/collections';
+import { forFirestore } from '@/lib/firebase/convert';
+import { findCaseById } from '@/lib/firebase/repositories/verification';
 import { decide, publicMessageKey, toCheckScores, type Signal } from './policy';
 import { stash, type BufferedDocument } from './reviewBuffer';
 import { wipe } from './fileValidation';
-import { enqueueNotification } from '@/lib/notifications/dispatch';
+import { enqueueNotificationTx } from '@/lib/notifications/dispatch';
 
 const MAX_ATTEMPTS = Number(process.env.VERIFICATION_MAX_ATTEMPTS ?? 3);
 
@@ -18,8 +21,6 @@ export type PipelineInput = {
 export type PipelineOutcome = {
   status: VerificationStatus;
   messageKey: string;
-  /** Present only when a human review was opened. Goes in the review link. */
-  reviewSecret?: string;
 };
 
 /**
@@ -28,17 +29,19 @@ export type PipelineOutcome = {
  * INVARIANT, and the reason this function is written as one linear block with
  * a single `finally`: when it returns, for any reason including a thrown
  * exception, every byte of every document has been overwritten with zeroes and
- * no copy exists on any disk anywhere.
+ * no copy survives in this process.
  *
  * The documents arrive as Buffers held by the request handler. They are:
  *   1. sent to the analysis service over mTLS as a multipart body,
- *   2. optionally re-encrypted into the Redis review buffer if a human is
- *      needed,
+ *   2. optionally uploaded to the ephemeral review buffer (Cloudinary,
+ *      authenticated delivery, 7-day expiry) if and only if a human reviewer
+ *      is needed,
  *   3. wiped.
  *
- * They are never written to S3, never written to a temp file, never logged,
- * and never attached to an error report. There is no code path that persists
- * them, which is why there is no code path that has to remember to delete them.
+ * They are never written to a temp file, never logged, and never attached to
+ * an error report. Step 2 is the ONE path on which anything outlives the
+ * request: an authenticated (signature-only) Cloudinary asset that is deleted
+ * within 7 days - see src/lib/verification/reviewBuffer.ts.
  */
 export async function runVerification(input: PipelineInput): Promise<PipelineOutcome> {
   let escalating = false;
@@ -47,10 +50,8 @@ export async function runVerification(input: PipelineInput): Promise<PipelineOut
     const analysis = await analyse(input);
 
     // ---- 2. Decide -------------------------------------------------------
-    const kase = await db.verificationCase.findUniqueOrThrow({
-      where: { id: input.caseId },
-      select: { attempt: true },
-    });
+    const kase = await findCaseById(input.caseId);
+    if (!kase) throw new Error(`verification case ${input.caseId} not found`);
 
     const decision = decide({
       signals: analysis.signals,
@@ -62,104 +63,125 @@ export async function runVerification(input: PipelineInput): Promise<PipelineOut
     const checkScores = toCheckScores(analysis.signals, analysis.qualityScore);
     const messageKey = publicMessageKey(decision);
 
-    // ---- 3. Apply --------------------------------------------------------
+    /**
+     * ---- 3. Apply ---------------------------------------------------------
+     *
+     * A BATCH, not a transaction, in all three branches.
+     *
+     * Every write below is unconditional - the decision was already made from
+     * values read above, and nothing here reads-then-writes. A Firestore batch
+     * commits all of it or none of it, which is the only property the old
+     * `$transaction` was providing. Using a transaction instead would add
+     * retry semantics to writes that cannot conflict, and would forbid the
+     * `stash()` call that has to happen before the NEEDS_REVIEW branch.
+     */
+    const caseRef = adminDb().collection(COLLECTIONS.verificationCases).doc(input.caseId);
+    const userRef = adminDb().collection(COLLECTIONS.users).doc(input.userId);
+
     if (decision.outcome === 'VERIFIED') {
-      await db.$transaction(async (tx) => {
-        await tx.verificationCase.update({
-          where: { id: input.caseId },
-          data: {
-            status: VerificationStatus.VERIFIED,
-            verdict: FraudVerdict.CLEAN,
-            confidence: decision.confidence,
-            failureCodes: decision.codes,
-            checkScores,
-            publicMessageKey: messageKey,
-            decidedAt: new Date(),
-          },
-        });
-        await tx.user.update({
-          where: { id: input.userId },
-          data: {
-            verificationStatus: VerificationStatus.VERIFIED,
-            isVerified: true,
-            verifiedAt: new Date(),
-            studentStatusConfirmed: true,
-            identityConfirmed: true,
-          },
-        });
-        await enqueueNotification(tx, {
-          userId: input.userId,
-          type: 'VERIFICATION_APPROVED',
-          titleKey: 'notifications.types.VERIFICATION_APPROVED',
-          bodyKey: 'verification.submitted.body',
-          linkUrl: '/dashboard',
-        });
+      const batch = adminDb().batch();
+      batch.update(
+        caseRef,
+        forFirestore({
+          status: VerificationStatus.VERIFIED,
+          verdict: FraudVerdict.CLEAN,
+          confidence: decision.confidence,
+          failureCodes: decision.codes,
+          checkScores,
+          publicMessageKey: messageKey,
+          decidedAt: new Date(),
+        }),
+      );
+      batch.update(
+        userRef,
+        forFirestore({
+          verificationStatus: VerificationStatus.VERIFIED,
+          isVerified: true,
+          verifiedAt: new Date(),
+          studentStatusConfirmed: true,
+          identityConfirmed: true,
+          updatedAt: new Date(),
+        }),
+      );
+      enqueueNotificationTx(batch, {
+        userId: input.userId,
+        type: 'VERIFICATION_APPROVED',
+        titleKey: 'notifications.types.VERIFICATION_APPROVED',
+        bodyKey: 'verification.submitted.body',
+        linkUrl: '/dashboard',
       });
+      await batch.commit();
 
       return { status: VerificationStatus.VERIFIED, messageKey };
     }
 
     if (decision.outcome === 'RETAKE') {
-      await db.$transaction(async (tx) => {
-        // decidedAt stays null and the attempt is not consumed - a bad photo
-        // is not a failed attempt.
-        await tx.verificationCase.update({
-          where: { id: input.caseId },
-          data: {
-            status: VerificationStatus.REJECTED,
-            confidence: decision.confidence,
-            failureCodes: decision.codes,
-            checkScores,
-            publicMessageKey: messageKey,
-          },
-        });
-        await tx.user.update({
-          where: { id: input.userId },
-          data: { verificationStatus: VerificationStatus.UNVERIFIED },
-        });
-      });
+      const batch = adminDb().batch();
+      // decidedAt stays null and the attempt is not consumed - a bad photo
+      // is not a failed attempt.
+      batch.update(
+        caseRef,
+        forFirestore({
+          status: VerificationStatus.REJECTED,
+          confidence: decision.confidence,
+          failureCodes: decision.codes,
+          checkScores,
+          publicMessageKey: messageKey,
+        }),
+      );
+      batch.update(
+        userRef,
+        forFirestore({
+          verificationStatus: VerificationStatus.UNVERIFIED,
+          updatedAt: new Date(),
+        }),
+      );
+      await batch.commit();
 
       return { status: VerificationStatus.REJECTED, messageKey };
     }
 
     // NEEDS_REVIEW: the only branch where documents outlive the request, and
-    // only inside the TTL-bound encrypted Redis buffer.
+    // only inside the expiry-bound review buffer (Cloudinary, 7 days max).
     const handle = await stash(input.documents);
 
-    await db.$transaction(async (tx) => {
-      await tx.verificationCase.update({
-        where: { id: input.caseId },
-        data: {
-          status: VerificationStatus.NEEDS_REVIEW,
-          verdict: analysis.signals.some((s) => s.code === 'DIGITAL_TAMPERING')
-            ? FraudVerdict.TAMPERED
-            : FraudVerdict.AMBIGUOUS,
-          confidence: decision.confidence,
-          failureCodes: decision.codes,
-          checkScores,
-          publicMessageKey: messageKey,
-          reviewBufferKey: handle.key,
-          reviewExpiresAt: handle.expiresAt,
-          reviewPriority: decision.priority,
-        },
-      });
-      await tx.user.update({
-        where: { id: input.userId },
-        data: { verificationStatus: VerificationStatus.NEEDS_REVIEW },
-      });
-      await enqueueNotification(tx, {
-        userId: input.userId,
-        type: 'VERIFICATION_NEEDS_REVIEW',
-        titleKey: 'notifications.types.VERIFICATION_NEEDS_REVIEW',
-        bodyKey: 'verification.banner.needsReview',
-        linkUrl: '/dashboard',
-      });
+    const batch = adminDb().batch();
+    batch.update(
+      caseRef,
+      forFirestore({
+        status: VerificationStatus.NEEDS_REVIEW,
+        verdict: analysis.signals.some((s) => s.code === 'DIGITAL_TAMPERING')
+          ? FraudVerdict.TAMPERED
+          : FraudVerdict.AMBIGUOUS,
+        confidence: decision.confidence,
+        failureCodes: decision.codes,
+        checkScores,
+        publicMessageKey: messageKey,
+        reviewBufferKey: handle.key,
+        reviewExpiresAt: handle.expiresAt,
+        reviewDocuments: handle.documents,
+        reviewPriority: decision.priority,
+      }),
+    );
+    batch.update(
+      userRef,
+      forFirestore({
+        verificationStatus: VerificationStatus.NEEDS_REVIEW,
+        updatedAt: new Date(),
+      }),
+    );
+    enqueueNotificationTx(batch, {
+      userId: input.userId,
+      type: 'VERIFICATION_NEEDS_REVIEW',
+      titleKey: 'notifications.types.VERIFICATION_NEEDS_REVIEW',
+      bodyKey: 'verification.banner.needsReview',
+      linkUrl: '/dashboard',
     });
+    await batch.commit();
 
     return {
       status: VerificationStatus.NEEDS_REVIEW,
       messageKey,
-      reviewSecret: handle.secret,
     };
   } catch (error) {
     // The caller escalates a pipeline outage, and escalateOnFailure still needs
@@ -171,8 +193,8 @@ export async function runVerification(input: PipelineInput): Promise<PipelineOut
   } finally {
     // Runs on success, on rejection, and on an unhandled throw - EXCEPT when
     // the caller is about to escalate. In that one case the submit route's own
-    // finally does the wipe, immediately after escalateOnFailure has copied the
-    // bytes into the encrypted buffer, so they still never outlive the request.
+    // finally does the wipe, immediately after escalateOnFailure has uploaded the
+    // bytes to the review buffer, so no in-memory copy outlives the request.
     if (!escalating) {
       for (const doc of input.documents) wipe(doc.bytes);
       input.documents.length = 0;
@@ -264,29 +286,32 @@ export async function escalateOnFailure(input: PipelineInput): Promise<PipelineO
   try {
     const handle = await stash(input.documents);
 
-    await db.$transaction(async (tx) => {
-      await tx.verificationCase.update({
-        where: { id: input.caseId },
-        data: {
-          status: VerificationStatus.NEEDS_REVIEW,
-          verdict: FraudVerdict.AMBIGUOUS,
-          failureCodes: ['PIPELINE_UNAVAILABLE'],
-          publicMessageKey: 'verification.banner.needsReview',
-          reviewBufferKey: handle.key,
-          reviewExpiresAt: handle.expiresAt,
-          reviewPriority: 80, // our fault, not theirs - review it quickly
-        },
-      });
-      await tx.user.update({
-        where: { id: input.userId },
-        data: { verificationStatus: VerificationStatus.NEEDS_REVIEW },
-      });
-    });
+    const batch = adminDb().batch();
+    batch.update(
+      adminDb().collection(COLLECTIONS.verificationCases).doc(input.caseId),
+      forFirestore({
+        status: VerificationStatus.NEEDS_REVIEW,
+        verdict: FraudVerdict.AMBIGUOUS,
+        failureCodes: ['PIPELINE_UNAVAILABLE'],
+        publicMessageKey: 'verification.banner.needsReview',
+        reviewBufferKey: handle.key,
+        reviewExpiresAt: handle.expiresAt,
+        reviewDocuments: handle.documents,
+        reviewPriority: 80, // our fault, not theirs - review it quickly
+      }),
+    );
+    batch.update(
+      adminDb().collection(COLLECTIONS.users).doc(input.userId),
+      forFirestore({
+        verificationStatus: VerificationStatus.NEEDS_REVIEW,
+        updatedAt: new Date(),
+      }),
+    );
+    await batch.commit();
 
     return {
       status: VerificationStatus.NEEDS_REVIEW,
       messageKey: 'verification.banner.needsReview',
-      reviewSecret: handle.secret,
     };
   } finally {
     for (const doc of input.documents) wipe(doc.bytes);

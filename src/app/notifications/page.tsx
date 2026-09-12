@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { NotificationsView } from '@/components/notifications/NotificationsView';
+import { requirePageSession } from '@/lib/auth/page-guard';
 
 export const metadata: Metadata = {
   title: 'Notifications',
@@ -16,7 +17,9 @@ export const dynamic = 'force-dynamic';
  * redirected to /login before this renders, and /api/notifications re-checks
  * the session independently - the page guard is convenience, not the control.
  */
-export default function NotificationsPage() {
+export default async function NotificationsPage() {
+  await requirePageSession('/notifications');
+
   return (
     <main id="main" className="min-h-dvh bg-surface-muted">
       <NotificationsView />

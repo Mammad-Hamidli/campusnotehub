@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { db } from '@/lib/db';
+import { findUserById } from '@/lib/firebase/repositories/users';
 import { getAdminViewer } from '@/lib/auth/admin';
 import { AdminSettings } from '@/components/admin/AdminSettings';
 
@@ -18,10 +18,7 @@ export default async function AdminSettingsPage() {
   const viewer = await getAdminViewer();
   if (!viewer) redirect('/dashboard');
 
-  const account = await db.user.findUnique({
-    where: { id: viewer.id },
-    select: { nickname: true },
-  });
+  const account = await findUserById(viewer.id);
 
   return <AdminSettings nickname={account?.nickname ?? '—'} />;
 }

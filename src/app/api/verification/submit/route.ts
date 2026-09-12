@@ -1,6 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { VerificationStatus } from '@prisma/client';
-import { db } from '@/lib/db';
+import { VerificationStatus } from '@/lib/enums';
+import { findUserById, updateUser } from '@/lib/firebase/repositories/users';
+import { findUniversityById } from '@/lib/firebase/repositories/reference';
+import {
+  createCase,
+  newCaseId,
+  listCases,
+  updateCase,
+} from '@/lib/firebase/repositories/verification';
 import { requireSession } from '@/lib/auth/session';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { isUserBlocked } from '@/lib/security/blocklist';
@@ -27,13 +34,42 @@ export const maxDuration = 60;
 
 const MAX_ATTEMPTS = Number(process.env.VERIFICATION_MAX_ATTEMPTS ?? 3);
 
-const REQUIRED_KINDS = [
-  'STUDENT_CARD_FRONT',
-  'STUDENT_CARD_BACK',
-  'ID_FRONT',
-  'ID_BACK',
-] as const;
-type RequiredKind = (typeof REQUIRED_KINDS)[number];
+/**
+ * Which documents each account type must submit.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS NO LONGER A SINGLE LIST
+ * ---------------------------------------------------------------------------
+ * It used to be four fixed kinds, which assumed every account is a student. A
+ * TEACHER has no student card, so demanding one would make teacher
+ * verification impossible to complete - the submission would be refused for a
+ * document that does not exist.
+ *
+ * Both types still prove IDENTITY with the same two ID images. Students
+ * additionally prove ENROLMENT with the student card, which is the claim only
+ * they are making.
+ *
+ * The set is chosen from the account's role on the SERVER. A client cannot
+ * shrink its own requirements by claiming to be a teacher, because the role is
+ * read from the database row, not from the request.
+ */
+const ID_KINDS = ['ID_FRONT', 'ID_BACK'] as const;
+const STUDENT_CARD_KINDS = ['STUDENT_CARD_FRONT', 'STUDENT_CARD_BACK'] as const;
+
+type RequiredKind =
+  | (typeof ID_KINDS)[number]
+  | (typeof STUDENT_CARD_KINDS)[number];
+
+function requiredKindsFor(role: string): readonly RequiredKind[] {
+  // TEACHER and MENTOR prove identity only - neither holds a student card, so
+  // demanding one would make their verification impossible to complete. Every
+  // other role - STUDENT, and the applicant-facing ones that can still be
+  // unverified - also proves enrolment, which is the conservative default:
+  // requiring an extra document is recoverable, silently skipping one is not.
+  return role === 'TEACHER' || role === 'MENTOR'
+    ? ID_KINDS
+    : [...STUDENT_CARD_KINDS, ...ID_KINDS];
+}
 
 /**
  * POST /api/verification/submit
@@ -58,7 +94,7 @@ type RequiredKind = (typeof REQUIRED_KINDS)[number];
  * memory under a hard cap, validate the bytes, run the analysis, decide, and
  * wipe. Nothing is written to durable storage at any point. The only branch
  * where documents survive the response is NEEDS_REVIEW, which parks them in a
- * TTL-bound encrypted Redis buffer so a human can actually review them - see
+ * 7-day authenticated Cloudinary buffer so a human can actually review them - see
  * src/lib/verification/reviewBuffer.ts for why that compromise is necessary
  * and how it is bounded.
  *
@@ -84,17 +120,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'verification.failure.generic' }, { status: 403 });
   }
 
-  const user = await db.user.findUniqueOrThrow({
-    where: { id: userId },
-    select: {
-      verificationStatus: true,
-      accountStatus: true,
-      fullName: true,
-      email: true,
-      nickname: true,
-      university: { select: { code: true } },
-    },
-  });
+  const user = await findUserById(userId);
+  if (!user) {
+    return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
+  }
+
+  // The institution CODE, which the verifier compares the student card
+  // against. A separate read where Prisma had a join, and issued before the
+  // status guards below only because every branch that proceeds needs it.
+  const university = user.universityId ? await findUniversityById(user.universityId) : null;
 
   if (user.verificationStatus === VerificationStatus.VERIFIED) {
     return NextResponse.json({ error: 'already_verified' }, { status: 409 });
@@ -108,9 +142,9 @@ export async function POST(request: NextRequest) {
 
   // Only decided attempts count. A RETAKE leaves decidedAt null, so a blurry
   // photo never burns one of the three.
-  const priorAttempts = await db.verificationCase.count({
-    where: { userId, decidedAt: { not: null } },
-  });
+  const priorAttempts = (
+    await listCases({ userId, includeDismissed: true }, 1, 100, 'submittedAt', 'desc')
+  ).cases.filter((c) => c.decidedAt !== null).length;
   if (priorAttempts >= MAX_ATTEMPTS) {
     return NextResponse.json(
       { error: 'verification.banner.attemptsExhausted', needsSupport: true },
@@ -131,7 +165,10 @@ export async function POST(request: NextRequest) {
 
     const form = await request.formData();
 
-    for (const kind of REQUIRED_KINDS) {
+    // Chosen from the account's own role, read from the database above.
+    const requiredKinds = requiredKindsFor(user.role);
+
+    for (const kind of requiredKinds) {
       const entry = form.get(kind);
       if (!(entry instanceof File)) {
         return NextResponse.json(
@@ -155,41 +192,64 @@ export async function POST(request: NextRequest) {
     }
 
     // ---- Open the case, then run the pipeline -----------------------------
-    const kase = await db.$transaction(async (tx) => {
-      const created = await tx.verificationCase.create({
-        data: {
-          userId,
-          attempt: priorAttempts + 1,
-          status: VerificationStatus.PROCESSING,
-        },
-        select: { id: true, attempt: true },
-      });
-      await tx.user.update({
-        where: { id: userId },
-        data: { verificationStatus: VerificationStatus.PROCESSING },
-      });
-      return created;
+    /**
+     * The case first, then the account flag.
+     *
+     * These shared a transaction; they no longer can, because createCase()
+     * and updateUser() each open their own write. The order is chosen so the
+     * survivable failure is the one that happens: a case with no PROCESSING
+     * flag is a row the pipeline will still decide, while a PROCESSING flag
+     * with no case would leave an account stuck in a state that nothing owns
+     * and nothing can clear.
+     */
+    const kase = await createCase({
+      id: newCaseId(),
+      userId,
+      attempt: priorAttempts + 1,
+      status: VerificationStatus.PROCESSING,
     });
+
+    await updateUser(userId, { verificationStatus: VerificationStatus.PROCESSING });
 
     const input: PipelineInput = {
       userId,
       caseId: kase.id,
       documents,
       declaredName: user.fullName,
-      declaredUniversityCode: user.university?.code ?? null,
+      declaredUniversityCode: university?.code ?? null,
     };
 
     let outcome;
     try {
-      // runVerification wipes `documents` in its own finally block.
-      outcome = await runVerification(input);
-    } catch (error) {
-      if (error instanceof PipelineUnavailableError) {
-        // Our outage must never read as the user's fraud. Park it for a human.
-        outcome = await escalateOnFailure(input);
-      } else {
-        throw error;
+      try {
+        // runVerification wipes `documents` in its own finally block.
+        outcome = await runVerification(input);
+      } catch (error) {
+        if (error instanceof PipelineUnavailableError) {
+          // Our outage must never read as the user's fraud. Park it for a human.
+          outcome = await escalateOnFailure(input);
+        } else {
+          throw error;
+        }
       }
+    } catch (error) {
+      /**
+       * Neither a verdict nor a parked review was committed (e.g. the review
+       * buffer upload to Cloudinary failed). Undo the PROCESSING flag set above
+       * so the account is not stuck in a state nothing will ever clear, and
+       * close the case like a RETAKE - decidedAt stays null, so our failure
+       * does not burn one of the user's attempts.
+       */
+      console.error('[verification] submission %s failed', kase.id, error);
+      await Promise.allSettled([
+        updateCase(kase.id, {
+          status: VerificationStatus.REJECTED,
+          failureCodes: ['SUBMISSION_FAILED'],
+          publicMessageKey: 'errors.generic',
+        }),
+        updateUser(userId, { verificationStatus: VerificationStatus.UNVERIFIED }),
+      ]);
+      return NextResponse.json({ error: 'errors.generic' }, { status: 503 });
     }
 
     /**
@@ -211,9 +271,6 @@ export async function POST(request: NextRequest) {
         attempt: kase.attempt,
         remainingAttempts: Math.max(0, MAX_ATTEMPTS - (priorAttempts + 1)),
         messageKey: outcome.messageKey,
-        // Present only for NEEDS_REVIEW. Handed to the moderator queue, never
-        // to the user - it is the decryption key for the review buffer.
-        reviewSecret: undefined,
       },
       { status: 200 },
     );

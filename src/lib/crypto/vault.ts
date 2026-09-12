@@ -1,94 +1,84 @@
-import {
-  KMSClient,
-  GenerateDataKeyCommand,
-  DecryptCommand,
-} from '@aws-sdk/client-kms';
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-
-const kms = new KMSClient({ region: process.env.S3_REGION });
-
-const ALGO = 'aes-256-gcm';
-const IV_BYTES = 12;
-
-export type Envelope = {
-  /** Base64 ciphertext: iv || authTag || payload */
-  ciphertext: string;
-  /** Base64 KMS-wrapped data key. Useless without KMS decrypt permission. */
-  wrappedDek: string;
-};
+import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 
 /**
- * Envelope encryption.
+ * Field-level encryption for short secrets at rest (booking meeting URLs).
  *
- * Every document and every sensitive field gets its own random 256-bit data
- * key. The plaintext data key never touches disk - only the KMS-wrapped
- * version does. Consequences that matter operationally:
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS NO LONGER AWS KMS
+ * ---------------------------------------------------------------------------
+ * This module used to wrap every value with KMS envelope encryption, keyed by
+ * KMS_KEY_ID_DOCS. That key was never provisioned in any environment, so
+ * seal() threw on EVERY booking and no mentor session could ever be booked.
+ * It was also the last AWS dependency in a Firebase-only application.
  *
- *  - Deleting the KMS key cryptographically shreds every document at once,
- *    which is how we honour an erasure request against S3 versions and
- *    backups we cannot practically rewrite.
- *  - KMS decrypt calls are logged in CloudTrail, so every single access to a
- *    national ID image is attributable, with no extra code on our side.
- *  - A stolen database dump is inert.
+ * It is now AES-256-GCM with a key derived (HKDF-SHA256) from a server-only
+ * secret: VAULT_KEY if set, otherwise PII_HASH_PEPPER, which every deployment
+ * already has to hold. Properties kept from the KMS version:
+ *
+ *  - a fresh random IV per value, and GCM authentication, so a tampered or
+ *    truncated ciphertext fails to open instead of decrypting to garbage;
+ *  - the caller's `context` is bound as additional authenticated data, so a
+ *    value sealed for booking A cannot be opened while claiming booking B
+ *    (the same guarantee KMS EncryptionContext gave).
+ *
+ * What is given up is CloudTrail-attributable decrypts and crypto-shredding by
+ * deleting a KMS key. For meeting URLs - which are useless without the
+ * per-session join JWT anyway - that trade is proportionate.
+ *
+ * Format: `v1.<base64(iv || tag || ciphertext)>`.
  */
-export async function seal(plaintext: Buffer, context: Record<string, string>): Promise<Envelope> {
-  const { Plaintext, CiphertextBlob } = await kms.send(
-    new GenerateDataKeyCommand({
-      KeyId: process.env.KMS_KEY_ID_DOCS,
-      KeySpec: 'AES_256',
-      // Bound to the subject: a DEK wrapped for user A cannot be unwrapped
-      // while claiming to be user B, even by someone with KMS access.
-      EncryptionContext: context,
-    }),
-  );
-  if (!Plaintext || !CiphertextBlob) throw new Error('KMS did not return a data key');
+const ALGO = 'aes-256-gcm';
+const IV_BYTES = 12;
+const TAG_BYTES = 16;
+const VERSION = 'v1';
 
-  const dek = Buffer.from(Plaintext);
-  try {
-    const iv = randomBytes(IV_BYTES);
-    const cipher = createCipheriv(ALGO, dek, iv);
-    const body = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-    const tag = cipher.getAuthTag();
-    return {
-      ciphertext: Buffer.concat([iv, tag, body]).toString('base64'),
-      wrappedDek: Buffer.from(CiphertextBlob).toString('base64'),
-    };
-  } finally {
-    dek.fill(0); // do not leave key material for the GC to hand out later
+let cachedKey: Buffer | null = null;
+
+function key(): Buffer {
+  if (cachedKey) return cachedKey;
+  const secret = process.env.VAULT_KEY || process.env.PII_HASH_PEPPER;
+  if (!secret) {
+    throw new Error('Vault is not configured: set VAULT_KEY (or PII_HASH_PEPPER).');
   }
+  cachedKey = Buffer.from(hkdfSync('sha256', secret, 'campushub-vault', 'field-encryption:v1', 32));
+  return cachedKey;
 }
 
-export async function open(envelope: Envelope, context: Record<string, string>): Promise<Buffer> {
-  const { Plaintext } = await kms.send(
-    new DecryptCommand({
-      CiphertextBlob: Buffer.from(envelope.wrappedDek, 'base64'),
-      EncryptionContext: context,
-    }),
-  );
-  if (!Plaintext) throw new Error('KMS refused to unwrap the data key');
-
-  const dek = Buffer.from(Plaintext);
-  try {
-    const raw = Buffer.from(envelope.ciphertext, 'base64');
-    const iv = raw.subarray(0, IV_BYTES);
-    const tag = raw.subarray(IV_BYTES, IV_BYTES + 16);
-    const body = raw.subarray(IV_BYTES + 16);
-    const decipher = createDecipheriv(ALGO, dek, iv);
-    decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(body), decipher.final()]);
-  } finally {
-    dek.fill(0);
-  }
+/** Canonical, order-independent encoding of the context, used as GCM AAD. */
+function aad(context: Record<string, string>): Buffer {
+  const entries = Object.entries(context).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return Buffer.from(JSON.stringify(entries), 'utf8');
 }
 
-/** Convenience wrappers for short JSON fields (OCR payloads, meeting URLs). */
-export async function sealJson(value: unknown, context: Record<string, string>) {
-  const env = await seal(Buffer.from(JSON.stringify(value), 'utf8'), context);
-  return `${env.wrappedDek}.${env.ciphertext}`;
+export function seal(plaintext: Buffer, context: Record<string, string>): string {
+  const iv = randomBytes(IV_BYTES);
+  const cipher = createCipheriv(ALGO, key(), iv);
+  cipher.setAAD(aad(context));
+  const body = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${VERSION}.${Buffer.concat([iv, tag, body]).toString('base64')}`;
+}
+
+export function open(packed: string, context: Record<string, string>): Buffer {
+  const [version, payload] = packed.split('.', 2);
+  if (version !== VERSION || !payload) throw new Error('Unsupported sealed value');
+
+  const raw = Buffer.from(payload, 'base64');
+  const iv = raw.subarray(0, IV_BYTES);
+  const tag = raw.subarray(IV_BYTES, IV_BYTES + TAG_BYTES);
+  const body = raw.subarray(IV_BYTES + TAG_BYTES);
+
+  const decipher = createDecipheriv(ALGO, key(), iv);
+  decipher.setAAD(aad(context));
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(body), decipher.final()]);
+}
+
+/** Convenience wrappers for short JSON fields. Async for call-site compatibility. */
+export async function sealJson(value: unknown, context: Record<string, string>): Promise<string> {
+  return seal(Buffer.from(JSON.stringify(value), 'utf8'), context);
 }
 
 export async function openJson<T>(packed: string, context: Record<string, string>): Promise<T> {
-  const [wrappedDek, ciphertext] = packed.split('.', 2);
-  const buf = await open({ wrappedDek, ciphertext }, context);
-  return JSON.parse(buf.toString('utf8')) as T;
+  return JSON.parse(open(packed, context).toString('utf8')) as T;
 }

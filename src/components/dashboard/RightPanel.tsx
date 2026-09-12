@@ -85,7 +85,7 @@ export function GraduationCountdown({
           {t('dashboard.graduation.body', { month: monthLabel, year })}
         </p>
         <Link
-          href="/settings/profile"
+          href="/settings"
           className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-accent
  transition hover:text-accent"
         >
@@ -138,7 +138,9 @@ export function TrendingNotes({ notes }: { notes: TrendingNote[] }) {
         {notes.map((note, index) => (
           <li key={note.id}>
             <Link
-              href={`/notes/${note.id}`}
+              // There is no per-note page; the listing is where a note is
+              // previewed and bought.
+              href="/notes"
               className="group flex gap-3 rounded-lg p-2 transition hover:bg-surface-muted"
             >
               <span

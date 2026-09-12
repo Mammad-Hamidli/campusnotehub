@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { listAuditLogs } from '@/lib/firebase/repositories/audit';
+import { findUsersByIds } from '@/lib/firebase/repositories/users';
 import { withAdmin } from '@/lib/auth/admin';
 import { adminAuditListSchema } from '@/server/validators/admin';
 import { auditWhere } from '@/lib/admin/auditQuery';
@@ -11,11 +12,12 @@ export const dynamic = 'force-dynamic';
  * GET /api/admin/audit-logs - read-only, deliberately.
  *
  * There is no POST, PATCH or DELETE in this file and there must never be one.
- * The `campushub_app` role holds only INSERT and SELECT on audit_logs
- * (0001_invariants.sql revokes UPDATE and DELETE), so an edit endpoint would
- * fail at the database anyway - but the absence here is what makes the
- * guarantee legible to a reader, and stops someone "fixing" the permission
- * error by granting the missing privilege.
+ * Under Postgres the `campushub_app` role held only INSERT and SELECT on
+ * audit_logs, so an edit endpoint would have failed at the database. Firestore
+ * has no per-collection role grants for a service account - the Admin SDK
+ * bypasses every rule - so that backstop is GONE, and the absence of a writer
+ * here is now the whole of the guarantee rather than a legible restatement of
+ * one. See the header of the audit repository for what else is available.
  *
  * ---------------------------------------------------------------------------
  * ON IP ADDRESSES - THIS CHANGED, READ THE DISTINCTION
@@ -64,37 +66,55 @@ export async function GET(request: NextRequest) {
     const input = parsed.data;
     const where = auditWhere(input);
 
-    const [total, rows] = await db.$transaction([
-      db.auditLog.count({ where }),
-      db.auditLog.findMany({
-        where,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        skip: (input.page - 1) * input.pageSize,
-        take: input.pageSize,
-        select: {
-          id: true,
-          action: true,
-          entityType: true,
-          entityId: true,
-          before: true,
-          after: true,
-          userAgent: true,
-          ip: true,
-          result: true,
-          createdAt: true,
-          actor: { select: { id: true, nickname: true, role: true } },
-        },
-      }),
-    ]);
+    /**
+     * ONE read, then page in memory - not a count plus an offset query.
+     *
+     * The SQL version paired `count()` with `skip`/`take` inside a transaction
+     * so the total and the page agreed. Firestore has neither `skip` nor a
+     * count that respects the in-memory half of this filter, and a separate
+     * count() aggregation would disagree with the page whenever the free-text
+     * match narrowed it.
+     *
+     * So the filtered set is materialised once under the repository's scan
+     * ceiling and sliced here. The total is therefore the total of what
+     * matched, which is what the pager needs, and `truncated` says when the
+     * ceiling was reached so a partial view is never read as a complete one.
+     */
+    const { rows: matched, truncated } = await listAuditLogs(where, 5000);
+
+    const total = matched.length;
+    const rows = matched.slice((input.page - 1) * input.pageSize, input.page * input.pageSize);
+
+    // The actor decoration Prisma did with a join, as one batched read over
+    // the page only - never over the whole filtered set.
+    const actors = await findUsersByIds(
+      rows.map((r) => r.actorId).filter((id): id is string => Boolean(id)),
+    );
 
     return NextResponse.json(
       {
-        logs: rows,
+        logs: rows.map((r) => {
+          const actor = r.actorId ? actors.get(r.actorId) : null;
+          return {
+            id: r.id,
+            action: r.action,
+            entityType: r.entityType,
+            entityId: r.entityId,
+            before: r.before,
+            after: r.after,
+            userAgent: r.userAgent,
+            ip: r.ip,
+            result: r.result,
+            createdAt: r.createdAt,
+            actor: actor ? { id: actor.id, nickname: actor.nickname, role: actor.role } : null,
+          };
+        }),
         page: {
           page: input.page,
           pageSize: input.pageSize,
           total,
           pageCount: Math.max(1, Math.ceil(total / input.pageSize)),
+          truncated,
         },
       },
       { headers: { 'Cache-Control': 'no-store' } },

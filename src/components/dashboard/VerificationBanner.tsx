@@ -11,10 +11,10 @@ const CONFIG = {
   UNVERIFIED: {
     key: 'verification.banner.unverified',
     ctaKey: 'verification.banner.unverifiedCta',
-    href: '/register',
+    href: '/verify',
     icon: ShieldAlert,
     wrap: 'border-warn/40 bg-warn-soft text-warn-fg',
-    iconTone: 'text-amber-600',
+    iconTone: 'text-warn',
     cta: 'bg-warn hover:opacity-90',
   },
   PENDING: {
@@ -40,7 +40,7 @@ const CONFIG = {
   REJECTED: {
     key: 'verification.banner.rejected',
     ctaKey: 'verification.banner.rejectedCta',
-    href: '/register',
+    href: '/verify',
     icon: AlertTriangle,
     wrap: 'border-danger/40 bg-danger-soft text-danger-fg',
     iconTone: 'text-danger',

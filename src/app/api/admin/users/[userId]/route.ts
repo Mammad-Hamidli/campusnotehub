@@ -1,6 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { AccountStatus, BlocklistType, UserRole, VerificationStatus } from '@prisma/client';
-import { db } from '@/lib/db';
+import { AccountStatus, BlocklistType, UserRole, VerificationStatus } from '@/lib/enums';
+import { adminDb } from '@/lib/firebase/admin';
+import { COLLECTIONS } from '@/lib/firebase/collections';
+import { countUsers, findUserById, findUsersByIds, updateUser } from '@/lib/firebase/repositories/users';
+import { findUniversityById, findFacultyById } from '@/lib/firebase/repositories/reference';
+import {
+  listUserDevices,
+  listUserSessions,
+  revokeUserSessions,
+} from '@/lib/firebase/repositories/sessions';
+import { listCases } from '@/lib/firebase/repositories/verification';
+import { listAuditLogs } from '@/lib/firebase/repositories/audit';
+import { moderationHistory } from '@/lib/firebase/repositories/moderation';
+import { enqueueNotification } from '@/lib/notifications/dispatch';
 import { withAdmin, adminAudit } from '@/lib/auth/admin';
 import {
   adminDeleteUserSchema,
@@ -11,6 +23,7 @@ import {
   PRIVILEGED_ROLES,
 } from '@/server/validators/admin';
 import { freezeAccount, freezeState, unfreezeAccount } from '@/lib/auth/freeze';
+import { writeModerationAction } from '@/lib/firebase/repositories/moderation';
 import { sendEmailAsync } from '@/lib/email/send';
 import { hashEmail, hashPhone } from '@/lib/crypto/hash';
 import { shortFingerprint } from '@/lib/admin/redact';
@@ -38,82 +51,29 @@ export async function GET(
   return withAdmin(request, 'MODERATOR', async (actor) => {
     const { userId } = await params;
 
-    const user = await db.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        fullName: true,
-        nickname: true,
-        email: true,
-        phone: true,
-        avatarUrl: true,
-        headline: true,
-        bio: true,
-        locale: true,
-        timezone: true,
-        role: true,
-        accountStatus: true,
-        frozenUntil: true,
-        frozenReason: true,
-        frozenAt: true,
-        frozenBy: { select: { id: true, nickname: true } },
-        facultySlug: true,
-        facultyOther: true,
-        verificationStatus: true,
-        isVerified: true,
-        verifiedAt: true,
-        studentStatusConfirmed: true,
-        identityConfirmed: true,
-        graduationYear: true,
-        graduationMonth: true,
-        alumniTransitionedAt: true,
-        emailVerifiedAt: true,
-        lastLoginAt: true,
-        failedLoginCount: true,
-        lockedUntil: true,
-        createdAt: true,
-        updatedAt: true,
-        deletedAt: true,
-        university: { select: { id: true, code: true, nameEn: true, city: true } },
-        faculty: { select: { id: true, nameEn: true } },
-        verificationCases: {
-          orderBy: { submittedAt: 'desc' },
-          select: {
-            id: true,
-            status: true,
-            attempt: true,
-            submittedAt: true,
-            decidedAt: true,
-            verdict: true,
-            confidence: true,
-            failureCodes: true,
-            checkScores: true,
-            reviewPriority: true,
-            reviewExpiresAt: true,
-            moderatorNote: true,
-            // The buffer KEY is deliberately absent: it is half of the pair
-            // that decrypts pending ID documents, and this endpoint has no
-            // business handing it out. Reviewing goes through the existing
-            // /api/admin/verification/:caseId route.
-            decidedByModerator: { select: { id: true, nickname: true, fullName: true } },
-          },
-        },
-        devices: {
-          orderBy: { lastSeenAt: 'desc' },
-          select: { id: true, fingerprint: true, label: true, trusted: true, firstSeenAt: true, lastSeenAt: true },
-        },
-        sessions: {
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-          // refreshTokenHash is NOT selected. It is the credential itself.
-          select: { id: true, userAgent: true, createdAt: true, lastSeenAt: true, expiresAt: true, revokedAt: true },
-        },
-      },
-    });
+    const user = await findUserById(userId);
 
     if (!user) {
       return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
     }
+
+    /**
+     * The five `include` branches Prisma resolved in one query, as five reads.
+     *
+     * Concurrent, because none depends on another. This endpoint is the admin
+     * detail modal for ONE named account - it is opened deliberately, it is
+     * audited, and it is not on any hot path - so paying several round trips
+     * for the fan-out is the right trade against denormalising this much
+     * relational detail onto the user document.
+     */
+    const [university, faculty, devices, sessions, cases, frozenBy] = await Promise.all([
+      user.universityId ? findUniversityById(user.universityId) : Promise.resolve(null),
+      user.facultyId ? findFacultyById(user.facultyId) : Promise.resolve(null),
+      listUserDevices(userId),
+      listUserSessions(userId, 20),
+      listCases({ userId, includeDismissed: true }, 1, 50, 'submittedAt', 'desc'),
+      user.frozenById ? findUserById(user.frozenById) : Promise.resolve(null),
+    ]);
 
     /**
      * Blocklist status, as booleans.
@@ -123,49 +83,76 @@ export async function GET(
      * That is done here rather than returning rows, because a row would expose
      * the hash - and a hash of a known-plaintext email is a lookup key for
      * every other blocklist entry.
+     *
+     * The SQL was one query with an `OR` over the candidates. Firestore has no
+     * cross-value OR, but it does not need one: `type` + `value` was a UNIQUE
+     * pair and is now the document id, so this is a batched read by key -
+     * strictly cheaper than the OR it replaces.
      */
     const blockCandidates = [
       { type: BlocklistType.USER_ID, value: user.id },
       { type: BlocklistType.EMAIL_HASH, value: hashEmail(user.email) },
       ...(user.phone ? [{ type: BlocklistType.PHONE_HASH, value: hashPhone(user.phone) }] : []),
-      ...user.devices.map((d) => ({ type: BlocklistType.DEVICE_FINGERPRINT, value: d.fingerprint })),
+      ...devices.map((d) => ({ type: BlocklistType.DEVICE_FINGERPRINT, value: d.fingerprint })),
     ];
-    const blocks = await db.blocklist.findMany({
-      where: {
-        OR: blockCandidates,
-        AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
-      },
-      select: { type: true, reason: true, expiresAt: true, createdAt: true, hitCount: true },
-    });
 
-    const [auditEvents, moderationNotes] = await Promise.all([
-      db.auditLog.findMany({
-        where: { OR: [{ entityType: 'user', entityId: user.id }, { actorId: user.id }] },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-        select: {
-          id: true,
-          action: true,
-          entityType: true,
-          entityId: true,
-          createdAt: true,
-          userAgent: true,
-          actor: { select: { id: true, nickname: true } },
-        },
-      }),
-      db.moderationAction.findMany({
-        where: { targetType: 'user', targetId: user.id },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-        select: {
-          id: true,
-          action: true,
-          reason: true,
-          createdAt: true,
-          moderator: { select: { id: true, nickname: true } },
-        },
-      }),
+    const blockSnaps = await adminDb().getAll(
+      ...blockCandidates.map((candidate) =>
+        adminDb()
+          .collection(COLLECTIONS.blocklist)
+          .doc(
+            `${candidate.type}__${Buffer.from(candidate.value).toString('base64url')}`.replace(
+              /\//g,
+              '_',
+            ),
+          ),
+      ),
+    );
+
+    const now = new Date();
+    const blocks = blockSnaps
+      .filter((snap) => snap.exists)
+      .map((snap) => snap.data() as Record<string, unknown>)
+      .filter((row) => {
+        // A null expiry means permanent. Evaluated here rather than in a
+        // query, because Firestore cannot express "null OR greater than now".
+        const expiresAt = row.expiresAt as { toDate(): Date } | Date | null | undefined;
+        if (!expiresAt) return true;
+        return (expiresAt instanceof Date ? expiresAt : expiresAt.toDate()) > now;
+      })
+      .map((row) => ({
+        type: row.type,
+        reason: row.reason,
+        expiresAt: row.expiresAt,
+        createdAt: row.createdAt,
+        hitCount: row.hitCount,
+      }));
+
+    /**
+     * The audit trail was `WHERE (entityType='user' AND entityId=:id) OR
+     * actorId=:id` - a cross-field OR, which Firestore cannot serve. It runs
+     * as two queries whose results are merged and re-sorted, which is exactly
+     * what the database would have done internally.
+     */
+    const [aboutUser, byUser, moderationNotes] = await Promise.all([
+      listAuditLogs({ entityType: 'user', entityId: user.id }, 50),
+      listAuditLogs({ actorId: user.id }, 50),
+      moderationHistory('user', user.id, 50),
     ]);
+
+    const auditEvents = [...aboutUser.rows, ...byUser.rows]
+      // The two queries overlap whenever an operator acted on their own row.
+      .filter((row, index, all) => all.findIndex((other) => other.id === row.id) === index)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 50);
+
+    const actorIds = [
+      ...new Set([
+        ...auditEvents.map((e) => e.actorId),
+        ...moderationNotes.map((m) => m.moderatorId),
+      ]),
+    ].filter((id): id is string => Boolean(id));
+    const actors = await findUsersByIds(actorIds);
 
     // Written before the response: an audit row that only appears on success
     // is not an audit row.
@@ -181,9 +168,55 @@ export async function GET(
       {
         user: {
           ...user,
-          devices: user.devices.map((d) => ({
-            ...d,
+          // Credentials are not in the user document at all - the argon2id
+          // hash and the PII HMACs live in a separate `credentials`
+          // collection that findUserById() never reads. See the header of the
+          // users repository for why that split exists.
+          university: university
+            ? {
+                id: university.id,
+                code: university.code,
+                nameEn: university.nameEn,
+                city: university.city,
+              }
+            : null,
+          faculty: faculty ? { id: faculty.id, nameEn: faculty.nameEn } : null,
+          frozenBy: frozenBy ? { id: frozenBy.id, nickname: frozenBy.nickname } : null,
+          verificationCases: cases.cases.map((c) => ({
+            id: c.id,
+            status: c.status,
+            attempt: c.attempt,
+            submittedAt: c.submittedAt,
+            decidedAt: c.decidedAt,
+            verdict: c.verdict,
+            confidence: c.confidence,
+            failureCodes: c.failureCodes,
+            checkScores: c.checkScores,
+            reviewPriority: c.reviewPriority,
+            reviewExpiresAt: c.reviewExpiresAt,
+            moderatorNote: c.moderatorNote,
+            // The buffer KEY is deliberately absent: it is half of the pair
+            // that decrypts pending ID documents, and this endpoint has no
+            // business handing it out. Reviewing goes through the existing
+            // /api/admin/verification/:caseId route.
+            decidedByModeratorId: c.decidedByModeratorId,
+          })),
+          devices: devices.map((d) => ({
+            id: d.id,
+            label: d.label,
+            trusted: d.trusted,
+            firstSeenAt: d.firstSeenAt,
+            lastSeenAt: d.lastSeenAt,
             fingerprint: shortFingerprint(d.fingerprint),
+          })),
+          sessions: sessions.map((session) => ({
+            id: session.id,
+            userAgent: session.userAgent,
+            createdAt: session.createdAt,
+            lastSeenAt: session.lastSeenAt,
+            expiresAt: session.expiresAt,
+            revokedAt: session.revokedAt,
+            // refreshTokenHash is NOT included. It is the credential itself.
           })),
           /**
            * One shared serialiser for the freeze, so this modal, the users
@@ -194,8 +227,30 @@ export async function GET(
           freeze: freezeState(user),
         },
         blocks,
-        auditEvents,
-        moderationNotes,
+        auditEvents: auditEvents.map((e) => ({
+          id: e.id,
+          action: e.action,
+          entityType: e.entityType,
+          entityId: e.entityId,
+          createdAt: e.createdAt,
+          userAgent: e.userAgent,
+          actor: e.actorId
+            ? (() => {
+                const found = actors.get(e.actorId);
+                return found ? { id: found.id, nickname: found.nickname } : null;
+              })()
+            : null,
+        })),
+        moderationNotes: moderationNotes.map((m) => {
+          const moderator = actors.get(m.moderatorId);
+          return {
+            id: m.id,
+            action: m.action,
+            reason: m.reason,
+            createdAt: m.createdAt,
+            moderator: moderator ? { id: moderator.id, nickname: moderator.nickname } : null,
+          };
+        }),
         capabilities: { canManage: actor.isAdmin },
       },
       { headers: { 'Cache-Control': 'no-store' } },
@@ -221,19 +276,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'errors.validationFailed' }, { status: 400 });
     }
 
-    const target = await db.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        nickname: true,
-        email: true,
-        role: true,
-        accountStatus: true,
-        verificationStatus: true,
-        frozenUntil: true,
-        deletedAt: true,
-      },
-    });
+    const target = await findUserById(userId);
     if (!target || target.deletedAt) {
       return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
     }
@@ -269,37 +312,40 @@ export async function PATCH(
 
       const until = parsed.data.until ?? null;
 
-      await db.$transaction(async (tx) => {
-        await freezeAccount({
-          tx,
-          userId,
-          actorId: actor.id,
+      /**
+       * Sequential, not transactional - Firestore cannot span a transaction
+       * across these repositories (see the note in src/lib/auth/freeze.ts).
+       *
+       * The freeze itself is applied FIRST, so an interruption leaves the
+       * account restricted with its paper trail incomplete, rather than a
+       * complete paper trail describing a freeze that never took effect. Of
+       * the two failure modes, only the second one lets someone keep posting.
+       */
+      await freezeAccount({
+        userId,
+        actorId: actor.id,
+        reason: parsed.data.reason,
+        until,
+      });
+      await writeModerationAction({
+        moderatorId: actor.id,
+        targetType: 'user',
+        targetId: userId,
+        action: 'freeze',
+        reason: parsed.data.reason,
+      });
+      await adminAudit({
+        actorId: actor.id,
+        action: 'ADMIN_USER_FROZEN',
+        entityType: 'user',
+        entityId: userId,
+        before: { accountStatus: target.accountStatus },
+        after: {
+          accountStatus: AccountStatus.SUSPENDED,
+          frozenUntil: until ? until.toISOString() : null,
           reason: parsed.data.reason,
-          until,
-        });
-        await tx.moderationAction.create({
-          data: {
-            moderatorId: actor.id,
-            targetType: 'user',
-            targetId: userId,
-            action: 'freeze',
-            reason: parsed.data.reason,
-          },
-        });
-        await adminAudit({
-          tx,
-          actorId: actor.id,
-          action: 'ADMIN_USER_FROZEN',
-          entityType: 'user',
-          entityId: userId,
-          before: { accountStatus: target.accountStatus },
-          after: {
-            accountStatus: AccountStatus.SUSPENDED,
-            frozenUntil: until ? until.toISOString() : null,
-            reason: parsed.data.reason,
-          },
-          request,
-        });
+        },
+        request,
       });
 
       // After the commit, never inside it: mail must not be sent for a change
@@ -324,21 +370,23 @@ export async function PATCH(
 
     /** op = 'unfreeze' - lift a freeze early. */
     if (op === 'unfreeze') {
-      const lifted = await db.$transaction(async (tx) => {
-        const ok = await unfreezeAccount({ tx, userId });
-        if (!ok) return false;
+      /**
+       * unfreezeAccount() returns false when there is nothing to lift, and
+       * that check happens BEFORE anything is written - so the early return
+       * below cannot leave a half-written trail. The two records that follow
+       * only run once the state change is known to have applied.
+       */
+      const lifted = await unfreezeAccount({ userId });
 
-        await tx.moderationAction.create({
-          data: {
-            moderatorId: actor.id,
-            targetType: 'user',
-            targetId: userId,
-            action: 'unfreeze',
-            reason: 'Freeze lifted by administrator',
-          },
+      if (lifted) {
+        await writeModerationAction({
+          moderatorId: actor.id,
+          targetType: 'user',
+          targetId: userId,
+          action: 'unfreeze',
+          reason: 'Freeze lifted by administrator',
         });
         await adminAudit({
-          tx,
           actorId: actor.id,
           action: 'ADMIN_USER_UNFROZEN',
           entityType: 'user',
@@ -350,8 +398,7 @@ export async function PATCH(
           after: { accountStatus: AccountStatus.ACTIVE },
           request,
         });
-        return true;
-      });
+      }
 
       if (!lifted) {
         // Nothing to lift: the account is banned, deleted, or already active.
@@ -394,40 +441,59 @@ export async function PATCH(
 
       const { accountStatus, reason } = parsed.data;
 
-      await db.$transaction(async (tx) => {
-        await tx.user.update({ where: { id: userId }, data: { accountStatus } });
+      /**
+       * THE ACT FIRST, THEN THE RECORD - and no longer one transaction.
+       *
+       * These four writes shared a Postgres transaction. They cannot share a
+       * Firestore one: revokeUserSessions() touches an unbounded number of
+       * session documents and chunks its own batches to stay under the
+       * 500-write ceiling.
+       *
+       * So the order carries the safety instead. The status change and the
+       * revocation are the act; the moderation entry and the audit row are the
+       * record of it. A failure part-way leaves an enacted change that is
+       * under-documented, which is recoverable and visible in the account
+       * state. The reverse order would leave a record of a suspension that
+       * never took effect - a lie in the audit log.
+       */
+      await updateUser(userId, { accountStatus });
 
-        // A suspension that leaves live sessions running is decorative: the
-        // access token is valid for up to 15 more minutes and requireSession
-        // only rejects BANNED/DELETED, so a SUSPENDED user would keep browsing.
-        if (accountStatus !== AccountStatus.ACTIVE) {
-          await tx.session.updateMany({
-            where: { userId, revokedAt: null },
-            data: { revokedAt: new Date() },
-          });
-        }
+      // A suspension that leaves live sessions running is decorative: the
+      // access token is valid for up to 15 more minutes and requireSession
+      // only rejects BANNED/DELETED, so a SUSPENDED user would keep browsing.
+      if (accountStatus !== AccountStatus.ACTIVE) {
+        await revokeUserSessions(userId);
+      }
 
-        await tx.moderationAction.create({
-          data: {
-            moderatorId: actor.id,
-            targetType: 'user',
-            targetId: userId,
-            action: `status:${accountStatus.toLowerCase()}`,
-            reason,
-          },
-        });
-
-        await adminAudit({
-          tx,
-          actorId: actor.id,
-          action: 'ADMIN_USER_STATUS_CHANGED',
-          entityType: 'user',
-          entityId: userId,
-          before: { accountStatus: target.accountStatus },
-          after: { accountStatus, reason },
-          request,
-        });
+      await writeModerationAction({
+        moderatorId: actor.id,
+        targetType: 'user',
+        targetId: userId,
+        action: `status:${accountStatus.toLowerCase()}`,
+        reason,
       });
+
+      await adminAudit({
+        actorId: actor.id,
+        action: 'ADMIN_USER_STATUS_CHANGED',
+        entityType: 'user',
+        entityId: userId,
+        before: { accountStatus: target.accountStatus },
+        after: { accountStatus, reason },
+        request,
+      });
+
+      if (accountStatus === AccountStatus.ACTIVE) {
+        sendEmailAsync(target.email, 'accountReactivated', { nickname: target.nickname });
+      } else {
+        // RESTRICTED or SUSPENDED - the only other values this schema allows.
+        // Bans go through the verification decision and email from there.
+        sendEmailAsync(target.email, 'accountSuspended', {
+          nickname: target.nickname,
+          level: accountStatus === AccountStatus.RESTRICTED ? 'restricted' : 'suspended',
+          reason,
+        });
+      }
 
       return NextResponse.json({ ok: true, accountStatus });
     }
@@ -470,61 +536,49 @@ export async function PATCH(
 
       const now = new Date();
 
-      await db.$transaction(async (tx) => {
-        await tx.user.update({
-          where: { id: userId },
-          data: {
-            verificationStatus,
-            isVerified: approving,
-            verifiedAt: approving ? now : null,
-            // These two are claims about DOCUMENTS the pipeline confirmed.
-            // Withdrawing verification must withdraw them too, or a rejected
-            // account keeps asserting its ID was checked.
-            studentStatusConfirmed: approving,
-            identityConfirmed: approving,
-            ...(role ? { role } : {}),
-          },
-        });
+      // The act, then the record - see the note in the status branch above.
+      await updateUser(userId, {
+        verificationStatus,
+        isVerified: approving,
+        verifiedAt: approving ? now : null,
+        // These two are claims about DOCUMENTS the pipeline confirmed.
+        // Withdrawing verification must withdraw them too, or a rejected
+        // account keeps asserting its ID was checked.
+        studentStatusConfirmed: approving,
+        identityConfirmed: approving,
+        ...(role ? { role } : {}),
+      });
 
-        if (role && PRIVILEGED_ROLES.has(role) !== PRIVILEGED_ROLES.has(target.role)) {
-          await tx.session.updateMany({
-            where: { userId, revokedAt: null },
-            data: { revokedAt: now },
-          });
-        }
+      if (role && PRIVILEGED_ROLES.has(role) !== PRIVILEGED_ROLES.has(target.role)) {
+        await revokeUserSessions(userId);
+      }
 
-        await tx.moderationAction.create({
-          data: {
-            moderatorId: actor.id,
-            targetType: 'user',
-            targetId: userId,
-            action: `verification:${verificationStatus.toLowerCase()}`,
-            reason,
-          },
-        });
+      await writeModerationAction({
+        moderatorId: actor.id,
+        targetType: 'user',
+        targetId: userId,
+        action: `verification:${verificationStatus.toLowerCase()}`,
+        reason,
+      });
 
-        await tx.notification.create({
-          data: {
-            userId,
-            type: approving ? 'VERIFICATION_APPROVED' : 'VERIFICATION_REJECTED',
-            titleKey: approving
-              ? 'notifications.types.VERIFICATION_APPROVED'
-              : 'notifications.types.VERIFICATION_REJECTED',
-            bodyKey: approving ? 'verification.badge.verified' : 'verification.banner.rejected',
-            linkUrl: approving ? '/dashboard' : '/verify',
-          },
-        });
+      await enqueueNotification({ skipEmail: true,
+        userId,
+        type: approving ? 'VERIFICATION_APPROVED' : 'VERIFICATION_REJECTED',
+        titleKey: approving
+          ? 'notifications.types.VERIFICATION_APPROVED'
+          : 'notifications.types.VERIFICATION_REJECTED',
+        bodyKey: approving ? 'verification.badge.verified' : 'verification.banner.rejected',
+        linkUrl: approving ? '/dashboard' : '/verify',
+      });
 
-        await adminAudit({
-          tx,
-          actorId: actor.id,
-          action: approving ? 'ADMIN_USER_VERIFIED' : 'ADMIN_USER_VERIFICATION_REJECTED',
-          entityType: 'user',
-          entityId: userId,
-          before: { verificationStatus: target.verificationStatus, role: target.role },
-          after: { verificationStatus, role: role ?? target.role, reason },
-          request,
-        });
+      await adminAudit({
+        actorId: actor.id,
+        action: approving ? 'ADMIN_USER_VERIFIED' : 'ADMIN_USER_VERIFICATION_REJECTED',
+        entityType: 'user',
+        entityId: userId,
+        before: { verificationStatus: target.verificationStatus, role: target.role },
+        after: { verificationStatus, role: role ?? target.role, reason },
+        request,
       });
 
       // `reason` is the operator's internal note and is deliberately NOT
@@ -569,10 +623,15 @@ export async function PATCH(
       // Removing the last ADMIN has the same effect as self-demotion, just
       // with an extra step, so it is refused for the same reason.
       if (target.role === UserRole.ADMIN && role !== UserRole.ADMIN) {
-        const remaining = await db.user.count({
-          where: { role: UserRole.ADMIN, deletedAt: null, id: { not: userId } },
-        });
-        if (remaining === 0) {
+        /**
+         * `id != userId` was part of the SQL predicate; Firestore permits only
+         * one inequality per query and `deletedAt == null` already uses the
+         * equality slot, so the target is excluded by subtracting it here.
+         * Same answer, one fewer index.
+         */
+        const admins = await countUsers({ role: UserRole.ADMIN, deletedAt: null });
+        const remaining = admins - (target.role === UserRole.ADMIN ? 1 : 0);
+        if (remaining <= 0) {
           return NextResponse.json({ error: 'admin.users.errors.lastAdmin' }, { status: 409 });
         }
       }
@@ -592,53 +651,43 @@ export async function PATCH(
       const crossesStaffBoundary =
         PRIVILEGED_ROLES.has(role) !== PRIVILEGED_ROLES.has(target.role);
 
-      await db.$transaction(async (tx) => {
-        await tx.user.update({ where: { id: userId }, data: { role } });
+      // The act, then the record - see the note in the status branch above.
+      await updateUser(userId, { role });
 
-        if (crossesStaffBoundary) {
-          await tx.session.updateMany({
-            where: { userId, revokedAt: null },
-            data: { revokedAt: new Date() },
-          });
-        }
+      if (crossesStaffBoundary) {
+        await revokeUserSessions(userId);
+      }
 
-        await tx.moderationAction.create({
-          data: {
-            moderatorId: actor.id,
-            targetType: 'user',
-            targetId: userId,
-            action: `role:${role.toLowerCase()}`,
-            reason,
-          },
-        });
+      await writeModerationAction({
+        moderatorId: actor.id,
+        targetType: 'user',
+        targetId: userId,
+        action: `role:${role.toLowerCase()}`,
+        reason,
+      });
 
-        /**
-         * Tell the account holder. An unexpected role change is a strong
-         * signal that someone else is in their account, and it is exactly the
-         * kind of event a person should never learn about only by noticing new
-         * buttons.
-         */
-        await tx.notification.create({
-          data: {
-            userId,
-            type: 'SYSTEM',
-            titleKey: 'notifications.roleChanged.title',
-            bodyKey: 'notifications.roleChanged.body',
-            params: { role },
-            linkUrl: '/settings',
-          },
-        });
+      /**
+       * Tell the account holder. An unexpected role change is a strong signal
+       * that someone else is in their account, and it is exactly the kind of
+       * event a person should never learn about only by noticing new buttons.
+       */
+      await enqueueNotification({ skipEmail: true,
+        userId,
+        type: 'SYSTEM',
+        titleKey: 'notifications.roleChanged.title',
+        bodyKey: 'notifications.roleChanged.body',
+        params: { role },
+        linkUrl: '/settings',
+      });
 
-        await adminAudit({
-          tx,
-          actorId: actor.id,
-          action: 'ADMIN_USER_ROLE_CHANGED',
-          entityType: 'user',
-          entityId: userId,
-          before: { role: target.role },
-          after: { role, reason, privileged: PRIVILEGED_ROLES.has(role) },
-          request,
-        });
+      await adminAudit({
+        actorId: actor.id,
+        action: 'ADMIN_USER_ROLE_CHANGED',
+        entityType: 'user',
+        entityId: userId,
+        before: { role: target.role },
+        after: { role, reason, privileged: PRIVILEGED_ROLES.has(role) },
+        request,
       });
 
       sendEmailAsync(target.email, 'roleAssigned', { nickname: target.nickname, role });
@@ -654,7 +703,7 @@ export async function PATCH(
  * DELETE /api/admin/users/:userId - soft delete.
  *
  * ---------------------------------------------------------------------------
- * WHY THIS DOES NOT ISSUE A `db.user.delete`
+ * WHY THIS DOES NOT ACTUALLY DELETE THE DOCUMENT
  * ---------------------------------------------------------------------------
  * The schema already answers this. `User.deletedAt` exists, AccountStatus has a
  * DELETED member, and requireSession refuses both - so soft deletion is the
@@ -689,10 +738,7 @@ export async function DELETE(
       );
     }
 
-    const target = await db.user.findUnique({
-      where: { id: userId },
-      select: { id: true, nickname: true, role: true, accountStatus: true, deletedAt: true },
-    });
+    const target = await findUserById(userId);
     if (!target || target.deletedAt) {
       return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
     }
@@ -705,44 +751,37 @@ export async function DELETE(
       return NextResponse.json({ error: 'admin.users.errors.confirmMismatch' }, { status: 400 });
     }
     if (target.role === UserRole.ADMIN) {
-      const remaining = await db.user.count({
-        where: { role: UserRole.ADMIN, deletedAt: null, id: { not: userId } },
-      });
-      if (remaining === 0) {
+      // See the note on the same guard in the role branch above.
+      const admins = await countUsers({ role: UserRole.ADMIN, deletedAt: null });
+      const remaining = admins - 1;
+      if (remaining <= 0) {
         return NextResponse.json({ error: 'admin.users.errors.lastAdmin' }, { status: 409 });
       }
     }
 
     const now = new Date();
 
-    await db.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: userId },
-        data: { deletedAt: now, accountStatus: AccountStatus.DELETED },
-      });
-      await tx.session.updateMany({
-        where: { userId, revokedAt: null },
-        data: { revokedAt: now },
-      });
-      await tx.moderationAction.create({
-        data: {
-          moderatorId: actor.id,
-          targetType: 'user',
-          targetId: userId,
-          action: 'delete',
-          reason: parsed.data.reason,
-        },
-      });
-      await adminAudit({
-        tx,
-        actorId: actor.id,
-        action: 'ADMIN_USER_DELETED',
-        entityType: 'user',
-        entityId: userId,
-        before: { accountStatus: target.accountStatus, deletedAt: null },
-        after: { accountStatus: AccountStatus.DELETED, reason: parsed.data.reason },
-        request,
-      });
+    // The act, then the record - see the note in the status branch above.
+    await updateUser(userId, { deletedAt: now, accountStatus: AccountStatus.DELETED });
+    await revokeUserSessions(userId);
+    sendEmailAsync(target.email, 'accountDeleted', { nickname: target.nickname });
+
+    await writeModerationAction({
+      moderatorId: actor.id,
+      targetType: 'user',
+      targetId: userId,
+      action: 'delete',
+      reason: parsed.data.reason,
+    });
+
+    await adminAudit({
+      actorId: actor.id,
+      action: 'ADMIN_USER_DELETED',
+      entityType: 'user',
+      entityId: userId,
+      before: { accountStatus: target.accountStatus, deletedAt: null },
+      after: { accountStatus: AccountStatus.DELETED, reason: parsed.data.reason },
+      request,
     });
 
     return NextResponse.json({ ok: true, deletedAt: now.toISOString() });

@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createHash } from 'node:crypto';
-import { db } from '@/lib/db';
+import {
+  createMediaAsset,
+  findUnattachedByHash,
+  newMediaId,
+} from '@/lib/firebase/repositories/media';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { can } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
@@ -136,10 +140,7 @@ export async function POST(request: NextRequest) {
      * blob. Scoped to the owner because two users posting the same meme are two
      * separate assets as far as deletion and attribution are concerned.
      */
-    const existing = await db.mediaAsset.findFirst({
-      where: { ownerId: userId, sha256, attachedAt: null },
-      select: { id: true, width: true, height: true },
-    });
+    const existing = await findUnattachedByHash(userId, sha256);
 
     if (existing) {
       return NextResponse.json(
@@ -155,21 +156,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const asset = await db.mediaAsset.create({
-      data: {
-        ownerId: userId,
-        mime,
-        width,
-        height,
-        sizeBytes: bytes.length,
-        sha256,
-        altText,
-        // Copied into a plain Uint8Array: Prisma's Bytes field types against
-        // Uint8Array<ArrayBuffer>, and a Node Buffer may be backed by a
-        // SharedArrayBuffer, which that type deliberately excludes.
-        bytes: new Uint8Array(bytes),
-      },
-      select: { id: true },
+    /**
+     * The id is minted BEFORE the write, because the object path in Storage is
+     * derived from it - the repository needs to know where the bytes go before
+     * it can put them there. Firestore hands out ids client-side without a
+     * round trip, so this costs nothing.
+     */
+    const asset = await createMediaAsset({
+      id: newMediaId(),
+      ownerId: userId,
+      mime,
+      width,
+      height,
+      sizeBytes: bytes.length,
+      sha256,
+      altText: altText ?? null,
+      bytes,
     });
 
     return NextResponse.json(
@@ -183,6 +185,9 @@ export async function POST(request: NextRequest) {
       },
       { status: 201, headers: { 'Cache-Control': 'no-store' } },
     );
+  } catch (error) {
+    console.error('[media] upload failed', error);
+    return NextResponse.json({ error: 'feed.image.errors.uploadFailed' }, { status: 502 });
   } finally {
     // The original upload is not needed once it has been re-encoded. Ordinary
     // user content rather than KYC material, so this is hygiene rather than the

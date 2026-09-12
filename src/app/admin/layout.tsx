@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
-import { db } from '@/lib/db';
+import { findUserById } from '@/lib/firebase/repositories/users';
 import { getAdminViewer } from '@/lib/auth/admin';
 import { AdminShell } from '@/components/admin/AdminShell';
 
@@ -44,10 +44,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // The shell shows who is signed in and at what tier, so an operator can tell
   // why an action is unavailable to them. Nickname is public by design.
-  const account = await db.user.findUnique({
-    where: { id: viewer.id },
-    select: { nickname: true },
-  });
+  const account = await findUserById(viewer.id);
 
   return (
     <AdminShell role={viewer.role} nickname={account?.nickname ?? '—'}>

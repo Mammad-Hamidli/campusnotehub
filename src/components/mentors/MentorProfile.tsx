@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   BadgeCheck,
@@ -11,12 +10,11 @@ import {
   Clock,
   Globe,
   Languages,
-  Loader2,
-  MessageSquare,
   Star,
   UserRoundSearch,
 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { BookingPanel } from './BookingPanel';
 
 /**
  * One mentor's profile.
@@ -93,7 +91,6 @@ function clock(minute: number): string {
 
 export function MentorProfile({ mentorId }: { mentorId: string }) {
   const t = useT();
-  const router = useRouter();
 
   const [mentor, setMentor] = useState<Mentor | null>(null);
   const [canBook, setCanBook] = useState(false);
@@ -102,7 +99,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [messaging, setMessaging] = useState(false);
+  const [booking, setBooking] = useState(false);
 
   const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'az' : 'az';
 
@@ -141,32 +138,6 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
     void load(controller.signal);
     return () => controller.abort();
   }, [load]);
-
-  /**
-   * Opens a conversation with this mentor.
-   *
-   * Reuses the messaging feature rather than a mentor-specific enquiry inbox:
-   * POST /api/messages is idempotent on the pair, so pressing this twice lands
-   * in the same thread instead of creating a second one.
-   */
-  async function message() {
-    if (!mentor || messaging) return;
-    setMessaging(true);
-    try {
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: mentor.user.id }),
-      });
-      if (response.ok) {
-        router.push('/messages');
-        return;
-      }
-      if (response.status === 401) router.push(`/login?next=/mentors/${mentorId}`);
-    } finally {
-      setMessaging(false);
-    }
-  }
 
   if (loading) {
     return (
@@ -294,13 +265,21 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
           ) : (
             <>
               {canBook && mentor.isAcceptingBookings ? (
-                <Link
-                  href={`/bookings?mentor=${mentor.id}`}
+                /*
+                  Opens the booking panel below rather than linking to
+                  /bookings?mentor=<id>, which is a StubPage - so the primary
+                  call to action on this whole feature used to land on "not
+                  built yet".
+                */
+                <button
+                  type="button"
+                  onClick={() => setBooking((v) => !v)}
+                  aria-expanded={booking}
                   className="btn-primary px-4 py-1.5 text-sm"
                 >
                   <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
                   {t('mentors.book')}
-                </Link>
+                </button>
               ) : (
                 <button type="button" disabled className="btn-secondary px-4 py-1.5 text-sm">
                   <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
@@ -308,19 +287,6 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => void message()}
-                disabled={messaging}
-                className="btn-secondary px-4 py-1.5 text-sm"
-              >
-                {messaging ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                ) : (
-                  <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
-                )}
-                {t('mentors.message')}
-              </button>
             </>
           )}
 
@@ -339,6 +305,15 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
           )}
         </div>
       </header>
+
+      {booking && canBook && mentor.isAcceptingBookings && (
+        <BookingPanel
+          mentorId={mentor.id}
+          sessionMinutes={mentor.sessionMinutes}
+          priceMinor={mentor.hourlyRateMinor}
+          onClose={() => setBooking(false)}
+        />
+      )}
 
       <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_18rem]">
         <div className="space-y-3">
@@ -405,7 +380,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
                 {mentor.specialties.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full bg-accent-soft px-2 py-0.5 text-2xs font-medium text-accent"
+                    className="badge-accent"
                   >
                     {tag}
                   </span>

@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { MentorIndustry, Prisma } from '@prisma/client';
+import { MentorIndustry } from '@/lib/enums';
 import { z } from 'zod';
-import { db } from '@/lib/db';
+import { listMentors } from '@/lib/firebase/repositories/mentors';
+import { findUsersByIds } from '@/lib/firebase/repositories/users';
+import { findUniversitiesByIds, findUniversityByCode } from '@/lib/firebase/repositories/reference';
 import { getViewer } from '@/lib/auth/session';
 import { can } from '@/lib/permissions';
 
@@ -32,6 +34,10 @@ const listSchema = z.object({
   sort: z.enum(['rating', 'sessions', 'recent', 'price']).default('rating'),
   limit: z.coerce.number().int().min(1).max(50).default(24),
   cursor: z.coerce.number().int().min(0).default(0),
+  university: z.string().trim().max(20).optional(),
+  minYears: z.coerce.number().min(0).max(60).optional(),
+  maxPrice: z.coerce.number().int().min(0).max(100_000).optional(),
+  accepting: z.enum(['1', 'true']).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -41,90 +47,97 @@ export async function GET(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'errors.validationFailed' }, { status: 400 });
   }
-  const { q, industry, sort, limit, cursor } = parsed.data;
+  const { q, industry, sort, limit, cursor, university, minYears, maxPrice, accepting } = parsed.data;
 
-  const where: Prisma.MentorProfileWhereInput = {
-    isApproved: true,
-    // A mentor who has paused bookings is still worth showing - their profile
-    // is real and they may reopen - so this is NOT filtered here. The card
-    // shows the paused state instead of hiding the person.
-    user: { deletedAt: null, accountStatus: { in: ['ACTIVE', 'RESTRICTED'] } },
-    ...(industry ? { industry } : {}),
-    ...(q
-      ? {
-          OR: [
-            { headline: { contains: q, mode: 'insensitive' } },
-            { about: { contains: q, mode: 'insensitive' } },
-            { company: { contains: q, mode: 'insensitive' } },
-            { jobTitle: { contains: q, mode: 'insensitive' } },
-            // Postgres array containment; matches a whole specialty tag.
-            { specialties: { has: q } },
-            { user: { nickname: { contains: q, mode: 'insensitive' } } },
-          ],
-        }
-      : {}),
-  };
+  /**
+   * `isApproved` is applied inside listMentors() and is not a parameter.
+   *
+   * An unreviewed profile is a set of claims about someone's employer and
+   * seniority made to students who will then sit in a one-to-one call with
+   * them, so it must never be discoverable - and that has to be structural
+   * rather than a filter a caller could omit.
+   *
+   * A mentor who has PAUSED bookings is still listed: their profile is real
+   * and they may reopen, so the card shows the paused state instead of hiding
+   * the person.
+   */
+  const { mentors: rows, total } = await listMentors(
+    { q, industry, minYears, maxPriceMinor: maxPrice, acceptingOnly: Boolean(accepting) },
+    sort,
+    cursor,
+    limit,
+  );
 
-  const orderBy: Prisma.MentorProfileOrderByWithRelationInput[] =
-    sort === 'sessions'
-      ? [{ sessionsCompleted: 'desc' }, { id: 'asc' }]
-      : sort === 'recent'
-        ? [{ createdAt: 'desc' }, { id: 'asc' }]
-        : sort === 'price'
-          ? [{ hourlyRateMinor: 'asc' }, { id: 'asc' }]
-          : // Rating, then volume: a lone 5.0 review should not outrank a
-            // mentor with fifty sessions at 4.8.
-            [{ ratingAvg: 'desc' }, { ratingCount: 'desc' }, { id: 'asc' }];
+  // University is a property of the mentor's ACCOUNT, so it is applied once
+  // the users are loaded. An unknown code matches nobody.
+  const universityFilter = university ? await findUniversityByCode(university) : undefined;
 
-  const [total, rows] = await db.$transaction([
-    db.mentorProfile.count({ where }),
-    db.mentorProfile.findMany({
-      where,
-      orderBy,
-      skip: cursor,
-      take: limit + 1,
-      select: {
-        id: true,
-        industry: true,
-        specialties: true,
-        headline: true,
-        company: true,
-        jobTitle: true,
-        yearsExperience: true,
-        languages: true,
-        hourlyRateMinor: true,
-        sessionMinutes: true,
-        isAcceptingBookings: true,
-        ratingAvg: true,
-        ratingCount: true,
-        sessionsCompleted: true,
-        // `about` is NOT selected: it is up to 4000 characters and the card
-        // shows the headline. Pulling it for every row would make the
-        // directory page many times heavier than it renders.
-        user: {
-          select: {
-            id: true,
-            nickname: true,
-            avatarUrl: true,
-            isVerified: true,
-            university: { select: { code: true } },
-          },
-        },
-      },
-    }),
-  ]);
+  /**
+   * The account behind each profile, batched.
+   *
+   * Prisma resolved `user` with a join, which also let it filter on
+   * `deletedAt` and `accountStatus` in the same query. Firestore can do
+   * neither, so the accounts are fetched in one batched read and the profiles
+   * whose owner is deleted or suspended are dropped afterwards. That filtering
+   * is not cosmetic - it is what stops a banned mentor staying in the
+   * directory - so it happens before the page is assembled, not in the client.
+   */
+  const users = await findUsersByIds(rows.map((m) => m.userId));
+  const visible = rows.filter((m) => {
+    const user = users.get(m.userId);
+    if (universityFilter !== undefined && (!universityFilter || user?.universityId !== universityFilter.id)) {
+      return false;
+    }
+    return (
+      user && !user.deletedAt && (user.accountStatus === 'ACTIVE' || user.accountStatus === 'RESTRICTED')
+    );
+  });
 
-  const hasMore = rows.length > limit;
-  const page = hasMore ? rows.slice(0, limit) : rows;
+  const universities = await findUniversitiesByIds(
+    visible
+      .map((m) => users.get(m.userId)?.universityId)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  const hasMore = visible.length > limit;
+  const page = hasMore ? visible.slice(0, limit) : visible;
 
   return NextResponse.json(
     {
-      mentors: page.map((m) => ({
-        ...m,
-        // Prisma returns Decimal, which serialises as an object rather than a
-        // number and would render as "[object Object]" in a rating.
-        ratingAvg: Number(m.ratingAvg),
-      })),
+      mentors: page.map((m) => {
+        const user = users.get(m.userId);
+        const university = user?.universityId ? universities.get(user.universityId) : null;
+        return {
+          id: m.id,
+          industry: m.industry,
+          specialties: m.specialties,
+          headline: m.headline,
+          company: m.company,
+          jobTitle: m.jobTitle,
+          yearsExperience: m.yearsExperience,
+          languages: m.languages,
+          hourlyRateMinor: m.hourlyRateMinor,
+          sessionMinutes: m.sessionMinutes,
+          isAcceptingBookings: m.isAcceptingBookings,
+          // Stored as a number in Firestore rather than a Decimal, but coerced
+          // anyway: a migrated document may still carry a string.
+          ratingAvg: Number(m.ratingAvg),
+          ratingCount: m.ratingCount,
+          sessionsCompleted: m.sessionsCompleted,
+          // `about` is deliberately absent: it is up to 4000 characters and
+          // the card shows the headline. Including it for every row would make
+          // the directory many times heavier than it renders.
+          user: user
+            ? {
+                id: user.id,
+                nickname: user.nickname,
+                avatarUrl: user.avatarUrl,
+                isVerified: user.isVerified,
+                university: university ? { code: university.code } : null,
+              }
+            : null,
+        };
+      }),
       total,
       nextCursor: hasMore ? cursor + limit : null,
       /**

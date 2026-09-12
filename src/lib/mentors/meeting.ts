@@ -1,6 +1,7 @@
 import { SignJWT } from 'jose';
 import { openJson } from '@/lib/crypto/vault';
-import { db } from '@/lib/db';
+import { findBookingById, findMentorById } from '@/lib/firebase/repositories/mentors';
+import { findUserById } from '@/lib/firebase/repositories/users';
 
 /**
  * Video call provisioning.
@@ -39,13 +40,18 @@ export class MeetingNotOpenError extends Error {
  * during the window.
  */
 export async function issueJoinToken(params: { bookingId: string; userId: string }) {
-  const booking = await db.booking.findUniqueOrThrow({
-    where: { id: params.bookingId },
-    include: { mentor: { select: { userId: true } }, mentee: { select: { id: true, fullName: true } } },
-  });
+  const booking = await findBookingById(params.bookingId);
+  if (!booking) throw new Error('No such booking');
 
-  const isParticipant =
-    booking.menteeId === params.userId || booking.mentor.userId === params.userId;
+  // The `include` becomes two keyed reads. Concurrent - neither depends on the
+  // other, and both are needed before the participant check can be made.
+  const [mentor, mentee] = await Promise.all([
+    findMentorById(booking.mentorId),
+    findUserById(booking.menteeId),
+  ]);
+  if (!mentor || !mentee) throw new Error('No such booking');
+
+  const isParticipant = booking.menteeId === params.userId || mentor.userId === params.userId;
   if (!isParticipant) throw new Error('Not a participant');
 
   if (booking.status !== 'CONFIRMED' && booking.status !== 'RESCHEDULED') {
@@ -63,11 +69,11 @@ export async function issueJoinToken(params: { bookingId: string; userId: string
 
   // The mentor is moderator; the mentee joins as a participant. Without this
   // the mentee could end the call for everyone or admit third parties.
-  const isMentor = booking.mentor.userId === params.userId;
+  const isMentor = mentor.userId === params.userId;
 
   const token = await new SignJWT({
     context: {
-      user: { name: booking.mentee.fullName, moderator: isMentor },
+      user: { name: mentee.fullName, moderator: isMentor },
     },
     room: `ch-${booking.id}`,
     moderator: isMentor,

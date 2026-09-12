@@ -2,8 +2,15 @@ node_modules/
 .next/
 out/
 build/
-.env
-.env.local
+# Environment files.
+#
+# `.env*` rather than a list of known names: the list only ever covers the
+# variants somebody has already thought of, and the one that leaks is the one
+# nobody named - .env.production, .env.prod, .env.backup, .env.save, a
+# `cp .env .env.old` before an edit. Everything is ignored and the template is
+# added back by the negation, so a new variant is safe by default.
+.env*
+!.env.example
 *.tsbuildinfo
 __pycache__/
 *.pyc
@@ -12,3 +19,41 @@ __pycache__/
 
 # graphify: generated knowledge graph (rebuild with `graphify update .`)
 graphify-out/
+
+# Firebase secrets - a service account bypasses every security rule.
+serviceAccountKey.json
+firebase-adminsdk-*.json
+.firebase/
+
+# Private keys and certificates, whatever they are called. The JWT signing key
+# lives in .env today, but an operator debugging a signature will write it to a
+# file, and that file must not be committable.
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa*
+id_ed25519*
+
+# Cloud credential dumps - `gcloud`, `aws` and the Firebase console all offer a
+# "download JSON" that lands in the project root under one of these names.
+*credentials*.json
+*service-account*.json
+*serviceaccount*.json
+gcp-*.json
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
+
+# Firebase emulator state (local fixture data, not source)
+firebase/emulator-data/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Build/tooling output that should never be pushed.
+.vercel/
+coverage/
+playwright-report/
+test-results/

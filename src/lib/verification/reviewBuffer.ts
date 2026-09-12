@@ -1,7 +1,6 @@
-import { randomUUID, createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { getRedis } from '@/lib/queue/connection';
-import { piiHash } from '@/lib/crypto/hash';
-import { wipe } from './fileValidation';
+import { randomUUID } from 'node:crypto';
+import { cloudinaryClient, uploadBuffer } from '@/lib/cloudinary/server';
+import { expiredReviewCases, updateCase } from '@/lib/firebase/repositories/verification';
 
 /**
  * The ephemeral review buffer.
@@ -9,57 +8,54 @@ import { wipe } from './fileValidation';
  * ---------------------------------------------------------------------------
  * WHY THIS EXISTS AT ALL - read before "simplifying" it away
  * ---------------------------------------------------------------------------
- * Two requirements in the spec pull in opposite directions:
+ * Two requirements pull in opposite directions:
  *
  *   (a) delete identity documents immediately after the AI returns a verdict;
  *   (b) route ambiguous cases to a human moderator who approves or bans.
  *
- * A moderator cannot review an image that was deleted. Something has to hold
- * the bytes between the AI verdict and the human decision, so the honest
- * question is not "retain or not" but "retain how little, for how long, where".
+ * A moderator cannot review an image that was deleted, so something has to
+ * hold the bytes between the AI verdict and the human decision. Only
+ * ambiguous cases reach this module; auto-approved and auto-rejected
+ * submissions are wiped before the HTTP response is written.
  *
- * The answer implemented here:
+ * ---------------------------------------------------------------------------
+ * WHERE THE BYTES LIVE: CLOUDINARY, AUTHENTICATED DELIVERY
+ * ---------------------------------------------------------------------------
+ * Documents are uploaded server-side (signed with the API secret, which never
+ * leaves the server) as `type: 'authenticated'` assets. An authenticated
+ * asset has no public URL: every delivery must carry a signature only this
+ * server can mint, so a leaked public ID or secure_url is useless on its own.
+ * Firebase Storage is not involved, and Firestore stores identifiers only
+ * (public ID, version, format, size, upload time) - never bytes or base64.
  *
- *   - ONLY ambiguous cases. Auto-approved and auto-rejected submissions never
- *     reach this module; their buffers are wiped before the HTTP response is
- *     written.
- *   - ONLY in Redis, configured with `maxmemory-policy noeviction` and
- *     appendonly/RDB persistence DISABLED, so the blob never reaches a disk.
- *     Deployment note in docs/SECURITY.md; a Redis with RDB on would silently
- *     write ID scans to a snapshot file and break the whole promise.
- *   - ONLY encrypted, with a per-case key that is returned to the caller and
- *     stored nowhere. Not in Postgres, not in Redis. It lives in the moderator
- *     review link. Losing the link means the blob is unrecoverable, which is
- *     the correct failure direction.
- *   - ONLY briefly. Redis enforces the TTL itself, so expiry does not depend
- *     on our cron running.
+ * ---------------------------------------------------------------------------
+ * RETENTION: 7 DAYS FROM UPLOAD, ENFORCED IN THREE INDEPENDENT PLACES
+ * ---------------------------------------------------------------------------
+ * Cloudinary has no per-asset TTL, so expiry is enforced here, keyed on the
+ * upload time Cloudinary itself recorded (`created_at`):
  *
- * Net effect: a database dump contains nothing, a disk image contains nothing,
- * and an unreviewed case erases itself.
+ *   1. retrieve() refuses an expired buffer AND deletes it on the spot. This
+ *      holds even if every scheduled job is dead.
+ *   2. reapExpired() closes cases whose window lapsed, deleting the assets
+ *      first and only then clearing the Firestore references, so a failed
+ *      delete never leaves an orphan nothing points at.
+ *   3. sweepExpiredAssets() lists every asset under the buffer prefix and
+ *      deletes those whose Cloudinary `created_at` is older than the TTL. It
+ *      does not need Firestore, so it also catches assets whose case row was
+ *      lost, and because it compares each asset's own upload time a newer
+ *      upload can never be swept early.
+ *
+ * (2) and (3) run from src/server/cron/scheduler.ts every 15 minutes and from
+ * GET /api/cron/verification-cleanup for platform schedulers.
  */
 
-/**
- * Retention window for flagged submissions.
- *
- * Raised from 24h/72h to 7 days, and the CHECK constraint in 0002 moved with
- * it - the two MUST agree, because a TTL longer than the constraint produces a
- * row Postgres refuses to write after the bytes are already in Redis, which
- * fails the submission after the expensive part succeeded.
- *
- * Why it moved: 72 hours is shorter than a realistic human moderation rota
- * (a case flagged on Friday evening expired before Monday), so honest students
- * whose only mistake was a glare on a student card were told to resubmit from
- * scratch. The retention promise is about not keeping documents INDEFINITELY
- * and not putting them on a disk; a week in an unpersisted, encrypted Redis
- * keyspace still satisfies both, and the alternative was a queue that
- * systematically timed out the users it exists to help.
- *
- * Everything that made this safe is unchanged: only NEEDS_REVIEW cases reach
- * the buffer, Redis enforces expiry itself, the blob is encrypted, and no
- * bytes ever touch durable storage.
- */
-const DEFAULT_TTL_SECONDS = 7 * 24 * 60 * 60;
-const MAX_TTL_SECONDS = 7 * 24 * 60 * 60; // matches the CHECK constraint in 0002
+/** Hard ceiling on the window. Deliberately not configurable upwards. */
+const MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+/** Every buffered asset's public ID starts with this, and nothing else's does. */
+const BUFFER_PREFIX = 'campushub/kyc-review';
+const BUFFER_TAG = 'campushub_kyc_review';
+const DELIVERY_TYPE = 'authenticated' as const;
 
 export type BufferedDocument = {
   kind: string;
@@ -67,210 +63,247 @@ export type BufferedDocument = {
   bytes: Buffer;
 };
 
+/** What Firestore holds for one buffered document: identifiers, never bytes. */
+export type StoredReviewDocument = {
+  kind: string;
+  publicId: string;
+  version: number;
+  format: string;
+  resourceType: 'image';
+  deliveryType: typeof DELIVERY_TYPE;
+  /** Unsigned authenticated URL - not deliverable without a server signature. */
+  secureUrl: string;
+  bytes: number;
+  width: number | null;
+  height: number | null;
+  uploadedAt: Date;
+};
+
 export type ReviewBufferHandle = {
-  /** Redis key. Safe to store in Postgres - useless without the secret. */
+  /** Public-ID prefix shared by this case's assets. */
   key: string;
-  /** Base64url. Returned once, persisted nowhere, carried in the review link. */
-  secret: string;
   expiresAt: Date;
+  documents: StoredReviewDocument[];
 };
 
 function ttlSeconds(): number {
-  const configured = Number(process.env.REVIEW_BUFFER_TTL_SECONDS ?? DEFAULT_TTL_SECONDS);
+  const configured = Number(process.env.REVIEW_BUFFER_TTL_SECONDS ?? MAX_TTL_SECONDS);
+  if (!Number.isFinite(configured)) return MAX_TTL_SECONDS;
   return Math.min(Math.max(configured, 300), MAX_TTL_SECONDS);
 }
 
-
-/**
- * Derives the per-case data key from a server-side secret.
- *
- * ---------------------------------------------------------------------------
- * WHY THIS CHANGED, AND WHAT IT DOES NOT GIVE UP
- * ---------------------------------------------------------------------------
- * The key used to be `randomBytes(32)` handed back to the caller and stored
- * nowhere - a genuinely strong position, and one nothing in the codebase could
- * actually use. `stash()` returned the secret, the submit route dropped it on
- * the floor (`reviewSecret: undefined`), and the moderator console read it from
- * a sessionStorage key that no code ever wrote. The result was that flagged
- * documents were encrypted with a key that ceased to exist the moment the
- * request ended, so no moderator could ever open a case: the review UI simply
- * spun forever. An unreadable buffer is not a security property, it is a
- * feature that does not work.
- *
- * Deriving the key from PII_HASH_PEPPER keeps the guarantee that actually
- * mattered. The threat model in this module's header is a stolen DATABASE:
- *
- *   - a Postgres dump still cannot decrypt anything - the ciphertext is not in
- *     Postgres, and neither is the pepper;
- *   - a Redis dump still cannot decrypt anything - it holds ciphertext only,
- *     and the pepper lives in the process environment / KMS;
- *   - an attacker now needs the application secret AND the Redis blob, which
- *     is the same bar as every other PII HMAC in this codebase.
- *
- * What it does give up: an attacker who holds the pepper AND a Redis dump can
- * decrypt pending buffers, whereas before nobody could. That is the honest
- * cost, and it buys a review flow that exists. The blast radius stays bounded
- * by the TTL - at most a few hours of pending cases, never a history.
- *
- * The domain separator is what stops this key from colliding with the email,
- * phone and device HMACs that share the same pepper.
- */
-function deriveKey(bufferKey: string): Buffer {
-  return Buffer.from(piiHash(bufferKey, 'review_buffer_dek'), 'hex');
+/** Accepts a Date, a Firestore Timestamp or an ISO string. */
+function toMillis(value: unknown): number {
+  if (value instanceof Date) return value.getTime();
+  if (value && typeof (value as { toDate?: () => Date }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate().getTime();
+  }
+  return new Date(value as string).getTime();
 }
 
 /**
- * Encrypts the document set and parks it in Redis under a TTL.
+ * Uploads the document set to Cloudinary and returns what the case row needs.
  *
- * The caller MUST wipe its own copies of `documents[].bytes` afterwards; this
- * function wipes the intermediate serialisation but cannot reach the caller's
- * buffers.
+ * The caller MUST wipe its own copies of `documents[].bytes` afterwards. A
+ * partial failure deletes whatever did upload before rethrowing, so a failed
+ * stash never leaves documents behind without a case pointing at them.
  */
 export async function stash(documents: BufferedDocument[]): Promise<ReviewBufferHandle> {
-  const key = `kyc:review:${randomUUID()}`;
-  // Derived, not random - see deriveKey(). The buffer key is unique per case,
-  // so each case still gets a distinct data key.
-  const dek = deriveKey(key);
-  const iv = randomBytes(12);
-
-  // Length-prefixed framing so the parts can be split without a JSON encode of
-  // the bytes (base64 in JSON would inflate a 5 MB image to ~6.7 MB and make a
-  // second plaintext copy on the heap).
-  const frames: Buffer[] = [];
-  for (const doc of documents) {
-    const header = Buffer.from(JSON.stringify({ kind: doc.kind, mime: doc.mime }), 'utf8');
-    const lengths = Buffer.alloc(8);
-    lengths.writeUInt32BE(header.length, 0);
-    lengths.writeUInt32BE(doc.bytes.length, 4);
-    frames.push(lengths, header, doc.bytes);
-  }
-  const plaintext = Buffer.concat(frames);
+  const key = `${BUFFER_PREFIX}/${randomUUID()}`;
 
   try {
-    const cipher = createCipheriv('aes-256-gcm', dek, iv);
-    const body = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-    const tag = cipher.getAuthTag();
-    const payload = Buffer.concat([iv, tag, body]);
-
-    const ttl = ttlSeconds();
-    // setex, not set+expire: an unexpiring blob is the exact failure this
-    // module exists to prevent, and two commands can interleave with a crash.
-    await getRedis().setex(key, ttl, payload);
-
-    return {
-      key,
-      secret: dek.toString('base64url'),
-      expiresAt: new Date(Date.now() + ttl * 1000),
-    };
-  } finally {
-    wipe(plaintext);
-    wipe(dek);
-  }
-}
-
-/**
- * Streams the buffered documents back for a moderator.
- *
- * Returns null when the TTL has already elapsed, which is a normal outcome and
- * must be handled as "ask the user to resubmit", not as an error.
- */
-export async function retrieve(
-  key: string,
-  /**
-   * Optional. Retained so the existing route signature keeps working and so an
-   * explicitly-supplied key still takes precedence; when it is absent or
-   * malformed the key is derived from the server secret instead.
-   */
-  secret?: string,
-): Promise<BufferedDocument[] | null> {
-  // getBuffer, not get: the default codec would mangle binary through UTF-8.
-  const payload = await getRedis().getBuffer(key);
-  if (!payload) return null;
-
-  const supplied = secret ? Buffer.from(secret, 'base64url') : null;
-  const dek = supplied && supplied.length === 32 ? supplied : deriveKey(key);
-
-  try {
-    const iv = payload.subarray(0, 12);
-    const tag = payload.subarray(12, 28);
-    const body = payload.subarray(28);
-
-    const decipher = createDecipheriv('aes-256-gcm', dek, iv);
-    decipher.setAuthTag(tag);
-    const plaintext = Buffer.concat([decipher.update(body), decipher.final()]);
-
-    try {
-      const documents: BufferedDocument[] = [];
-      let offset = 0;
-      while (offset < plaintext.length) {
-        const headerLength = plaintext.readUInt32BE(offset);
-        const bodyLength = plaintext.readUInt32BE(offset + 4);
-        offset += 8;
-
-        const header = JSON.parse(plaintext.toString('utf8', offset, offset + headerLength));
-        offset += headerLength;
-
-        // Copy out before the plaintext buffer is wiped below.
-        documents.push({
-          kind: header.kind,
-          mime: header.mime,
-          bytes: Buffer.from(plaintext.subarray(offset, offset + bodyLength)),
+    const stored = await Promise.all(
+      documents.map(async (doc): Promise<StoredReviewDocument> => {
+        const isPdf = doc.mime === 'application/pdf';
+        const result = await uploadBuffer(doc.bytes, {
+          public_id: `${key}/${doc.kind}`,
+          resource_type: 'image',
+          type: DELIVERY_TYPE,
+          tags: [BUFFER_TAG],
+          overwrite: false,
+          // Cap the stored original: phone photos arrive at 12+ MP and a
+          // reviewer never needs more. 'limit' never upscales; PDFs are kept
+          // as submitted.
+          ...(isPdf ? {} : { transformation: [{ width: 2400, height: 2400, crop: 'limit' }] }),
+          timeout: 60_000,
         });
-        offset += bodyLength;
-      }
-      return documents;
-    } finally {
-      wipe(plaintext);
-    }
-  } catch {
-    // Wrong secret or tampered ciphertext. Indistinguishable on purpose.
-    return null;
-  } finally {
-    wipe(dek);
+
+        const uploadedAt = new Date(result.created_at);
+        return {
+          kind: doc.kind,
+          publicId: result.public_id,
+          version: result.version,
+          format: result.format,
+          resourceType: 'image',
+          deliveryType: DELIVERY_TYPE,
+          // For an authenticated asset the upload response URL already carries
+          // a NON-EXPIRING signature, i.e. it is a permanent public link to an
+          // identity document. Strip it: what Firestore stores must not be
+          // deliverable on its own - only retrieve() mints signed URLs.
+          secureUrl: result.secure_url.replace(/\/s--[^/]+--\//, '/'),
+          bytes: result.bytes,
+          width: result.width ?? null,
+          height: result.height ?? null,
+          uploadedAt: Number.isNaN(uploadedAt.getTime()) ? new Date() : uploadedAt,
+        };
+      }),
+    );
+
+    // The window starts at the EARLIEST upload, so the case row and the asset
+    // sweep, which reads each asset's own created_at, agree on the expiry.
+    const earliest = Math.min(...stored.map((doc) => doc.uploadedAt.getTime()));
+    return { key, documents: stored, expiresAt: new Date(earliest + ttlSeconds() * 1000) };
+  } catch (error) {
+    await destroy(key).catch(() => {});
+    throw error;
   }
 }
 
 /**
- * Destroys the buffer the instant a moderator decides. Called before the
- * decision is even written to Postgres - if the DB write then fails, the
+ * Fetches the buffered documents for a moderator, server-side.
+ *
+ * Each image is delivered through a signed URL that never leaves this process,
+ * as a size-capped JPEG (the first page, for a PDF) so the review console
+ * renders every document the same way.
+ *
+ * Returns null when the window has elapsed or the assets are gone - a normal
+ * outcome meaning "ask the user to resubmit", not an error.
+ */
+export async function retrieve(buffer: {
+  key: string;
+  expiresAt: Date | null;
+  documents: StoredReviewDocument[] | null;
+}): Promise<BufferedDocument[] | null> {
+  const documents = buffer.documents ?? [];
+  if (documents.length === 0) return null;
+
+  const now = Date.now();
+  const lapsed =
+    (buffer.expiresAt !== null && toMillis(buffer.expiresAt) <= now) ||
+    documents.some((doc) => toMillis(doc.uploadedAt) + ttlSeconds() * 1000 <= now);
+  if (lapsed) {
+    await destroy(buffer.key).catch((error) =>
+      console.error('[reviewBuffer] failed to destroy expired %s', buffer.key, error),
+    );
+    return null;
+  }
+
+  const client = cloudinaryClient();
+  const fetched = await Promise.all(
+    documents.map(async (doc) => {
+      const url = client.url(doc.publicId, {
+        type: doc.deliveryType,
+        resource_type: 'image',
+        version: doc.version,
+        sign_url: true,
+        secure: true,
+        format: 'jpg',
+        transformation: [
+          { width: 1600, height: 1600, crop: 'limit', quality: 'auto:good', page: 1 },
+        ],
+      });
+      const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(20_000) });
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`Cloudinary delivery returned ${response.status}`);
+      return {
+        kind: doc.kind,
+        mime: 'image/jpeg',
+        bytes: Buffer.from(await response.arrayBuffer()),
+      };
+    }),
+  );
+
+  if (fetched.some((doc) => doc === null)) return null;
+  return fetched as BufferedDocument[];
+}
+
+/**
+ * Destroys every asset under a buffer key. Called the instant a moderator
+ * decides, before the decision is written - if that write then fails, the
  * correct state is "documents gone, case reopened", never "documents linger".
  */
 export async function destroy(key: string): Promise<void> {
-  await getRedis().del(key);
+  // Trailing slash: `.../abc/` must never match a sibling `.../abcd/`.
+  await cloudinaryClient().api.delete_resources_by_prefix(`${key}/`, {
+    type: DELIVERY_TYPE,
+    resource_type: 'image',
+    invalidate: true,
+  });
 }
 
 /**
- * Belt and braces for the TTL.
- *
- * Redis expires the blob on its own, so this sweep exists to reconcile the
- * Postgres side: clear the dangling key reference and reopen the case so the
- * user is told to resubmit rather than waiting forever on a review that can no
- * longer happen. Run from the scheduler worker every 15 minutes.
+ * Closes cases whose review window lapsed. Deletes the assets FIRST and only
+ * then clears the case's references, so the residue of a partial failure is a
+ * case still pointing at its assets (retried next run), never an orphan.
  */
-export async function reapExpired(db: {
-  verificationCase: {
-    findMany: (args: unknown) => Promise<{ id: string; userId: string }[]>;
-    updateMany: (args: unknown) => Promise<unknown>;
-  };
-}): Promise<number> {
-  const expired = await db.verificationCase.findMany({
-    where: { reviewBufferKey: { not: null }, reviewExpiresAt: { lt: new Date() } },
-    select: { id: true, userId: true },
-    take: 500,
-  });
+export async function reapExpired(): Promise<number> {
+  const expired = await expiredReviewCases(new Date());
   if (expired.length === 0) return 0;
 
-  await db.verificationCase.updateMany({
-    where: { id: { in: expired.map((c) => c.id) } },
-    data: {
+  let closed = 0;
+  for (const kase of expired) {
+    if (kase.reviewBufferKey) {
+      try {
+        await destroy(kase.reviewBufferKey);
+      } catch (error) {
+        console.error('[reviewBuffer] failed to destroy %s', kase.reviewBufferKey, error);
+        continue;
+      }
+    }
+
+    await updateCase(kase.id, {
       reviewBufferKey: null,
       reviewExpiresAt: null,
+      reviewDocuments: null,
       status: 'REJECTED',
       publicMessageKey: 'verification.banner.resubmitRequired',
       failureCodes: ['REVIEW_WINDOW_EXPIRED'],
       decidedAt: new Date(),
-    },
-  });
+    });
+    closed += 1;
+  }
 
-  return expired.length;
+  return closed;
+}
+
+/**
+ * Deletes every buffered asset whose Cloudinary upload time is older than the
+ * TTL, independently of Firestore. Assets uploaded after the cutoff are never
+ * touched: the filter reads each asset's own `created_at`.
+ */
+export async function sweepExpiredAssets(now: Date = new Date()): Promise<number> {
+  const api = cloudinaryClient().api;
+  const cutoff = now.getTime() - ttlSeconds() * 1000;
+  let cursor: string | undefined;
+  let deleted = 0;
+
+  do {
+    const page = await api.resources({
+      type: DELIVERY_TYPE,
+      resource_type: 'image',
+      prefix: `${BUFFER_PREFIX}/`,
+      max_results: 500,
+      ...(cursor ? { next_cursor: cursor } : {}),
+    });
+
+    const stale = (page.resources as { public_id: string; created_at: string }[])
+      .filter((asset) => {
+        const created = Date.parse(asset.created_at);
+        return Number.isFinite(created) && created <= cutoff;
+      })
+      .map((asset) => asset.public_id);
+
+    for (let i = 0; i < stale.length; i += 100) {
+      const result = await api.delete_resources(stale.slice(i, i + 100), {
+        type: DELIVERY_TYPE,
+        resource_type: 'image',
+        invalidate: true,
+      });
+      deleted += Object.values(result.deleted ?? {}).filter((status) => status === 'deleted').length;
+    }
+
+    cursor = page.next_cursor;
+  } while (cursor);
+
+  return deleted;
 }

@@ -79,7 +79,7 @@ function Tile({
   loading,
 }: {
   label: string;
-  value: number | undefined;
+  value: number | null | undefined;
   icon: LucideIcon;
   href: string;
   tone?: string;
@@ -97,7 +97,7 @@ function Tile({
       {loading ? (
         <span className="h-7 w-14 animate-pulse rounded bg-surface-muted" aria-hidden="true" />
       ) : (
-        <span className="text-2xl font-bold tabular-nums tracking-tight text-fg">{value ?? 0}</span>
+        <span className="text-2xl font-bold tabular-nums tracking-tight text-fg">{value ?? '—'}</span>
       )}
     </Link>
   );
