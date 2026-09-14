@@ -34,6 +34,7 @@
     "exceljs": "^4.4.0",
     "firebase": "^12.18.0",
     "firebase-admin": "^14.3.0",
+    "jose": "4.15.9",
     "lucide-react": "^0.469.0",
     "next": "^15.1.0",
     "nodemailer": "^10.0.0",
@@ -45,7 +46,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.2",
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.0.2",
@@ -63,7 +64,7 @@
     "vitest": "^2.1.8"
   },
   "overrides": {
-    "jose": "4.15.9",
+    "jose": "$jose",
     "jwks-rsa": "^3.1.0"
   },
   "resolutions": {

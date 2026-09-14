@@ -82,7 +82,9 @@ export async function issueJoinToken(params: { bookingId: string; userId: string
     .setIssuer(process.env.JITSI_APP_ID!)
     .setAudience('jitsi')
     .setSubject('meet.campushub.az')
-    .setExpirationTime(new Date(closesAt))
+    // Epoch SECONDS, not a Date and not milliseconds: jose's setExpirationTime
+    // writes a number straight into `exp`, which RFC 7519 defines as NumericDate.
+    .setExpirationTime(Math.floor(closesAt / 1000))
     .sign(new TextEncoder().encode(process.env.JITSI_JWT_SECRET!));
 
   return { url: `${url}?jwt=${token}`, expiresAt: new Date(closesAt) };

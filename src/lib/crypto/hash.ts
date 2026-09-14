@@ -1,23 +1,41 @@
 import { createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
 import type argon2Types from 'argon2';
+import type bcryptTypes from 'bcryptjs';
 
 /**
- * argon2 and bcrypt are native addons. They are loaded lazily, inside the
- * functions that need them, rather than at module scope.
+ * argon2 is a native addon and bcryptjs is only ever needed for legacy
+ * hashes. Both are loaded lazily, inside the functions that need them, rather
+ * than at module scope.
  *
  * Two concrete reasons, both of which bit us:
  *  - Next.js evaluates every module a route transitively imports while
  *    collecting page data at build time. A top-level `import argon2` pulls a
  *    .node binary into that phase, so the build fails on any machine or CI
  *    image where the binary is not compiled for the current platform.
- *  - bcrypt is only ever needed to verify a LEGACY hash. Most deployments will
- *    never call it at all, and it has no business being in the cold-start path
- *    of every route that happens to import this file.
+ *  - bcryptjs is only ever needed to verify a LEGACY hash. Most deployments
+ *    will never call it at all, and it has no business being in the cold-start
+ *    path of every route that happens to import this file.
  */
 let argon2Module: typeof argon2Types | null = null;
 async function getArgon2() {
   argon2Module ??= (await import('argon2')).default;
   return argon2Module;
+}
+
+/**
+ * bcryptjs 2.x is a CommonJS module with no named `default`. Webpack's interop
+ * synthesises one, tsx/vitest running it natively does not - so take whichever
+ * is actually there rather than assuming `.default`.
+ */
+let bcryptModule: typeof bcryptTypes | null = null;
+async function getBcrypt() {
+  if (!bcryptModule) {
+    const mod = (await import('bcryptjs')) as unknown as
+      | typeof bcryptTypes
+      | { default: typeof bcryptTypes };
+    bcryptModule = 'default' in mod && mod.default ? mod.default : (mod as typeof bcryptTypes);
+  }
+  return bcryptModule;
 }
 
 /**
@@ -125,8 +143,13 @@ export async function verifyPassword(plain: string, stored: string): Promise<Pas
 
   if (stored.startsWith('$2a$') || stored.startsWith('$2b$') || stored.startsWith('$2y$')) {
     // Legacy path only. Loaded on demand so a deployment with no bcrypt hashes
-    // never touches the addon.
-    const bcrypt = (await import('bcrypt')).default;
+    // pays nothing for it on a cold start.
+    //
+    // bcryptjs, not the native `bcrypt` addon: it is the package this project
+    // actually depends on, it reads the same $2a$/$2b$/$2y$ hashes bit for bit
+    // (same Blowfish KDF, same modular-crypt encoding), and being pure JS it
+    // needs no prebuilt binary in Vercel's serverless bundle.
+    const bcrypt = await getBcrypt();
     const valid = await bcrypt.compare(plain, stored).catch(() => false);
     return { valid, needsRehash: valid }; // always upgrade bcrypt to argon2id
   }
