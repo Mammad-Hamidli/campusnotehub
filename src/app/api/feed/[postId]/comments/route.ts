@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getViewer, requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { can, ForbiddenError } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
+import { toPlainText } from '@/lib/security/plainText';
 import { findVisiblePost } from '@/lib/feed/visibility';
 import {
   createComment,
@@ -47,7 +48,11 @@ const listSchema = z.object({
 });
 
 const createSchema = z.object({
-  body: z.string().trim().min(1, 'errors.validationFailed').max(1000),
+  body: z
+    .string()
+    .max(2000)
+    .transform(toPlainText)
+    .pipe(z.string().min(1, 'errors.validationFailed').max(1000)),
   /** Optional parent for a one-level reply. */
   parentId: z.string().min(1).max(64).optional(),
 });

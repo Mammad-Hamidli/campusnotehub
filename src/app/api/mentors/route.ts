@@ -127,9 +127,10 @@ export async function GET(request: NextRequest) {
           // `about` is deliberately absent: it is up to 4000 characters and
           // the card shows the headline. Including it for every row would make
           // the directory many times heavier than it renders.
+          // No account id: users/{id} also names the owner's wallet,
+          // credentials and sessions, and nothing public needs it.
           user: user
             ? {
-                id: user.id,
                 nickname: user.nickname,
                 avatarUrl: user.avatarUrl,
                 isVerified: user.isVerified,

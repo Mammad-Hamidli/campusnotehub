@@ -85,11 +85,33 @@ export async function GET(
 
   return NextResponse.json(
     {
+      /**
+       * An explicit allow-list, not `...mentor`. Spreading the stored record
+       * published `userId` (the owner's account id) plus internal fields such
+       * as `isApproved`, `approvedAt` and `bufferMinutes` on an endpoint that
+       * is readable signed out. `id` stays: it is the profile's own random id
+       * and the key /mentors/[mentorId] and booking are routed by.
+       */
       mentor: {
-        ...mentor,
+        id: mentor.id,
+        industry: mentor.industry,
+        specialties: mentor.specialties,
+        headline: mentor.headline,
+        about: mentor.about,
+        company: mentor.company,
+        jobTitle: mentor.jobTitle,
+        yearsExperience: mentor.yearsExperience,
+        linkedinUrl: mentor.linkedinUrl,
+        languages: mentor.languages,
+        hourlyRateMinor: mentor.hourlyRateMinor,
+        sessionMinutes: mentor.sessionMinutes,
+        minNoticeHours: mentor.minNoticeHours,
+        timezone: mentor.timezone,
+        isAcceptingBookings: mentor.isAcceptingBookings,
         ratingAvg: Number(mentor.ratingAvg),
+        ratingCount: mentor.ratingCount,
+        sessionsCompleted: mentor.sessionsCompleted,
         user: {
-          id: owner.id,
           nickname: owner.nickname,
           avatarUrl: owner.avatarUrl,
           isVerified: owner.isVerified,

@@ -6,13 +6,14 @@ import { adminDb } from '@/lib/firebase/admin';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { forFirestore } from '@/lib/firebase/convert';
 import { findVisiblePost } from '@/lib/feed/visibility';
+import { toPlainText } from '@/lib/security/plainText';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const reportSchema = z.object({
   reason: z.nativeEnum(ReportReason).optional(),
-  details: z.string().trim().max(1000).optional(),
+  details: z.string().max(2000).transform(toPlainText).pipe(z.string().max(1000)).optional(),
 });
 
 /**

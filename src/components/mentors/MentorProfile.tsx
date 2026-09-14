@@ -60,7 +60,6 @@ type Mentor = {
   ratingCount: number;
   sessionsCompleted: number;
   user: {
-    id: string;
     nickname: string;
     avatarUrl: string | null;
     isVerified: boolean;

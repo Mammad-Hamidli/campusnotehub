@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getViewer, requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { can, ForbiddenError } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
+import { toPlainText } from '@/lib/security/plainText';
 import { serializePost } from '@/lib/feed/serialize';
 import { resolveViewerAudience } from '@/lib/feed/visibility';
 import { createPost, feedPage, likedPostIds, newPostId } from '@/lib/firebase/repositories/posts';
@@ -148,7 +149,9 @@ export async function GET(request: NextRequest) {
 }
 
 const createSchema = z.object({
-  body: z.string().trim().min(1).max(2000),
+  // Sanitised BEFORE the length checks, so a body that is only markup is
+  // rejected as empty. The pre-transform max bounds the sanitiser's work.
+  body: z.string().max(4000).transform(toPlainText).pipe(z.string().min(1).max(2000)),
   visibility: z.nativeEnum(PostVisibility).default(PostVisibility.PUBLIC),
   universityId: z.string().min(1).max(64).optional(),
   tags: z.array(z.string().regex(/^[\p{L}\p{N}_]{2,40}$/u)).max(5).default([]),
@@ -166,7 +169,7 @@ const createSchema = z.object({
         storageKey: z.string().max(200),
         width: z.number().int().optional(),
         height: z.number().int().optional(),
-        altText: z.string().max(300).optional(),
+        altText: z.string().max(600).transform(toPlainText).pipe(z.string().max(300)).optional(),
       }),
     )
     .max(4)
