@@ -258,9 +258,14 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
           {isSelf ? (
             // Your own profile: no point offering to message yourself, and the
             // booking flow would refuse anyway.
-            <Link href="/mentors/apply" className="btn-secondary px-3 py-1.5 text-sm">
-              {t('mentors.editProfile')}
-            </Link>
+            <>
+              <Link href="/mentors/apply" className="btn-secondary px-3 py-1.5 text-sm">
+                {t('mentors.editProfile')}
+              </Link>
+              <Link href="/mentors/schedule" className="btn-secondary px-3 py-1.5 text-sm">
+                {t('nav.mentorSchedule')}
+              </Link>
+            </>
           ) : (
             <>
               {canBook && mentor.isAcceptingBookings ? (

@@ -1,12 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { NoteStatus } from '@/lib/enums';
-import {
-  findNoteById,
-  hasPaidOrder,
-  incrementDownloadCount,
-  readNoteBytes,
-} from '@/lib/firebase/repositories/notes';
+import { findNoteById, hasPaidOrder, readNoteBytes } from '@/lib/firebase/repositories/notes';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
+import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,17 +9,21 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/notes/:noteId/file - download the attachment.
  *
- * The bytes are never served from a public path. Notes are a paid product, so
- * "who may read this file" is an authorization decision made per request:
+ * The ONLY path to a note's bytes. The asset is a Cloudinary `authenticated`
+ * raw file whose signed URL is minted server-side (5 min) inside
+ * readNoteBytes() and never sent to a browser, so there is no CDN link to
+ * share or guess. Access, decided per request:
  *
- *   - the seller always may (it is their upload);
- *   - a buyer with a PAID order may;
- *   - anyone may, if the note is published and free;
- *   - staff may, because moderating a marketplace means opening what is sold.
+ *   - the seller;
+ *   - staff (moderation);
+ *   - a buyer with a PAID order (keyed read on the derived order id).
  *
- * Everyone else gets 404 rather than 403. A 403 on a note id confirms the note
- * exists and that someone paid for it, which is not information a stranger
- * should be able to enumerate.
+ * FREE NOTES ARE NOT AN EXCEPTION. They previously skipped the order check,
+ * which let anyone fetch a free listing's file by URL without "buying" it.
+ * A free note is acquired through POST /purchase like any other (a zero-value
+ * PAID order), so "no completed transaction, no bytes" holds without a carve-out.
+ *
+ * Everyone else gets 404 (not 403), so note ids cannot be probed.
  */
 export async function GET(
   request: NextRequest,
@@ -41,55 +40,40 @@ export async function GET(
     throw error;
   }
 
+  const limit = await rateLimit('notes:download', { userId, ip: clientIp(request.headers) });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'errors.rateLimited' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } },
+    );
+  }
+
   const { noteId } = await params;
-
   const note = await findNoteById(noteId);
-
   if (!note || !note.attachment) {
     return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
   }
 
-  const isSeller = note.sellerId === userId;
-  const isStaff = viewer.role === 'MODERATOR' || viewer.role === 'ADMIN';
-  const isFreeAndPublished = note.priceMinor === 0 && note.status === NoteStatus.PUBLISHED;
+  const allowed =
+    note.sellerId === userId ||
+    viewer.role === 'MODERATOR' ||
+    viewer.role === 'ADMIN' ||
+    (await hasPaidOrder(userId, note.id));
 
-  let hasPurchased = false;
-  if (!isSeller && !isStaff && !isFreeAndPublished) {
-    // A keyed read: the order id is derived from (buyer, note), so the
-    // "did you pay for this" question needs no query.
-    hasPurchased = await hasPaidOrder(userId, note.id);
-  }
-
-  if (!isSeller && !isStaff && !isFreeAndPublished && !hasPurchased) {
+  if (!allowed) {
     return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
   }
 
-  /**
-   * The bytes are fetched only AFTER the authorization decision.
-   *
-   * That ordering was free when the file was a column selected alongside the
-   * row; now it is a separate Storage download, and doing it first would mean
-   * pulling a 20 MB object for every caller who is about to be refused.
-   */
+  // Bytes only after the decision: no 10 MB fetch for a caller about to be refused.
   const bytes = await readNoteBytes(note);
-
-  // Counted only for a genuine reader, so the figure on the listing means
-  // something. The seller re-downloading their own upload is not a download.
-  if (!isSeller && !isStaff) {
-    await incrementDownloadCount(note.id);
-  }
-
   const { fileName, mime } = note.attachment;
 
   return new NextResponse(new Uint8Array(bytes), {
     status: 200,
     headers: {
       'Content-Type': mime,
-      // `attachment` and a quoted, sanitised filename: an inline HTML or SVG
-      // response would execute in the site's origin. The filename was already
-      // stripped of path characters on upload; quoting it here stops a comma
-      // or semicolon from splitting the header.
-      'Content-Disposition': `attachment; filename="${fileName.replace(/["\\]/g, '')}"`,
+      // `attachment` + sanitised name: inline HTML/SVG would run in our origin.
+      'Content-Disposition': `attachment; filename="${fileName.replace(/["\\\r\n]/g, '')}"`,
       'Content-Length': String(bytes.length),
       'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'private, no-store',

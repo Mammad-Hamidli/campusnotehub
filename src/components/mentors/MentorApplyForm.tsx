@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { cellsToRules } from '@/lib/mentors/schedule';
+import { AvailabilityGrid } from './AvailabilityGrid';
+import { timezones } from './MentorScheduleSettings';
 
 /**
  * PocketMentor application form (POST /api/mentors/apply).
@@ -45,6 +48,13 @@ export function MentorApplyForm() {
   const [rate, setRate] = useState('0');
   const [sessionMinutes, setSessionMinutes] = useState(60);
   const [linkedinUrl, setLinkedinUrl] = useState('');
+  const [availability, setAvailability] = useState<Set<string>>(new Set());
+  const [timezone, setTimezone] = useState('Asia/Baku');
+  // Browser zone after mount (not during render) to avoid a hydration mismatch.
+  useEffect(() => {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (zone) setTimezone(zone);
+  }, []);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +87,10 @@ export function MentorApplyForm() {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (availability.size === 0) {
+      setError('mentors.schedule.errors.empty');
+      return;
+    }
     setBusy(true);
     setError(null);
     setFieldErrors({});
@@ -102,6 +116,8 @@ export function MentorApplyForm() {
       hourlyRateMinor: Math.round(Number(rate.replace(',', '.') || 0) * 100),
       sessionMinutes,
       linkedinUrl: linkedinUrl.trim() || null,
+      availability: cellsToRules(availability),
+      timezone,
     };
 
     try {
@@ -273,6 +289,24 @@ export function MentorApplyForm() {
           <span className="text-2xs font-medium text-fg-muted">{t('mentors.apply.linkedin')}</span>
           <input className={`${field} ${invalid('linkedinUrl')}`} type="url" value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} placeholder="https://linkedin.com/in/…" />
         </label>
+      </section>
+
+      <section className="card space-y-3 p-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-fg">{t('mentors.schedule.weekly')}</h2>
+            <p className="text-2xs text-fg-subtle">{t('mentors.schedule.applyHint')}</p>
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-2xs font-medium text-fg-muted">{t('mentors.schedule.timezone')}</span>
+            <select className={field} value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+              {timezones(timezone).map((z) => (
+                <option key={z} value={z}>{z}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <AvailabilityGrid value={availability} onChange={setAvailability} />
       </section>
 
       {error && (

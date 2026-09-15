@@ -41,7 +41,9 @@
     "help": "Kömək",
     "bookmarks": "Yadda saxlanılanlar",
     "explore": "Kəşf et",
-    "admin": "Admin"
+    "admin": "Admin",
+    "saved": "Saxlanılanlar",
+    "mentorSchedule": "Mentor cədvəli"
   },
   "auth": {
     "register": {
@@ -356,7 +358,8 @@
         "subject": "Fənn",
         "courseCode": "Kurs kodu",
         "university": "Universitet",
-        "price": "Qiymət (qəpik, 0 = pulsuz)"
+        "price": "Qiymət (qəpik, 0 = pulsuz)",
+        "universities": "Universitetlər"
       },
       "errors": {
         "missing": "Yükləmək üçün fayl seçin.",
@@ -382,7 +385,9 @@
       "maxSize": "{mb} MB-a qədər. PDF və ya Word (.pdf, .doc, .docx).",
       "verifyFirstTitle": "Əvvəlcə şəxsiyyətinizi təsdiqləyin",
       "verifyFirstBody": "Konspekt satmaq üçün təsdiqlənmiş şəxsiyyət tələb olunur. Təsdiq tamamlandıqdan sonra konspekt yükləyə bilərsiniz.",
-      "selected": "{name} ({size})"
+      "selected": "{name} ({size})",
+      "universitiesHint": "Konspektin aid olduğu bütün universitetləri seçin (10-a qədər).",
+      "titleFromFile": "Fayl adından dolduruldu — istədiyiniz kimi dəyişin."
     },
     "errors": {
       "notVerified": "Konspekt satmaq üçün hesabınız doğrulanmalıdır",
@@ -396,7 +401,6 @@
     "free": "Pulsuz",
     "download": "Yüklə",
     "stats": {
-      "downloads": "{n} yükləmə",
       "purchases": "{n} alış"
     },
     "empty": "Hələ heç bir konspekt yüklənməyib.",
@@ -413,7 +417,25 @@
     "buyFree": "Pulsuz götür",
     "buying": "Alınır…",
     "owned": "Sizdədir",
-    "bought": "Alış tamamlandı"
+    "bought": "Alış tamamlandı",
+    "creatorStats": "{avg}⭐ ({reviews} rəy, {files} fayl üzrə)",
+    "lockedUntilPurchase": "Alışdan sonra açılır",
+    "reviews": {
+      "rate": "Konspekti qiymətləndir",
+      "yourRating": "Sizin qiymətiniz",
+      "stars": "{n} ulduz",
+      "summary": "{avg} ({count} rəy)",
+      "errors": {
+        "purchaseRequired": "Yalnız bu konspekti alanlar qiymət verə bilər."
+      }
+    },
+    "saved": {
+      "title": "Saxlanılanlar",
+      "subtitle": "Sonra baxmaq üçün saxladığınız konspektlər",
+      "empty": "Hələ heç nə saxlanılmayıb. Konspektdəki əlfəcin işarəsinə toxunun.",
+      "add": "Sonraya saxla",
+      "remove": "Saxlanılanlardan çıxar"
+    }
   },
   "mentors": {
     "title": "PocketMentor",
@@ -547,6 +569,34 @@
       "errors": {
         "pending": "Artıq yoxlanılan müraciətiniz var.",
         "alreadyMentor": "Siz artıq təsdiqlənmiş mentorsunuz."
+      }
+    },
+    "schedule": {
+      "title": "Əlçatanlıq",
+      "subtitle": "Tələbələrin sizi nə vaxt sifariş edə biləcəyini seçin. Dəyişikliklər yeni sifarişlərə dərhal tətbiq olunur.",
+      "gridLabel": "Həftəlik əlçatanlıq",
+      "available": "Əlçatan",
+      "unavailable": "Əlçatan deyil",
+      "hint": "Seçmək üçün klikləyin və ya sürüşdürün. Bütün günü və ya saatı dəyişmək üçün başlığa klikləyin.",
+      "clear": "Hamısını təmizlə",
+      "notMentor": "Cədvəl ayarları mentor müraciətiniz təsdiqləndikdən sonra əlçatandır.",
+      "accepting": "Yeni sifarişlər qəbul olunur",
+      "timezone": "Saat qurşağı",
+      "buffer": "Sessiyalar arası fasilə",
+      "minNotice": "Minimum xəbərdarlıq (saat)",
+      "weekly": "Həftəlik cədvəl",
+      "blocked": "Bağlı tarixlər",
+      "blockedHint": "Həftəlik cədvəldən asılı olmayaraq əlçatan olmadığınız gün və ya saatlar.",
+      "date": "Tarix",
+      "allDay": "Bütün gün",
+      "from": "Başlanğıc",
+      "to": "Son",
+      "addBlocked": "Bağla",
+      "save": "Cədvəli yadda saxla",
+      "saved": "Cədvəl yadda saxlanıldı.",
+      "applyHint": "Adətən sessiya keçirə biləcəyiniz vaxtları seçin. Sonra dəyişə bilərsiniz.",
+      "errors": {
+        "empty": "Ən azı bir əlçatan vaxt seçin."
       }
     }
   },

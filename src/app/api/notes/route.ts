@@ -8,10 +8,11 @@ import {
   listNotes,
   newNoteId,
 } from '@/lib/firebase/repositories/notes';
-import { findUserById, findUsersByIds } from '@/lib/firebase/repositories/users';
+import { findUserById } from '@/lib/firebase/repositories/users';
 import { findUniversitiesByIds } from '@/lib/firebase/repositories/reference';
 import { writeAuditLog } from '@/lib/firebase/repositories/audit';
-import { requireSession, UnauthorizedError } from '@/lib/auth/session';
+import { getViewer, requireSession, UnauthorizedError } from '@/lib/auth/session';
+import { serializeNotes } from '@/lib/notes/serialize';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { can } from '@/lib/permissions';
 import {
@@ -52,67 +53,15 @@ export async function GET(request: NextRequest) {
   }
   const { sort, limit, universityId, subject } = parsed.data;
 
-  const notes = await listNotes(
-    { status: NoteStatus.PUBLISHED, universityId, subject },
-    sort,
-    limit,
-  );
-
-  /**
-   * The seller and university decorations, as TWO batched reads.
-   *
-   * Prisma resolved these with a join. Firestore cannot, and the naive
-   * translation - a lookup per row - would turn a 20-item listing into 41
-   * round trips. Collecting the distinct ids first and fetching them in one
-   * `getAll` keeps it at three reads regardless of page size, which is the
-   * same shape the feed serialiser already uses.
-   */
-  const [sellers, universities] = await Promise.all([
-    findUsersByIds(notes.map((n) => n.sellerId)),
-    findUniversitiesByIds(
-      notes.map((n) => n.universityId).filter((id): id is string => Boolean(id)),
-    ),
+  const [rows, viewer] = await Promise.all([
+    listNotes({ status: NoteStatus.PUBLISHED, universityId, subject }, sort, limit),
+    getViewer(),
   ]);
 
+  // Batched decorations + per-viewer flags; see src/lib/notes/serialize.ts.
   return NextResponse.json(
-    {
-      notes: notes.map((n) => {
-        const seller = sellers.get(n.sellerId);
-        const university = n.universityId ? universities.get(n.universityId) : null;
-        return {
-          id: n.id,
-          title: n.title,
-          subject: n.subject,
-          courseCode: n.courseCode,
-          language: n.language,
-          priceMinor: n.priceMinor,
-          currency: n.currency,
-          ratingAvg: Number(n.ratingAvg),
-          ratingCount: n.ratingCount,
-          purchaseCount: n.purchaseCount,
-          downloadCount: n.downloadCount,
-          pageCount: n.pageCount,
-          publishedAt: n.publishedAt,
-          createdAt: n.createdAt,
-          university: university
-            ? { id: university.id, code: university.code, nameEn: university.nameEn }
-            : null,
-          seller: seller
-            ? { id: seller.id, nickname: seller.nickname, isVerified: seller.isVerified }
-            : null,
-          // Metadata only. The bytes are a Storage object and are served by
-          // /api/notes/[noteId]/file after an authorization check.
-          attachment: n.attachment
-            ? {
-                fileName: n.attachment.fileName,
-                mime: n.attachment.mime,
-                sizeBytes: n.attachment.sizeBytes,
-              }
-            : null,
-        };
-      }),
-    },
-    { headers: { 'Cache-Control': 'no-store' } },
+    { notes: await serializeNotes(rows, viewer?.id ?? null) },
+    { headers: { 'Cache-Control': 'private, no-store' } },
   );
 }
 
@@ -125,7 +74,8 @@ const createSchema = z.object({
   language: z.enum(['az', 'en', 'ru']).default('az'),
   /** Minor units (qepik). 0 means a free note. */
   priceMinor: z.coerce.number().int().min(0).max(100_000).default(0),
-  universityId: z.string().optional(),
+  /** Multi-select; de-duplicated and existence-checked below. */
+  universityIds: z.array(z.string().min(1).max(64)).max(10).default([]),
 });
 
 /**
@@ -195,11 +145,27 @@ export async function POST(request: NextRequest) {
     academicYear: form.get('academicYear') || undefined,
     language: form.get('language') || 'az',
     priceMinor: form.get('priceMinor') ?? 0,
-    universityId: form.get('universityId') || undefined,
+    // `universityId` still accepted so older clients keep working.
+    universityIds: [
+      ...new Set(
+        [...form.getAll('universityIds'), ...form.getAll('universityId')].filter(
+          (v): v is string => typeof v === 'string' && v.length > 0,
+        ),
+      ),
+    ],
   });
   if (!fields.success) {
     return NextResponse.json(
       { error: 'errors.validationFailed', fields: fields.error.flatten().fieldErrors },
+      { status: 400 },
+    );
+  }
+
+  // Unknown ids would render as blank tags and pollute the university filter.
+  const knownUniversities = await findUniversitiesByIds(fields.data.universityIds);
+  if (knownUniversities.size !== fields.data.universityIds.length) {
+    return NextResponse.json(
+      { error: 'errors.validationFailed', fields: { universityIds: ['unknown'] } },
       { status: 400 },
     );
   }
@@ -262,7 +228,7 @@ export async function POST(request: NextRequest) {
       academicYear: fields.data.academicYear,
       language: fields.data.language,
       priceMinor: fields.data.priceMinor,
-      universityId: fields.data.universityId,
+      universityIds: fields.data.universityIds,
       // Listed once a moderator approves it in the admin panel (Reviews).
       status: NoteStatus.PENDING_REVIEW,
       fileName: safeName,

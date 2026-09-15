@@ -44,8 +44,14 @@ export function NoteUploadForm({ universities }: { universities: { id: string; c
     academicYear: '',
     language: 'az',
     priceMinor: '0',
-    universityId: '',
   });
+  const [universityIds, setUniversityIds] = useState<string[]>([]);
+  /** Last title we generated; lets a new file replace it but never a user edit. */
+  const autoTitle = useRef('');
+
+  function toggleUniversity(id: string) {
+    setUniversityIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : ids.length < 10 ? [...ids, id] : ids));
+  }
 
   function pick(selected: File | null) {
     setError(null);
@@ -55,6 +61,20 @@ export function NoteUploadForm({ universities }: { universities: { id: string; c
       return setFile(null);
     }
     setFile(selected);
+
+    // "calculus_final-2024.pdf" -> "calculus final 2024"; only overwrite an
+    // empty or previously auto-filled title.
+    const derived = selected.name
+      .replace(/\.[^.]+$/, '')
+      .replace(/[_\-.]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 160);
+    setForm((f) => {
+      if (f.title && f.title !== autoTitle.current) return f;
+      autoTitle.current = derived;
+      return { ...f, title: derived };
+    });
   }
 
   function cancel() {
@@ -92,6 +112,7 @@ export function NoteUploadForm({ universities }: { universities: { id: string; c
     for (const [key, value] of Object.entries(form)) {
       if (value) body.append(key, value);
     }
+    for (const id of universityIds) body.append('universityIds', id);
 
     const xhr = new XMLHttpRequest();
     xhrRef.current = xhr;
@@ -236,6 +257,9 @@ export function NoteUploadForm({ universities }: { universities: { id: string; c
           <span className="text-2xs font-medium text-fg-muted">{t('notes.upload.fields.title')}</span>
           <input required minLength={3} maxLength={160} className={field}
             value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          {form.title && form.title === autoTitle.current && (
+            <span className="text-2xs text-fg-subtle">{t('notes.upload.titleFromFile')}</span>
+          )}
         </label>
 
         <label className="flex flex-col gap-1 sm:col-span-2">
@@ -256,14 +280,32 @@ export function NoteUploadForm({ universities }: { universities: { id: string; c
             value={form.courseCode} onChange={(e) => setForm({ ...form, courseCode: e.target.value })} />
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-2xs font-medium text-fg-muted">{t('notes.upload.fields.university')}</span>
-          <select className={field} value={form.universityId}
-            onChange={(e) => setForm({ ...form, universityId: e.target.value })}>
-            <option value="">—</option>
-            {universities.map((u) => <option key={u.id} value={u.id}>{u.code}</option>)}
-          </select>
-        </label>
+        <fieldset className="flex flex-col gap-1 sm:col-span-2">
+          <legend className="text-2xs font-medium text-fg-muted">
+            {t('notes.upload.fields.universities')}
+          </legend>
+          <div className="mt-1 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+            {universities.map((u) => {
+              const on = universityIds.includes(u.id);
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleUniversity(u.id)}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
+                    on
+                      ? 'bg-accent text-accent-fg'
+                      : 'border border-edge bg-surface text-fg-muted hover:border-edge-strong'
+                  }`}
+                >
+                  {u.code}
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-2xs text-fg-subtle">{t('notes.upload.universitiesHint')}</span>
+        </fieldset>
 
         <label className="flex flex-col gap-1">
           <span className="text-2xs font-medium text-fg-muted">{t('notes.upload.fields.price')}</span>

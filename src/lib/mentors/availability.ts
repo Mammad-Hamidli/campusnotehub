@@ -46,13 +46,19 @@ export async function getDaySlots(params: {
   const localDay = toZonedTime(dayStartUtc, mentor.timezone);
   const weekday = localDay.getDay();
 
-  const exception = availabilityExceptions.find(
+  // A day may carry several exceptions: a whole-day block wins; partial
+  // blocks (from the mentor schedule settings) carve time out of the windows.
+  const todays = availabilityExceptions.filter(
     (e) => e.date.toISOString().slice(0, 10) === params.date,
   );
-  if (exception?.isBlocked && exception.startMinute === null) return [];
+  if (todays.some((e) => e.isBlocked && e.startMinute === null)) return [];
+  const blocks = todays
+    .filter((e) => e.isBlocked && e.startMinute !== null)
+    .map((e) => ({ start: e.startMinute!, end: e.endMinute ?? 1440 }));
+  const exception = todays.find((e) => !e.isBlocked && e.startMinute !== null);
 
-  const windows = exception && !exception.isBlocked && exception.startMinute !== null
-    ? [{ startMinute: exception.startMinute, endMinute: exception.endMinute ?? 1440 }]
+  const windows = exception
+    ? [{ startMinute: exception.startMinute!, endMinute: exception.endMinute ?? 1440 }]
     : availabilityRules
         .filter((r) => r.weekday === weekday)
         .filter((r) => !r.validFrom || r.validFrom <= dayStartUtc)
@@ -71,6 +77,7 @@ export async function getDaySlots(params: {
   const slots: Slot[] = [];
   for (const w of windows) {
     for (let m = w.startMinute; m + mentor.sessionMinutes <= w.endMinute; m += step) {
+      if (blocks.some((b) => m < b.end && m + mentor.sessionMinutes > b.start)) continue;
       const startsAt = addMinutes(dayStartUtc, m);
       const endsAt = addMinutes(startsAt, mentor.sessionMinutes);
 

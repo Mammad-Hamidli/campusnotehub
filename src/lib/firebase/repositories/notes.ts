@@ -1,7 +1,6 @@
-import { FieldValue } from 'firebase-admin/firestore';
 import type { NoteStatus, OrderStatus } from '@/lib/enums';
 import { adminDb } from '../admin.core';
-import { COLLECTIONS } from '../collections';
+import { COLLECTIONS, SUBCOLLECTIONS } from '../collections';
 import { deleteAuthenticated, downloadAuthenticated, uploadBuffer } from '@/lib/cloudinary/server';
 import { docToObject, docsToObjects, forFirestore, sortBy } from '../convert';
 
@@ -60,7 +59,10 @@ export type NoteRecord = {
   sellerId: string;
   title: string;
   description: string;
+  /** First entry of universityIds; kept for older readers (admin, purchases). */
   universityId: string | null;
+  /** Every university the note is tagged with. Absent on pre-multi-tag notes. */
+  universityIds?: string[];
   courseCode: string | null;
   subject: string;
   language: string;
@@ -73,10 +75,12 @@ export type NoteRecord = {
   sizeBytes: number;
   pageCount: number | null;
   previewKey: string | null;
-  downloadCount: number;
   purchaseCount: number;
   ratingAvg: number;
+  /** Unique reviewers: one noteReviews doc per verified buyer. */
   ratingCount: number;
+  /** Sum of star values; lets creator averages be weighted exactly. */
+  ratingSum?: number;
   rejectionReason: string | null;
   publishedAt: Date | null;
   createdAt: Date;
@@ -102,6 +106,13 @@ export type OrderRecord = {
 
 const notes = () => adminDb().collection(COLLECTIONS.notes);
 const orders = () => adminDb().collection(COLLECTIONS.orders);
+const reviews = () => adminDb().collection(COLLECTIONS.noteReviews);
+const saved = (userId: string) => adminDb().collection(SUBCOLLECTIONS.savedNotes(userId));
+
+/** Tagged universities, tolerant of notes written before multi-tagging. */
+export function noteUniversityIds(note: Pick<NoteRecord, 'universityId' | 'universityIds'>): string[] {
+  return note.universityIds?.length ? note.universityIds : note.universityId ? [note.universityId] : [];
+}
 
 export function newNoteId(): string {
   return notes().doc().id;
@@ -154,11 +165,16 @@ export async function listNotes(
   let query: FirebaseFirestore.Query = notes();
   if (filter.status) query = query.where('status', '==', filter.status);
   if (filter.sellerId) query = query.where('sellerId', '==', filter.sellerId);
-  if (filter.universityId) query = query.where('universityId', '==', filter.universityId);
   if (filter.subject) query = query.where('subject', '==', filter.subject);
 
   const snap = await query.limit(LIST_SCAN_CEILING).get();
-  const rows = docsToObjects<NoteRecord>(snap.docs) as NoteRecord[];
+  let rows = docsToObjects<NoteRecord>(snap.docs) as NoteRecord[];
+  // In memory: covers both `universityIds` (array) and legacy `universityId`
+  // without an array-contains + status composite index.
+  if (filter.universityId) {
+    const wanted = filter.universityId;
+    rows = rows.filter((n) => noteUniversityIds(n).includes(wanted));
+  }
 
   if (sort === 'trending') {
     rows.sort(
@@ -215,7 +231,7 @@ export async function createNote(params: {
   academicYear?: string;
   language: string;
   priceMinor: number;
-  universityId?: string;
+  universityIds: string[];
   status: NoteStatus;
   fileName: string;
   mime: string;
@@ -248,7 +264,8 @@ export async function createNote(params: {
     language: params.language,
     priceMinor: params.priceMinor,
     currency: 'AZN',
-    universityId: params.universityId ?? null,
+    universityId: params.universityIds[0] ?? null,
+    universityIds: params.universityIds,
     status: params.status,
     // `fileKey` stays the logical locator the rest of the code talks in; it is
     // now genuinely an object key, which is what the old comment anticipated.
@@ -257,10 +274,10 @@ export async function createNote(params: {
     sizeBytes: params.bytes.length,
     pageCount: null,
     previewKey: null,
-    downloadCount: 0,
     purchaseCount: 0,
     ratingAvg: 0,
     ratingCount: 0,
+    ratingSum: 0,
     rejectionReason: null,
     publishedAt: null,
     createdAt: now,
@@ -287,10 +304,6 @@ export async function readNoteBytes(note: NoteRecord): Promise<Buffer> {
     resourceType: 'raw',
     version: note.attachment?.storageVersion ?? null,
   });
-}
-
-export async function incrementDownloadCount(id: string): Promise<void> {
-  await notes().doc(id).update({ downloadCount: FieldValue.increment(1) });
 }
 
 export async function updateNote(id: string, patch: Record<string, unknown>): Promise<void> {
@@ -345,6 +358,147 @@ export async function countOrders(where: Record<string, unknown> = {}): Promise<
   let query: FirebaseFirestore.Query = orders();
   for (const [field, value] of Object.entries(where)) query = query.where(field, '==', value);
   return (await query.count().get()).data().count;
+}
+
+/** Keyed batch read; `getAll()` with zero refs throws, hence the guard. */
+async function existingIds(refs: FirebaseFirestore.DocumentReference[]) {
+  if (refs.length === 0) return [];
+  return adminDb().getAll(...refs);
+}
+
+export async function findNotesByIds(ids: string[]): Promise<NoteRecord[]> {
+  const snaps = await existingIds([...new Set(ids)].map((id) => notes().doc(id)));
+  return docsToObjects<NoteRecord>(snaps) as NoteRecord[];
+}
+
+/** Which of these notes the buyer holds a PAID order for. */
+export async function findPaidNoteIds(buyerId: string, noteIds: string[]): Promise<Set<string>> {
+  const snaps = await existingIds(noteIds.map((id) => orders().doc(orderIdFor(buyerId, id))));
+  return new Set(snaps.filter((s) => s.data()?.status === 'PAID').map((s) => String(s.data()!.noteId)));
+}
+
+// ---------------------------------------------------------------- reviews
+
+export class NoteReviewError extends Error {
+  constructor(readonly messageKey: string, readonly status: number) {
+    super(messageKey);
+  }
+}
+
+/** The viewer's own star value per note, for pre-filling the rating control. */
+export async function findViewerRatings(userId: string, noteIds: string[]): Promise<Map<string, number>> {
+  const snaps = await existingIds(noteIds.map((id) => reviews().doc(orderIdFor(userId, id))));
+  return new Map(snaps.filter((s) => s.exists).map((s) => [String(s.data()!.noteId), Number(s.data()!.rating)]));
+}
+
+/**
+ * Creates or updates a buyer's rating.
+ *
+ * Review id = order id, so one buyer is one reviewer (ratingCount counts unique
+ * reviewers) and a re-rate replaces rather than adds. The PAID-order read is
+ * inside the transaction: a refund racing the review aborts and re-runs it.
+ */
+export async function upsertNoteReview(p: {
+  userId: string;
+  noteId: string;
+  rating: number;
+  body: string | null;
+}): Promise<{ ratingAvg: number; ratingCount: number; rating: number }> {
+  const db = adminDb();
+  const id = orderIdFor(p.userId, p.noteId);
+  const noteRef = notes().doc(p.noteId);
+  const reviewRef = reviews().doc(id);
+
+  return db.runTransaction(async (tx) => {
+    const [orderSnap, noteSnap, reviewSnap] = await tx.getAll(orders().doc(id), noteRef, reviewRef);
+    if (orderSnap.data()?.status !== 'PAID') {
+      throw new NoteReviewError('notes.reviews.errors.purchaseRequired', 403);
+    }
+    if (!noteSnap.exists) throw new NoteReviewError('errors.notFound', 404);
+
+    const note = noteSnap.data()!;
+    const previous = reviewSnap.exists ? Number(reviewSnap.data()!.rating) : null;
+    const prevCount = Number(note.ratingCount ?? 0);
+    const prevSum = Number(note.ratingSum ?? Number(note.ratingAvg ?? 0) * prevCount);
+    const ratingCount = prevCount + (previous === null ? 1 : 0);
+    const ratingSum = prevSum - (previous ?? 0) + p.rating;
+    const ratingAvg = Math.round((ratingSum / ratingCount) * 100) / 100;
+    const now = new Date();
+
+    tx.set(reviewRef, {
+      noteId: p.noteId,
+      sellerId: note.sellerId,
+      userId: p.userId,
+      rating: p.rating,
+      body: p.body,
+      createdAt: reviewSnap.data()?.createdAt ?? now,
+      updatedAt: now,
+    });
+    tx.update(noteRef, { ratingSum, ratingCount, ratingAvg });
+    return { ratingAvg, ratingCount, rating: p.rating };
+  });
+}
+
+export type CreatorStats = { ratingAvg: number; ratedFiles: number; reviewCount: number };
+
+/**
+ * `@handle 4.6⭐ (3 files for 27 total reviews)` for many sellers at once.
+ *
+ * Computed on read from PUBLISHED notes (sellerId `in`, single-field index,
+ * projected to four fields) so deletions and takedowns never leave a stale
+ * denormalised aggregate behind.
+ */
+export async function creatorStatsFor(sellerIds: string[]): Promise<Map<string, CreatorStats>> {
+  const unique = [...new Set(sellerIds)].filter(Boolean);
+  const chunks = Array.from({ length: Math.ceil(unique.length / 30) }, (_, i) => unique.slice(i * 30, i * 30 + 30));
+  const snaps = await Promise.all(
+    chunks.map((ids) =>
+      notes().where('sellerId', 'in', ids).select('sellerId', 'status', 'ratingSum', 'ratingAvg', 'ratingCount').get(),
+    ),
+  );
+
+  const acc = new Map<string, { sum: number; files: number; reviews: number }>();
+  for (const doc of snaps.flatMap((s) => s.docs)) {
+    const d = doc.data();
+    const count = Number(d.ratingCount ?? 0);
+    if (d.status !== 'PUBLISHED' || count === 0) continue;
+    const a = acc.get(d.sellerId) ?? { sum: 0, files: 0, reviews: 0 };
+    a.sum += Number(d.ratingSum ?? Number(d.ratingAvg ?? 0) * count);
+    a.files += 1;
+    a.reviews += count;
+    acc.set(d.sellerId, a);
+  }
+
+  return new Map(
+    unique.map((id) => {
+      const a = acc.get(id);
+      return [
+        id,
+        a
+          ? { ratingAvg: Math.round((a.sum / a.reviews) * 10) / 10, ratedFiles: a.files, reviewCount: a.reviews }
+          : { ratingAvg: 0, ratedFiles: 0, reviewCount: 0 },
+      ];
+    }),
+  );
+}
+
+// ------------------------------------------------------------ saved notes
+
+export async function setNoteSaved(userId: string, noteId: string, on: boolean): Promise<void> {
+  const ref = saved(userId).doc(noteId);
+  if (on) await ref.set({ noteId, createdAt: new Date() });
+  else await ref.delete();
+}
+
+export async function findSavedNoteIds(userId: string, noteIds: string[]): Promise<Set<string>> {
+  const snaps = await existingIds(noteIds.map((id) => saved(userId).doc(id)));
+  return new Set(snaps.filter((s) => s.exists).map((s) => s.id));
+}
+
+/** Newest first. Single-field order on a subcollection: no composite index. */
+export async function listSavedNoteIds(userId: string, take = 100): Promise<string[]> {
+  const snap = await saved(userId).orderBy('createdAt', 'desc').limit(take).get();
+  return snap.docs.map((d) => d.id);
 }
 
 /** Moderation queue: every note in one status, newest first. */

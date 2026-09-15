@@ -30,7 +30,14 @@
 export const MAX_IMAGE_BYTES = 12 * 1024 * 1024; // 12 MB
 export const MAX_IMAGE_MB = MAX_IMAGE_BYTES / (1024 * 1024);
 
-export const ACCEPTED_IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+/**
+ * The ONE stored size for feed images (4:3). Every upload is cover-cropped to
+ * exactly this, so the feed never renders mixed aspect ratios.
+ */
+export const FEED_IMAGE_WIDTH = 1200;
+export const FEED_IMAGE_HEIGHT = 900;
+
+export const ACCEPTED_IMAGE_MIME =['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 
 /** The accept= attribute for the file input, derived from the same list. */
 export const IMAGE_ACCEPT_ATTRIBUTE = [

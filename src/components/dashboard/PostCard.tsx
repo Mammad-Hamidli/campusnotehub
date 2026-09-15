@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Flag, Heart, Link2, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { FEED_IMAGE_HEIGHT, FEED_IMAGE_WIDTH } from '@/lib/media/constants';
 import { Menu, MenuItem } from '@/components/ui/Menu';
 import { VerifiedBadge } from './VerificationBanner';
 import { CommentThread } from './CommentThread';
@@ -240,12 +241,11 @@ export function PostCard({
       </p>
 
       {/*
-        Images.
-
-        `aspect-ratio` is set from the stored dimensions so the browser
-        reserves the right box BEFORE the bytes arrive. Without it every image
-        loads at zero height and then shoves the rest of the feed down - the
-        layout shift that makes a timeline unusable while scrolling.
+        Images: one fixed 4:3 frame for every upload, whatever its native
+        ratio (object-cover crops, never letterboxes). The box is sized before
+        the bytes arrive, so no layout shift. Server re-encodes new uploads to
+        FEED_IMAGE_WIDTH x FEED_IMAGE_HEIGHT; this frame also normalises
+        images stored before that change.
       */}
       {post.media.length > 0 && (
         <div
@@ -257,25 +257,18 @@ export function PostCard({
               href={image.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block overflow-hidden rounded-xl border border-edge bg-surface-inset"
+              className="relative block aspect-[4/3] w-full overflow-hidden rounded-xl border border-edge bg-surface-inset"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element -- next/image
-                  would proxy through the optimiser, which needs a configured
-                  loader and buys nothing here: these are already re-encoded,
-                  bounded WebP served with an immutable cache header. */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- already
+                  re-encoded, bounded WebP; next/image would add a loader hop. */}
               <img
                 src={image.url}
                 alt={image.alt ?? ''}
-                width={image.width ?? undefined}
-                height={image.height ?? undefined}
+                width={FEED_IMAGE_WIDTH}
+                height={FEED_IMAGE_HEIGHT}
                 loading="lazy"
                 decoding="async"
-                className="h-auto w-full object-cover"
-                style={
-                  image.width && image.height
-                    ? { aspectRatio: `${image.width} / ${image.height}` }
-                    : undefined
-                }
+                className="absolute inset-0 h-full w-full object-cover"
               />
             </a>
           ))}

@@ -47,6 +47,7 @@ type Viewer = {
   verificationStatus: string;
   graduationYear?: number;
   graduationMonth?: number;
+  isMentor: boolean;
 };
 
 /**
@@ -248,6 +249,7 @@ export function DashboardShell({
             verificationStatus: user.verificationStatus,
             graduationYear: user.graduationYear ?? undefined,
             graduationMonth: user.graduationMonth ?? undefined,
+            isMentor: Boolean(user.isMentor),
           });
         }
 
@@ -522,6 +524,8 @@ export function DashboardShell({
               // the note list, its create button and the mentor directory never
               // appeared on the dashboard. The real modules are used instead.
               <NotesList embedded canUpload={canUploadNotes} />
+            ) : tab === 'saved' ? (
+              <NotesList embedded source="saved" />
             ) : tab === 'mentors' ? (
               <MentorsList embedded />
             ) : (
@@ -551,6 +555,7 @@ function ModulePlaceholder({ tab }: { tab: DashboardTab }) {
 
   const config = {
     notes: { icon: BookOpen, titleKey: 'notes.title', bodyKey: 'notes.subtitle' },
+    saved: { icon: BookOpen, titleKey: 'notes.saved.title', bodyKey: 'notes.saved.empty' },
     mentors: { icon: UserRoundSearch, titleKey: 'mentors.title', bodyKey: 'mentors.subtitle' },
     wallet: { icon: Wallet, titleKey: 'wallet.title', bodyKey: 'wallet.empty' },
     feed: { icon: BookOpen, titleKey: 'feed.title', bodyKey: 'feed.empty' },

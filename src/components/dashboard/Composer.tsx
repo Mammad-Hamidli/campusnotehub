@@ -210,7 +210,7 @@ export function Composer({
                     aria-pressed={selected}
                     className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
                       selected
-                        ? 'bg-accent text-accent'
+                        ? 'bg-accent text-accent-fg'
                         : 'bg-surface text-fg-muted hover:bg-surface-inset'
                     }`}
                   >
@@ -291,9 +291,14 @@ export function Composer({
                 type="button"
                 onClick={submit}
                 disabled={!canPost}
+                /* Was `bg-accent text-accent hover:bg-accent`: label and icon
+                   painted in the fill colour, so the Share button rendered as a
+                   blank pill. `accent-fg` is the on-accent token (white / near-
+                   black by theme); disabled uses the inset surface + subtle
+                   text pair, which also keeps contrast in both themes. */
                 className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2
- text-sm font-semibold text-accent transition hover:bg-accent
-                           active:scale-[0.98] disabled:bg-surface-inset disabled:text-fg-subtle"
+ text-sm font-semibold text-accent-fg transition hover:bg-accent-hover
+                           active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-surface-inset disabled:text-fg-subtle"
               >
                 {posting ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />

@@ -11,6 +11,7 @@ import {
 } from '@/lib/firebase/repositories/mentorApplications';
 import { writeAuditLog } from '@/lib/firebase/repositories/audit';
 import { sendEmailAsync } from '@/lib/email/send';
+import { timezoneSchema, weeklyRulesSchema } from '@/lib/mentors/schedule';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -51,6 +52,9 @@ const applySchema = z.object({
     .optional()
     .nullable()
     .or(z.literal('').transform(() => null)),
+  /** From the interactive grid; replaces free-text availability. */
+  availability: weeklyRulesSchema.refine((rules) => rules.length > 0, 'mentors.schedule.errors.empty'),
+  timezone: timezoneSchema.default('Asia/Baku'),
 });
 
 async function session(request: NextRequest) {
@@ -159,6 +163,8 @@ export async function POST(request: NextRequest) {
     hourlyRateMinor: input.hourlyRateMinor,
     sessionMinutes: input.sessionMinutes,
     linkedinUrl: input.linkedinUrl ?? null,
+    availability: input.availability,
+    timezone: input.timezone,
   });
 
   await writeAuditLog({

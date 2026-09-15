@@ -7,6 +7,7 @@ import {
   Bell,
   BookOpen,
   Bookmark,
+  CalendarClock,
   LogOut,
   Menu as MenuIcon,
   MessagesSquare,
@@ -22,11 +23,12 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Menu, MenuItem, MenuSeparator } from '@/components/ui/Menu';
 import { useT } from '@/lib/i18n/LocaleProvider';
 
-export type DashboardTab = 'feed' | 'notes' | 'mentors' | 'wallet';
+export type DashboardTab = 'feed' | 'notes' | 'saved' | 'mentors' | 'wallet';
 
 const TABS: { tab: DashboardTab; icon: LucideIcon; labelKey: string }[] = [
   { tab: 'feed', icon: MessagesSquare, labelKey: 'nav.feed' },
   { tab: 'notes', icon: BookOpen, labelKey: 'nav.notes' },
+  { tab: 'saved', icon: Bookmark, labelKey: 'nav.saved' },
   { tab: 'mentors', icon: UserRoundSearch, labelKey: 'nav.mentors' },
   { tab: 'wallet', icon: Wallet, labelKey: 'nav.wallet' },
 ];
@@ -34,7 +36,6 @@ const TABS: { tab: DashboardTab; icon: LucideIcon; labelKey: string }[] = [
 /** Secondary destinations. All resolve to real 200 pages. */
 const LINKS: { href: string; icon: LucideIcon; labelKey: string }[] = [
   { href: '/notifications', icon: Bell, labelKey: 'nav.notifications' },
-  { href: '/bookmarks', icon: Bookmark, labelKey: 'nav.bookmarks' },
 ];
 
 /**
@@ -52,7 +53,7 @@ export function Sidebar({
 }: {
   active: DashboardTab;
   onSelect: (tab: DashboardTab) => void;
-  user: { nickname: string; university: string; verified: boolean; initials: string };
+  user: { nickname: string; university: string; verified: boolean; initials: string; isMentor?: boolean };
 }) {
   const t = useT();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -163,6 +164,11 @@ export function Sidebar({
           <MenuItem href="/settings" icon={<Settings className="h-4 w-4" />} onSelect={close}>
             {t('nav.settings')}
           </MenuItem>
+          {user.isMentor && (
+            <MenuItem href="/mentors/schedule" icon={<CalendarClock className="h-4 w-4" />} onSelect={close}>
+              {t('nav.mentorSchedule')}
+            </MenuItem>
+          )}
           <MenuSeparator />
           <MenuItem
             href="/logout"

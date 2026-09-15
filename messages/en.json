@@ -41,7 +41,9 @@
     "help": "Help",
     "bookmarks": "Bookmarks",
     "explore": "Explore",
-    "admin": "Admin"
+    "admin": "Admin",
+    "saved": "Saved items",
+    "mentorSchedule": "Mentor schedule"
   },
   "auth": {
     "register": {
@@ -356,7 +358,8 @@
         "subject": "Subject",
         "courseCode": "Course code",
         "university": "University",
-        "price": "Price (qepik, 0 = free)"
+        "price": "Price (qepik, 0 = free)",
+        "universities": "Universities"
       },
       "errors": {
         "missing": "Choose a file to upload.",
@@ -382,7 +385,9 @@
       "maxSize": "Up to {mb} MB. PDF or Word (.pdf, .doc, .docx).",
       "verifyFirstTitle": "Verify your identity first",
       "verifyFirstBody": "Selling notes requires a verified identity. Once your verification is complete you can upload notes.",
-      "selected": "{name} ({size})"
+      "selected": "{name} ({size})",
+      "universitiesHint": "Select every university this note is relevant to (up to 10).",
+      "titleFromFile": "Filled in from the file name — edit freely."
     },
     "errors": {
       "notVerified": "Your account must be verified before you can sell notes",
@@ -396,7 +401,6 @@
     "free": "Free",
     "download": "Download",
     "stats": {
-      "downloads": "{n} downloads",
       "purchases": "{n} purchases"
     },
     "empty": "No notes have been uploaded yet.",
@@ -413,7 +417,25 @@
     "buyFree": "Get for free",
     "buying": "Purchasing…",
     "owned": "Owned",
-    "bought": "Purchase complete"
+    "bought": "Purchase complete",
+    "creatorStats": "{avg}⭐ ({files} files for {reviews} total reviews)",
+    "lockedUntilPurchase": "Unlocks after purchase",
+    "reviews": {
+      "rate": "Rate this note",
+      "yourRating": "Your rating",
+      "stars": "{n} stars",
+      "summary": "{avg} ({count} reviewers)",
+      "errors": {
+        "purchaseRequired": "Only buyers of this note can rate it."
+      }
+    },
+    "saved": {
+      "title": "Saved items",
+      "subtitle": "Notes you saved for later",
+      "empty": "Nothing saved yet. Tap the bookmark on any note to keep it here.",
+      "add": "Save for later",
+      "remove": "Remove from saved"
+    }
   },
   "mentors": {
     "title": "PocketMentor",
@@ -547,6 +569,34 @@
       "errors": {
         "pending": "You already have an application under review.",
         "alreadyMentor": "You are already an approved mentor."
+      }
+    },
+    "schedule": {
+      "title": "Availability",
+      "subtitle": "Choose when students can book you. Changes apply to new bookings immediately.",
+      "gridLabel": "Weekly availability",
+      "available": "Available",
+      "unavailable": "Unavailable",
+      "hint": "Click or drag to paint. Click a day or hour to toggle it all.",
+      "clear": "Clear all",
+      "notMentor": "Schedule settings are available once your mentor application is approved.",
+      "accepting": "Accepting new bookings",
+      "timezone": "Time zone",
+      "buffer": "Break between sessions",
+      "minNotice": "Minimum notice (hours)",
+      "weekly": "Weekly schedule",
+      "blocked": "Blocked dates",
+      "blockedHint": "Days or hours you are unavailable, overriding the weekly schedule.",
+      "date": "Date",
+      "allDay": "All day",
+      "from": "From",
+      "to": "To",
+      "addBlocked": "Block",
+      "save": "Save schedule",
+      "saved": "Schedule saved.",
+      "applyHint": "Select the time slots you can usually take sessions. You can change this later.",
+      "errors": {
+        "empty": "Select at least one available time slot."
       }
     }
   },

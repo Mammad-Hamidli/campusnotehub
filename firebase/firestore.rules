@@ -93,6 +93,12 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Bookmarks: private to the owner; written only via /api/notes/:id/save.
+      match /savedNotes/{noteId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
+
       // Follow graph. Public in the product, so readable; written server-side
       // so the denormalised counters stay consistent with it.
       match /followers/{followerId} {
@@ -156,9 +162,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // A review doc carries the reviewer's userId, and only buyers can review,
+    // so reading it would disclose who purchased what. Aggregates are served
+    // by the API (ratingAvg / ratingCount on the note).
     match /noteReviews/{id} {
-      allow read: if signedIn();
-      allow write: if false;
+      allow read, write: if false;
     }
 
     // An order is a purchase record: what someone bought and what they paid.

@@ -5,6 +5,7 @@ import {
   FileImage,
   FileSpreadsheet,
   FileText,
+  Lock,
   Presentation,
   type LucideIcon,
 } from 'lucide-react';
@@ -43,12 +44,17 @@ export function FileChip({
   mime,
   sizeBytes,
   downloadLabel,
+  locked = false,
+  lockedLabel,
 }: {
   noteId: string;
   fileName: string;
   mime: string;
   sizeBytes: number;
   downloadLabel: string;
+  /** Not purchased: no link is rendered at all (the route would 404 anyway). */
+  locked?: boolean;
+  lockedLabel?: string;
 }) {
   const { icon: Icon, label } = describe(mime);
 
@@ -70,16 +76,23 @@ export function FileChip({
         </span>
       </span>
 
-      <a
-        href={`/api/notes/${noteId}/file`}
-        className="btn-secondary shrink-0 px-2 py-1 text-2xs"
-        // The server sets Content-Disposition: attachment; this only supplies
-        // a sensible default name if the browser asks where to save it.
-        download={fileName}
-      >
-        <Download className="h-3.5 w-3.5" aria-hidden="true" />
-        {downloadLabel}
-      </a>
+      {locked ? (
+        <span className="inline-flex shrink-0 items-center gap-1 px-2 py-1 text-2xs text-fg-subtle">
+          <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+          {lockedLabel}
+        </span>
+      ) : (
+        <a
+          href={`/api/notes/${noteId}/file`}
+          className="btn-secondary shrink-0 px-2 py-1 text-2xs"
+          // The server sets Content-Disposition: attachment; this only supplies
+          // a sensible default name if the browser asks where to save it.
+          download={fileName}
+        >
+          <Download className="h-3.5 w-3.5" aria-hidden="true" />
+          {downloadLabel}
+        </a>
+      )}
     </div>
   );
 }

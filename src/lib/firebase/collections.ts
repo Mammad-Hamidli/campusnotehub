@@ -103,6 +103,8 @@ export const SUBCOLLECTIONS = {
   userFollowing: (userId: string) => `${COLLECTIONS.users}/${userId}/following`,
   /** Per-user notification preferences, one document per type+channel. */
   notifPrefs: (userId: string) => `${COLLECTIONS.users}/${userId}/notificationPreferences`,
+  /** "Save for later" bookmarks; doc id = noteId, so saving twice is a no-op. */
+  savedNotes: (userId: string) => `${COLLECTIONS.users}/${userId}/savedNotes`,
   /** Availability rules belong to exactly one mentor and are read with them. */
   availability: (mentorId: string) => `${COLLECTIONS.mentorProfiles}/${mentorId}/availability`,
   /**

@@ -242,6 +242,53 @@ export async function listAvailabilityExceptions(
   return docsToObjects<AvailabilityExceptionRecord>(snap.docs) as AvailabilityExceptionRecord[];
 }
 
+/**
+ * Queues "replace all weekly rules" onto a batch. Existing rule ids must be
+ * read by the caller first (a batch cannot read), so approval and settings
+ * share this without either owning the read.
+ */
+export function replaceRulesInBatch(
+  batch: FirebaseFirestore.WriteBatch,
+  mentorId: string,
+  existingIds: string[],
+  next: { weekday: number; startMinute: number; endMinute: number }[],
+): void {
+  for (const id of existingIds) batch.delete(rules(mentorId).doc(id));
+  for (const r of next) {
+    batch.set(rules(mentorId).doc(), { ...r, validFrom: null, validUntil: null });
+  }
+}
+
+/**
+ * Settings save: weekly rules, blocked dates and booking knobs, atomically.
+ * Past exceptions are pruned on every save so the subcollection stays bounded.
+ */
+export async function saveMentorSchedule(
+  mentorId: string,
+  input: {
+    rules: { weekday: number; startMinute: number; endMinute: number }[];
+    blocked: { date: string; startMinute: number | null; endMinute: number | null }[];
+    profile: Record<string, unknown>;
+  },
+): Promise<void> {
+  const [ruleSnap, exceptionSnap] = await Promise.all([rules(mentorId).get(), exceptions(mentorId).get()]);
+  const batch = adminDb().batch();
+
+  replaceRulesInBatch(batch, mentorId, ruleSnap.docs.map((d) => d.id), input.rules);
+  for (const doc of exceptionSnap.docs) batch.delete(doc.ref);
+  for (const b of input.blocked) {
+    batch.set(exceptions(mentorId).doc(), {
+      // UTC midnight: getDaySlots matches on toISOString().slice(0, 10).
+      date: new Date(`${b.date}T00:00:00Z`),
+      isBlocked: true,
+      startMinute: b.startMinute,
+      endMinute: b.endMinute,
+    });
+  }
+  batch.update(mentors().doc(mentorId), forFirestore({ ...input.profile, updatedAt: new Date() }));
+  await batch.commit();
+}
+
 export async function findBookingById(id: string): Promise<BookingRecord | null> {
   return docToObject<BookingRecord>(await bookings().doc(id).get()) as BookingRecord | null;
 }

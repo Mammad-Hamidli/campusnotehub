@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BadgeCheck, Loader2, Pencil, ShieldAlert } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { CreatorHandle, type CreatorStats } from '@/components/notes/CreatorHandle';
 
 type Me = {
   id: string;
@@ -28,6 +29,7 @@ type Me = {
   university: { code: string; nameEn: string; city: string } | null;
   faculty: { nameEn: string } | null;
   _count: { posts: number; notes: number; followers: number; following: number };
+  creatorStats: CreatorStats | null;
 };
 
 /**
@@ -96,8 +98,8 @@ export function ProfileView() {
         </span>
 
         <div className="min-w-0 flex-1">
-          <h1 className="flex items-center gap-1.5 text-lg font-bold tracking-tight text-fg">
-            @{me.nickname}
+          <h1 className="flex flex-wrap items-center gap-1.5 text-lg font-bold tracking-tight text-fg">
+            <CreatorHandle nickname={me.nickname} stats={me.creatorStats} />
             {me.isVerified && (
               <BadgeCheck className="h-4 w-4 shrink-0 text-verified" aria-label={t('profile.verified')} />
             )}

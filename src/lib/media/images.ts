@@ -10,7 +10,7 @@
  */
 import 'server-only';
 import sharp from 'sharp';
-import { ACCEPTED_IMAGE_MIME, MAX_IMAGE_BYTES } from './constants';
+import { ACCEPTED_IMAGE_MIME, FEED_IMAGE_HEIGHT, FEED_IMAGE_WIDTH, MAX_IMAGE_BYTES } from './constants';
 
 /**
  * Re-exported so server code has one import for everything image-related,
@@ -59,8 +59,6 @@ export {
  */
 
 
-/** Longest edge of the stored image. Larger inputs are scaled down. */
-const MAX_DIMENSION = 2048;
 /** Smallest accepted input; below this it is an icon, not a photo. */
 const MIN_DIMENSION = 32;
 
@@ -138,13 +136,16 @@ export async function processImage(input: Buffer): Promise<ImageResult> {
 
     const bytes = await pipeline
       .rotate() // Applies the EXIF orientation flag BEFORE that metadata is dropped.
+      // Strict uniform output: every feed image is exactly FEED_IMAGE_WIDTH x
+      // FEED_IMAGE_HEIGHT. `cover` + `attention` crops to the most salient
+      // region instead of letterboxing; small inputs are upscaled so the
+      // stored size never varies.
       .resize({
-        width: MAX_DIMENSION,
-        height: MAX_DIMENSION,
-        fit: 'inside',
-        // Never scale a small image UP: it would waste bytes and look worse
-        // than the original at the same rendered size.
-        withoutEnlargement: true,
+        width: FEED_IMAGE_WIDTH,
+        height: FEED_IMAGE_HEIGHT,
+        fit: 'cover',
+        // Saliency cropping is single-frame only; animated GIFs crop centred.
+        position: sniffed === 'image/gif' ? 'centre' : sharp.strategy.attention,
       })
       .webp({ quality: 82 })
       .toBuffer();

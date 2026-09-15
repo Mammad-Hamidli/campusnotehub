@@ -90,6 +90,10 @@ export const LIMITS = {
   // Its own bucket: uploading notes must never use up the right to apply.
   'mentors:apply': { limit: 5, windowMs: 24 * 60 * 60_000 },
   'orders:create': { limit: 30, windowMs: 60 * 60_000 },
+  'notes:review': { limit: 30, windowMs: 60 * 60_000 },
+  'notes:save': { limit: 120, windowMs: 60 * 60_000 },
+  'notes:download': { limit: 60, windowMs: 60 * 60_000 },
+  'mentors:schedule': { limit: 60, windowMs: 60 * 60_000 },
   'bookings:create': { limit: 10, windowMs: 24 * 60 * 60_000 },
   'search': { limit: 120, windowMs: 60_000 },
 } as const;

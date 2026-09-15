@@ -1,7 +1,8 @@
 import { adminDb } from '../admin.core';
 import { COLLECTIONS } from '../collections';
 import { docToObject, docsToObjects, forFirestore } from '../convert';
-import { findMentorByUserId } from './mentors';
+import { findMentorByUserId, mentorCollections, replaceRulesInBatch } from './mentors';
+import type { WeeklyRule } from '@/lib/mentors/schedule';
 
 /**
  * PocketMentor applications.
@@ -38,6 +39,9 @@ export type MentorApplicationInput = {
   hourlyRateMinor: number;
   sessionMinutes: number;
   linkedinUrl: string | null;
+  /** Weekly grid from the application. Optional: older applications lack it. */
+  availability?: WeeklyRule[];
+  timezone?: string;
 };
 
 export type MentorApplicationRecord = MentorApplicationInput & {
@@ -127,6 +131,12 @@ export async function approveMentorApplication(
 
   const now = new Date();
   const [current] = application.experiences;
+  // Read before the batch (batches cannot read). Only touched when the
+  // application carries a schedule, so legacy approvals keep existing rules.
+  const existingRuleIds =
+    existing && application.availability
+      ? (await mentorCollections.rules(existing.id).get()).docs.map((d) => d.id)
+      : [];
 
   const fromApplication = {
     userId: application.userId,
@@ -143,6 +153,7 @@ export async function approveMentorApplication(
     languages: application.languages,
     hourlyRateMinor: application.hourlyRateMinor,
     sessionMinutes: application.sessionMinutes,
+    ...(application.timezone ? { timezone: application.timezone } : {}),
     isApproved: true,
     approvedAt: now,
     updatedAt: now,
@@ -158,7 +169,7 @@ export async function approveMentorApplication(
         ...fromApplication,
         bufferMinutes: 15,
         minNoticeHours: 12,
-        timezone: 'Asia/Baku',
+        timezone: application.timezone ?? 'Asia/Baku',
         isAcceptingBookings: true,
         ratingAvg: 0,
         ratingCount: 0,
@@ -166,6 +177,9 @@ export async function approveMentorApplication(
         createdAt: now,
       }),
     );
+  }
+  if (application.availability) {
+    replaceRulesInBatch(batch, profileRef.id, existingRuleIds, application.availability);
   }
   batch.update(
     applications().doc(application.userId),

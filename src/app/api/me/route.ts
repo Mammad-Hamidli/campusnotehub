@@ -12,6 +12,8 @@ import {
   findUniversityById,
 } from '@/lib/firebase/repositories/reference';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
+import { creatorStatsFor } from '@/lib/firebase/repositories/notes';
+import { findMentorByUserId } from '@/lib/firebase/repositories/mentors';
 import { sendEmailAsync } from '@/lib/email/send';
 import { freezeState } from '@/lib/auth/freeze';
 import { FACULTIES, FACULTY_OTHER, facultyLabel } from '@/lib/faculties';
@@ -129,10 +131,12 @@ export async function GET(request: NextRequest) {
    * `university` and `faculty` are null when unset, exactly as the relation
    * was - the response shape the client already parses does not change.
    */
-  const [university, faculty, counts] = await Promise.all([
+  const [university, faculty, counts, stats, mentor] = await Promise.all([
     user.universityId ? findUniversityById(user.universityId) : null,
     user.facultyId ? findFacultyById(user.facultyId) : null,
     profileCounts(userId),
+    creatorStatsFor([userId]),
+    findMentorByUserId(userId),
   ]);
 
   return NextResponse.json(
@@ -159,6 +163,10 @@ export async function GET(request: NextRequest) {
           : null,
         _count: counts,
         initials,
+        /** `@handle avg⭐ (X files for Y total reviews)` inputs. */
+        creatorStats: stats.get(userId) ?? null,
+        /** Approved mentor profile exists: drives the schedule-settings link. */
+        isMentor: Boolean(mentor?.isApproved),
         /**
          * The resolved faculty label, so no consumer has to re-implement the
          * "catalogue slug, or the typed value when it is `other`" rule. Null
