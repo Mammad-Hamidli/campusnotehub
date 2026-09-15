@@ -10,6 +10,9 @@ import { VerificationBanner, type VerificationState } from './VerificationBanner
 import { Composer } from './Composer';
 import { PostCard, type Post } from './PostCard';
 import { GraduationCountdown, TrendingNotes, type TrendingNote } from './RightPanel';
+import { NotesList } from '@/components/notes/NotesList';
+import { MentorsList } from '@/components/mentors/MentorsList';
+import { can, type Viewer as PermissionViewer } from '@/lib/permissions';
 
 /** 'all' or a university code. The codes are loaded from /api/universities. */
 type UniversityFilter = string;
@@ -39,6 +42,9 @@ type Viewer = {
   verified: boolean;
   /** Drives the mentor onboarding prompt below; see mentorTodo. */
   role: string;
+  /** With role, the inputs can() needs to decide what the viewer is offered. */
+  accountStatus: string;
+  verificationStatus: string;
   graduationYear?: number;
   graduationMonth?: number;
 };
@@ -238,6 +244,8 @@ export function DashboardShell({
             university: user.university?.code ?? '—',
             verified: user.isVerified,
             role: user.role,
+            accountStatus: user.accountStatus,
+            verificationStatus: user.verificationStatus,
             graduationYear: user.graduationYear ?? undefined,
             graduationMonth: user.graduationMonth ?? undefined,
           });
@@ -407,6 +415,21 @@ export function DashboardShell({
     );
   }
 
+  /**
+   * Same capability table the server enforces, evaluated on the live /api/me
+   * record (not the `?verification=` display override). A UI hint only:
+   * POST /api/notes re-checks `notes:sell` on every upload.
+   */
+  const canUploadNotes = can(
+    {
+      id: viewer.id,
+      role: viewer.role as PermissionViewer['role'],
+      accountStatus: viewer.accountStatus as PermissionViewer['accountStatus'],
+      verificationStatus: viewer.verificationStatus as PermissionViewer['verificationStatus'],
+    },
+    'notes:sell',
+  );
+
   return (
     <div className="flex min-h-dvh bg-surface-muted lg:flex-row">
       <Sidebar active={tab} onSelect={setTab} user={viewer} />
@@ -494,6 +517,13 @@ export function DashboardShell({
                   ))
                 )}
               </div>
+            ) : tab === 'notes' ? (
+              // These tabs rendered ModulePlaceholder - a static title card - so
+              // the note list, its create button and the mentor directory never
+              // appeared on the dashboard. The real modules are used instead.
+              <NotesList embedded canUpload={canUploadNotes} />
+            ) : tab === 'mentors' ? (
+              <MentorsList embedded />
             ) : (
               <ModulePlaceholder tab={tab} />
             )}

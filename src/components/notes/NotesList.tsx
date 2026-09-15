@@ -30,8 +30,23 @@ type Note = {
  * has no placeholder content: an empty marketplace renders the empty state,
  * because that is the truth about a new deployment.
  */
-export function NotesList() {
+/**
+ * `canUpload` is the caller's `can(viewer, 'notes:sell')`, the same capability
+ * POST /api/notes and /notes/new enforce. It only decides whether the button is
+ * offered; the server still refuses an upload from anyone without it.
+ *
+ * `embedded` drops the page gutter and demotes the heading, for use inside the
+ * dashboard, which already provides both.
+ */
+export function NotesList({
+  canUpload = false,
+  embedded = false,
+}: {
+  canUpload?: boolean;
+  embedded?: boolean;
+} = {}) {
   const t = useT();
+  const Heading = embedded ? 'h2' : 'h1';
   const [notes, setNotes] = useState<Note[] | null>(null);
   /** noteId currently being purchased, so only that row shows a spinner. */
   const [buying, setBuying] = useState<string | null>(null);
@@ -89,10 +104,10 @@ export function NotesList() {
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+    <div className={embedded ? 'w-full' : 'mx-auto w-full max-w-3xl px-4 py-8 sm:px-6'}>
       <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-fg">{t('notes.title')}</h1>
+          <Heading className="text-xl font-bold tracking-tight text-fg">{t('notes.title')}</Heading>
           <p className="mt-0.5 text-sm text-fg-muted">{t('notes.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -103,10 +118,12 @@ export function NotesList() {
             <ShoppingBag className="h-3.5 w-3.5" aria-hidden="true" />
             {t('notes.myPurchases')}
           </Link>
-          <Link href="/notes/new" className="btn-primary">
-            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-            {t('notes.upload.title')}
-          </Link>
+          {canUpload && (
+            <Link href="/notes/new" className="btn-primary">
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('notes.upload.title')}
+            </Link>
+          )}
         </div>
       </header>
 

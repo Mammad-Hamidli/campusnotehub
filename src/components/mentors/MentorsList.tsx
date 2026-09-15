@@ -74,7 +74,9 @@ function formatPrice(minor: number, locale: string): string | null {
   return new Intl.NumberFormat(locale, { style: 'currency', currency: 'AZN' }).format(minor / 100);
 }
 
-export function MentorsList() {
+/** `embedded` drops the page gutter and demotes the heading, for the dashboard tab. */
+export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
+  const Heading = embedded ? 'h2' : 'h1';
   const t = useT();
 
   const [mentors, setMentors] = useState<Mentor[]>([]);
@@ -150,10 +152,10 @@ export function MentorsList() {
   }, [load]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
+    <div className={embedded ? 'w-full' : 'mx-auto w-full max-w-5xl px-4 py-8 sm:px-6'}>
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-xl font-bold tracking-tight text-fg">{t('mentors.title')}</h1>
+          <Heading className="text-xl font-bold tracking-tight text-fg">{t('mentors.title')}</Heading>
           <p className="mt-1 text-sm text-fg-muted">{t('mentors.subtitle')}</p>
         </div>
         <Link href="/mentors/apply" className="btn-secondary shrink-0 px-3 py-1.5 text-sm">
