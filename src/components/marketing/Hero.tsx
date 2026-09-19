@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowRight, ShieldCheck } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import type { PublicStats } from '@/lib/stats/public';
 import { StatsRow } from './StatsBanner';
 
 /**
@@ -21,7 +22,7 @@ import { StatsRow } from './StatsBanner';
  *    stats sitting in the right column reads as a designed page.
  *  - The badge is a hairline outline, not a filled pill with a gradient.
  */
-export function Hero() {
+export function Hero({ stats }: { stats: PublicStats }) {
   const t = useT();
 
   return (
@@ -69,7 +70,7 @@ export function Hero() {
           {/* Stats live beside the copy, not in a full-width dark slab below
               it. Same information, no "marketing band" break in the page. */}
           <div className="lg:pt-14">
-            <StatsRow />
+            <StatsRow stats={stats} />
           </div>
         </div>
       </div>

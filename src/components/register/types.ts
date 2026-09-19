@@ -48,8 +48,6 @@ export type AccountForm = {
   dateOfBirth: string;
   /** Chosen in step 2; decides which fields follow. */
   accountType: AccountType | '';
-  /** STUDENT only. */
-  studentNumber: string;
   /** STUDENT only: 'STUDYING' or 'GRADUATED'. See AcademicStatus. */
   academicStatus: AcademicStatus | '';
   /** MENTOR only. */
@@ -101,7 +99,6 @@ export const FIELD_ORDER: (keyof AccountForm)[] = [
   'accountType',
   'universityId',
   'academicStatus',
-  'studentNumber',
   'department',
   'academicTitle',
   'facultySlug',
@@ -119,7 +116,6 @@ export const FIELD_LABEL_KEYS: Record<keyof AccountForm, string> = {
   lastName: 'auth.register.lastName',
   dateOfBirth: 'auth.register.dateOfBirth',
   accountType: 'auth.register.accountType',
-  studentNumber: 'auth.register.studentNumber',
   academicStatus: 'auth.register.academicStatus',
   department: 'auth.register.department',
   academicTitle: 'auth.register.academicTitle',
@@ -143,7 +139,6 @@ export const EMPTY_ACCOUNT: AccountForm = {
   lastName: '',
   dateOfBirth: '',
   accountType: '',
-  studentNumber: '',
   academicStatus: '',
   department: '',
   academicTitle: '',
@@ -314,8 +309,6 @@ export function validateAccount(
     // Asked in the same block as the university: which institution, and are
     // you still there. Everything below reads differently depending on it.
     if (!form.academicStatus) errors.academicStatus = 'errors.fieldRequired';
-
-    if (!form.studentNumber.trim()) errors.studentNumber = 'auth.errors.studentNumberRequired';
 
     // Faculty: a catalogue choice is required, and the free text is required
     // only when that choice is 'other'.

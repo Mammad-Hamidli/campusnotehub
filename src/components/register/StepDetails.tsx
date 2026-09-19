@@ -108,25 +108,6 @@ export function StepDetails({
             onChange={(academicStatus) => onChange({ academicStatus })}
           />
 
-          <Field
-            id="studentNumber"
-            label={t('auth.register.studentNumber')}
-            hint={t('auth.register.studentNumberHint')}
-            error={errors.studentNumber && t(errors.studentNumber)}
-          >
-            <input
-              id="studentNumber"
-              required
-              aria-required="true"
-              value={value.studentNumber}
-              onChange={(e) => onChange({ studentNumber: e.target.value })}
-              maxLength={40}
-              inputMode="numeric"
-              placeholder={t('auth.register.studentNumberPlaceholder')}
-              className={inputClass(!!errors.studentNumber)}
-            />
-          </Field>
-
           <FacultySelect
             value={value.facultySlug}
             otherValue={value.facultyOther}

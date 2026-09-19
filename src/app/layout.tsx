@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 import { SessionKeeper } from '@/components/auth/SessionKeeper';
 import { IdentityPromptSlot } from '@/components/account/IdentityPromptSlot';
 import { FeedbackProvider } from '@/components/ui/Feedback';
+import { WarmBackdrop } from '@/components/ui/WarmBackdrop';
 // Imported from constants.ts, NOT from the 'use client' provider: a plain
 // export read across that boundary resolves to undefined on the server.
 // See src/lib/theme/constants.ts.
@@ -131,6 +132,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           Skip to content
         </a>
+        <WarmBackdrop />
         <ThemeProvider initialPreference={themePreference}>
           <LocaleProvider initialLocale={locale}>
             {/* Toasts and confirmation dialogs for every route, admin included.

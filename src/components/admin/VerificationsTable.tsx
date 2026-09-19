@@ -37,7 +37,6 @@ type Case = {
     verificationStatus: string;
     /** STUDENT or TEACHER - decides which documents the case should carry. */
     role: string;
-    studentNumber: string | null;
     department: string | null;
     academicTitle: string | null;
     dateOfBirth: string | null;
@@ -254,17 +253,12 @@ export function VerificationsTable() {
                       than buried in the detail view. */}
                   <td className="whitespace-nowrap px-3 py-2">
                     <StatusBadge kind="role" value={kase.user.role} />
-                    {kase.user.role === 'TEACHER' || kase.user.role === 'MENTOR'
-                      ? kase.user.department && (
-                          <span className="mt-0.5 block text-2xs text-fg-subtle">
-                            {kase.user.department}
-                          </span>
-                        )
-                      : kase.user.studentNumber && (
-                          <span className="mt-0.5 block font-mono text-2xs text-fg-subtle">
-                            {kase.user.studentNumber}
-                          </span>
-                        )}
+                    {(kase.user.role === 'TEACHER' || kase.user.role === 'MENTOR') &&
+                      kase.user.department && (
+                        <span className="mt-0.5 block text-2xs text-fg-subtle">
+                          {kase.user.department}
+                        </span>
+                      )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-fg-muted">{kase.user.university?.code ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2 tabular-nums text-2xs text-fg-muted">{formatDateTime(kase.submittedAt)}</td>

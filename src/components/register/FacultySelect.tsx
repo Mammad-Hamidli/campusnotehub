@@ -3,19 +3,20 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
-import { FACULTIES, FACULTY_GROUPS, FACULTY_OTHER, type FacultyOption } from '@/lib/faculties';
+import { FACULTY_OTHER, FACULTY_PICKER_OPTIONS } from '@/lib/faculties';
+import type { MajorOption } from '@/lib/majors';
 
 /**
- * Faculty picker: a searchable combobox over the 60+ entry catalogue.
+ * Faculty picker: a searchable combobox over the 100+ entry global majors list.
  *
  * ---------------------------------------------------------------------------
  * WHY NOT A NATIVE <select>
  * ---------------------------------------------------------------------------
  * The rest of the registration form uses native selects, and for university
- * (18 options) or graduation month (12) that is the right call - it is
+ * (a few dozen options) or graduation month (12) that is the right call - it is
  * accessible for free and gets the platform's own mobile picker.
  *
- * At sixty-plus options it stops working. A native select has no search, so
+ * At a hundred-plus options it stops working. A native select has no search, so
  * finding "Telecommunications Engineering" means scrolling a list the height
  * of the screen; on a phone it becomes a full-screen wheel with no way to jump.
  * Type-ahead exists but only matches from the first character, so someone
@@ -27,8 +28,8 @@ import { FACULTIES, FACULTY_GROUPS, FACULTY_OTHER, type FacultyOption } from '@/
  * reader - `role="combobox"`, `aria-expanded`, `aria-activedescendant` on the
  * input, and `role="option"` with `aria-selected` on the rows.
  *
- * The options stay grouped, because a flat alphabetical list of sixty fields
- * is genuinely harder to scan than eight labelled sections.
+ * Every student sees the same alphabetical list, whatever their university;
+ * the search box is what makes its length manageable.
  */
 export function FacultySelect({
   value,
@@ -68,7 +69,10 @@ export function FacultySelect({
   const listRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
 
-  const selected = useMemo(() => FACULTIES.find((f) => f.slug === value) ?? null, [value]);
+  const selected = useMemo(
+    () => FACULTY_PICKER_OPTIONS.find((f) => f.slug === value) ?? null,
+    [value],
+  );
 
   /**
    * Filtering is accent- and case-insensitive.
@@ -87,19 +91,9 @@ export function FacultySelect({
 
   const matches = useMemo(() => {
     const needle = normalize(query.trim());
-    if (!needle) return FACULTIES;
-    return FACULTIES.filter(
-      (f) => normalize(f.label).includes(needle) || normalize(f.group).includes(needle),
-    );
+    if (!needle) return FACULTY_PICKER_OPTIONS;
+    return FACULTY_PICKER_OPTIONS.filter((f) => normalize(f.label).includes(needle));
   }, [query]);
-
-  /** Flat list drives keyboard navigation; the render below regroups it. */
-  const grouped = useMemo(() => {
-    return FACULTY_GROUPS.map((group) => ({
-      group,
-      options: matches.filter((f) => f.group === group),
-    })).filter((section) => section.options.length > 0);
-  }, [matches]);
 
   // A filter change can leave the highlight past the end of the new list.
   useEffect(() => setActiveIndex(0), [query]);
@@ -121,7 +115,7 @@ export function FacultySelect({
       ?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex, open]);
 
-  function choose(option: FacultyOption) {
+  function choose(option: MajorOption) {
     onChange(option.slug);
     setOpen(false);
     setQuery('');
@@ -159,9 +153,6 @@ export function FacultySelect({
       setOpen(false);
     }
   }
-
-  // Running counter so grouped rendering and flat keyboard indices agree.
-  let flatIndex = -1;
 
   return (
     <div className="space-y-2">
@@ -226,47 +217,38 @@ export function FacultySelect({
             aria-label={t('auth.register.faculty')}
             className="overlay absolute z-50 mt-1 max-h-72 w-full overflow-y-auto p-1"
           >
-            {grouped.length === 0 ? (
+            {matches.length === 0 ? (
               <p className="px-3 py-6 text-center text-sm text-fg-muted">
                 {t('auth.register.facultyNoMatch')}
               </p>
             ) : (
-              grouped.map((section) => (
-                <div key={section.group}>
-                  <div className="px-2.5 pb-1 pt-2 text-2xs font-semibold uppercase tracking-wider text-fg-subtle">
-                    {section.group}
-                  </div>
-                  {section.options.map((option) => {
-                    flatIndex += 1;
-                    const index = flatIndex;
-                    const isActive = index === activeIndex;
-                    const isSelected = option.slug === value;
-                    return (
-                      <button
-                        key={option.slug}
-                        id={`${listboxId}-${index}`}
-                        data-index={index}
-                        type="button"
-                        role="option"
-                        aria-selected={isSelected}
-                        // Mouse-over syncs the highlight with the pointer so
-                        // the keyboard and mouse do not fight over which row
-                        // is "current".
-                        onMouseEnter={() => setActiveIndex(index)}
-                        onClick={() => choose(option)}
-                        className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${
-                          isActive ? 'bg-surface-muted text-fg' : 'text-fg-muted'
-                        }`}
-                      >
-                        <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                        {isSelected && (
-                          <Check className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden="true" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))
+              matches.map((option, index) => {
+                const isActive = index === activeIndex;
+                const isSelected = option.slug === value;
+                return (
+                  <button
+                    key={option.slug}
+                    id={`${listboxId}-${index}`}
+                    data-index={index}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    // Mouse-over syncs the highlight with the pointer so
+                    // the keyboard and mouse do not fight over which row
+                    // is "current".
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => choose(option)}
+                    className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${
+                      isActive ? 'bg-surface-muted text-fg' : 'text-fg-muted'
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                    {isSelected && (
+                      <Check className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden="true" />
+                    )}
+                  </button>
+                );
+              })
             )}
           </div>
         )}

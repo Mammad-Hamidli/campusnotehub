@@ -3,6 +3,7 @@ import { Hero } from '@/components/marketing/Hero';
 import { FeatureGrid } from '@/components/marketing/FeatureGrid';
 import { CallToAction } from '@/components/marketing/CallToAction';
 import { SiteFooter } from '@/components/marketing/SiteFooter';
+import { getPublicStats } from '@/lib/stats/public';
 
 /**
  * Landing page.
@@ -11,20 +12,17 @@ import { SiteFooter } from '@/components/marketing/SiteFooter';
  * JS; only the pieces that genuinely need it (scroll-aware header, count-up
  * stats, language menu, marquee pause) hydrate.
  *
- * When the public stats endpoint lands, fetch it here and pass the numbers
- * down as props — see the integration note in StatsBanner.tsx:
- *
- *   export const revalidate = 900;
- *   const stats = await fetch(`${process.env.APP_URL}/api/stats/public`, {
- *     next: { revalidate: 900 },
- *   }).then((r) => r.json());
+ * The stats are read here, on the server, from live collections (cached for
+ * 15 minutes - see src/lib/stats/public.ts) and handed down as plain props.
  */
-export default function HomePage() {
+export default async function HomePage() {
+  const stats = await getPublicStats();
+
   return (
     <>
       <SiteHeader />
       <main id="main">
-        <Hero />
+        <Hero stats={stats} />
         <FeatureGrid />
         <CallToAction />
       </main>

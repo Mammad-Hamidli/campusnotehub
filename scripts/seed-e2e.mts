@@ -110,7 +110,6 @@ for (const person of PEOPLE) {
       facultyId: null,
       facultySlug: 'computer-science',
       facultyOther: null,
-      studentNumber: null,
       department: null,
       academicTitle: null,
       verificationStatus: person.verification,

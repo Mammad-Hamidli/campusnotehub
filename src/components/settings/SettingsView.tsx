@@ -291,7 +291,7 @@ export function SettingsView() {
     setData((prev) => ({ ...prev, privacy: { ...prev.privacy, ...next } }));
 
   return (
-    <div className="min-h-dvh bg-canvas">
+    <div className="min-h-dvh">
       <header className="sticky top-0 z-30 border-b border-edge bg-canvas/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-shell items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">

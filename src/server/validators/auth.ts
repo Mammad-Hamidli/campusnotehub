@@ -214,11 +214,6 @@ export const registerSchema = z
 
     // ---- STUDENT-specific --------------------------------------------------
     /**
-     * University-issued student number, cross-checked against the student card.
-     * Required for a STUDENT registration; see the refinement below.
-     */
-    studentNumber: z.string().trim().min(3).max(40).optional(),
-    /**
      * "Currently studying" or "Graduated". Required for a STUDENT
      * registration; meaningless for a MENTOR, and refused on that branch by
      * the refinement below so a mentor account cannot carry one.
@@ -302,10 +297,6 @@ export const registerSchema = z
   .refine((d) => d.accountType !== UserRole.STUDENT || Boolean(d.universityId), {
     path: ['universityId'],
     message: 'errors.fieldRequired',
-  })
-  .refine((d) => d.accountType !== UserRole.STUDENT || Boolean(d.studentNumber), {
-    path: ['studentNumber'],
-    message: 'auth.errors.studentNumberRequired',
   })
   .refine((d) => d.accountType !== UserRole.STUDENT || Boolean(d.academicStatus), {
     path: ['academicStatus'],

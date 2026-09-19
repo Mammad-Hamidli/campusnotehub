@@ -73,7 +73,7 @@ export function StubPage({
   descriptionKey?: string;
 }) {
   return (
-    <main id="main" className="min-h-dvh bg-canvas">
+    <main id="main" className="min-h-dvh">
       <UnderConstruction titleKey={titleKey} descriptionKey={descriptionKey} />
     </main>
   );

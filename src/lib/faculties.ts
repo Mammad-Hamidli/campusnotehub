@@ -29,6 +29,8 @@
  * the slug is the key to translate against.
  */
 
+import { MAJORS, MAJOR_SLUGS, majorLabel, type MajorOption } from './majors';
+
 export type FacultyOption = {
   /** Stable identifier persisted to `users.facultySlug`. Never rename. */
   slug: string;
@@ -57,6 +59,11 @@ export type FacultyGroup =
  */
 export const FACULTY_OTHER = 'other';
 
+/**
+ * The original English catalogue. No longer offered in the picker (see
+ * FACULTY_PICKER_OPTIONS) but kept so slugs already stored on users still
+ * validate and render.
+ */
 export const FACULTIES: readonly FacultyOption[] = [
   // --- Computing & IT -------------------------------------------------------
   { slug: 'computer-science', label: 'Computer Science', group: 'Computing & IT' },
@@ -163,11 +170,16 @@ export const FACULTY_GROUPS: readonly FacultyGroup[] = [
 
 const BY_SLUG = new Map(FACULTIES.map((f) => [f.slug, f]));
 
-/** The set the zod schema validates against. Unknown slugs are refused. */
-export const FACULTY_SLUGS: ReadonlySet<string> = new Set(BY_SLUG.keys());
+/**
+ * The set the zod schemas validate against: the global majors list
+ * (src/lib/majors.ts) plus the legacy catalogue above, which stays valid so
+ * profiles saved before the majors list keep their value. Unknown slugs are
+ * refused.
+ */
+export const FACULTY_SLUGS: ReadonlySet<string> = new Set([...BY_SLUG.keys(), ...MAJOR_SLUGS]);
 
 export function isFacultySlug(value: string): boolean {
-  return BY_SLUG.has(value);
+  return FACULTY_SLUGS.has(value);
 }
 
 /**
@@ -185,13 +197,11 @@ export function facultyLabel(
 ): string | null {
   if (!slug) return null;
   if (slug === FACULTY_OTHER) return other?.trim() || null;
-  return BY_SLUG.get(slug)?.label ?? null;
+  return BY_SLUG.get(slug)?.label ?? majorLabel(slug) ?? null;
 }
 
-/** Groups for rendering, preserving FACULTY_GROUPS order. */
-export function groupedFaculties(): { group: FacultyGroup; options: FacultyOption[] }[] {
-  return FACULTY_GROUPS.map((group) => ({
-    group,
-    options: FACULTIES.filter((f) => f.group === group),
-  })).filter((section) => section.options.length > 0);
-}
+/**
+ * What the picker offers every student, whatever their university: the global
+ * majors list with "Other" last.
+ */
+export const FACULTY_PICKER_OPTIONS: readonly MajorOption[] = [...MAJORS, BY_SLUG.get(FACULTY_OTHER)!];

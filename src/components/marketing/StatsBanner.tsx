@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import type { PublicStats } from '@/lib/stats/public';
 
 /**
  * Counts 0 -> target once scrolled into view.
@@ -51,24 +52,6 @@ function useCountUp(target: number, durationMs = 1400) {
 }
 
 /**
- * BACKEND INTEGRATION
- * -------------------
- *   GET /api/stats/public -> { students, notes, mentorHours, universities }
- *
- * Serve from a materialised view refreshed every 15 minutes rather than live
- * COUNT(*) queries: these are vanity metrics on a public page and must never
- * be able to slow the landing page down or hold a row lock. Render the page
- * with `revalidate: 900` and pass the numbers in as props; the count-up stays
- * entirely client-side.
- */
-const STATS = [
-  { key: 'students', value: 12480, suffix: '+' },
-  { key: 'notes', value: 8630, suffix: '+' },
-  { key: 'hours', value: 3175, suffix: '' },
-  { key: 'universities', value: 18, suffix: '' },
-] as const;
-
-/**
  * A bordered list, not a dark marketing slab.
  *
  * The previous version was a full-width slate-950 panel with a radial indigo
@@ -76,25 +59,27 @@ const STATS = [
  * same thing at 20px inside the page's own grid, which is both calmer and
  * more credible.
  */
-export function StatsRow() {
+export function StatsRow({ stats }: { stats: PublicStats }) {
   const t = useT();
+  const rows = [
+    { key: 'students', value: stats.students },
+    { key: 'notes', value: stats.notes },
+    { key: 'hours', value: stats.mentorHours },
+    { key: 'universities', value: stats.universities },
+  ];
 
   return (
     <dl className="divide-y divide-edge rounded-xl border border-edge bg-surface">
-      {STATS.map((stat) => (
-        <StatItem
-          key={stat.key}
-          target={stat.value}
-          suffix={stat.suffix}
-          label={t(`landing.stats.${stat.key}`)}
-        />
+      {rows.map((stat) => (
+        <StatItem key={stat.key} target={stat.value} label={t(`landing.stats.${stat.key}`)} />
       ))}
     </dl>
   );
 }
 
-function StatItem({ target, suffix, label }: { target: number; suffix: string; label: string }) {
-  const { ref, value } = useCountUp(target);
+/** `null` is an unreadable stat: shown as a dash rather than a false zero. */
+function StatItem({ target, label }: { target: number | null; label: string }) {
+  const { ref, value } = useCountUp(target ?? 0);
 
   return (
     <div ref={ref} className="flex items-baseline justify-between gap-4 px-4 py-3">
@@ -102,8 +87,7 @@ function StatItem({ target, suffix, label }: { target: number; suffix: string; l
           length of the English ones and must wrap, not clip. */}
       <dt className="min-w-0 text-xs leading-snug text-fg-muted">{label}</dt>
       <dd className="tabular shrink-0 text-xl font-medium text-fg">
-        {value.toLocaleString()}
-        <span className="text-fg-subtle">{suffix}</span>
+        {target === null ? '—' : value.toLocaleString()}
       </dd>
     </div>
   );

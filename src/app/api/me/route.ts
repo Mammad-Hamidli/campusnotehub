@@ -16,7 +16,7 @@ import { creatorStatsFor } from '@/lib/firebase/repositories/notes';
 import { findMentorByUserId } from '@/lib/firebase/repositories/mentors';
 import { sendEmailAsync } from '@/lib/email/send';
 import { freezeState } from '@/lib/auth/freeze';
-import { FACULTIES, FACULTY_OTHER, facultyLabel } from '@/lib/faculties';
+import { FACULTY_OTHER, facultyLabel, isFacultySlug } from '@/lib/faculties';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -222,7 +222,7 @@ const patchSchema = z
     facultySlug: z
       .string()
       .trim()
-      .refine((v) => FACULTIES.some((f) => f.slug === v), 'errors.validationFailed')
+      .refine(isFacultySlug, 'errors.validationFailed')
       .optional(),
     /** Only meaningful with facultySlug === 'other'; enforced below and by a CHECK. */
     facultyOther: z.string().trim().max(120).optional(),

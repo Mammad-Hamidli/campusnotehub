@@ -197,7 +197,6 @@ batch.set(
     facultyId: null,
     facultySlug: null,
     facultyOther: null,
-    studentNumber: null,
     department: null,
     academicTitle: null,
     verificationStatus: 'VERIFIED',

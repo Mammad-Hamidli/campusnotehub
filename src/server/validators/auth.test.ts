@@ -25,8 +25,7 @@ const student = {
   ...base,
   accountType: 'STUDENT',
   academicStatus: 'STUDYING',
-  studentNumber: '2021001',
-  facultySlug: 'computer-science',
+  facultySlug: 'komputer-elmleri',
   graduationYear: new Date().getFullYear() + 2,
   graduationMonth: 6,
 };

@@ -135,7 +135,6 @@ export async function GET(request: NextRequest) {
                  * a teacher is missing paperwork.
                  */
                 role: applicant.role,
-                studentNumber: applicant.studentNumber,
                 department: applicant.department,
                 academicTitle: applicant.academicTitle,
                 dateOfBirth: applicant.dateOfBirth,

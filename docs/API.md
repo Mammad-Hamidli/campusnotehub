@@ -47,7 +47,6 @@ when they choose to.
 
   // ---- STUDENT only ----
   "academicStatus": "STUDYING",  // STUDYING | GRADUATED
-  "studentNumber": "20231234",
   "facultySlug": "computer-science",
   "facultyOther": "…",           // required iff facultySlug === "other"
   "graduationYear": 2026,

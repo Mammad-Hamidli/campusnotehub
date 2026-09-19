@@ -58,7 +58,6 @@ export type UserRecord = {
   facultyId: string | null;
   facultySlug: string | null;
   facultyOther: string | null;
-  studentNumber: string | null;
   department: string | null;
   academicTitle: string | null;
   verificationStatus: VerificationStatus;
@@ -248,7 +247,6 @@ export function newUserDefaults(): Omit<
     facultyId: null,
     facultySlug: null,
     facultyOther: null,
-    studentNumber: null,
     department: null,
     academicTitle: null,
     verificationStatus: 'UNVERIFIED' as VerificationStatus,

@@ -315,7 +315,6 @@ export function RegisterWizard() {
           // to; the server's conditional refinements require the ones that
           // matter, so an omission on the wrong branch is refused there.
           academicStatus: account.academicStatus || undefined,
-          studentNumber: account.studentNumber.trim() || undefined,
           department: account.department.trim() || undefined,
           academicTitle: account.academicTitle.trim() || undefined,
           graduationYear: account.graduationYear ? Number(account.graduationYear) : undefined,
@@ -473,7 +472,6 @@ export function RegisterWizard() {
                   ...(accountType === 'STUDENT'
                     ? { department: '', academicTitle: '', availability: new Set<string>() }
                     : {
-                        studentNumber: '',
                         academicStatus: '' as const,
                         graduationYear: '',
                         graduationMonth: '',

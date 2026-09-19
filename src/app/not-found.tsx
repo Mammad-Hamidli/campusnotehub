@@ -20,7 +20,7 @@ export default function NotFound() {
   const router = useRouter();
 
   return (
-    <main id="main" className="flex min-h-dvh flex-col bg-canvas">
+    <main id="main" className="flex min-h-dvh flex-col">
       <header className="border-b border-edge">
         <div className="mx-auto flex h-14 max-w-shell items-center px-4 sm:px-6 lg:px-8">
           <Logo />

@@ -154,13 +154,39 @@ export const UNIVERSITIES: University[] = [
     ru: 'Университет Азербайджан',
     domains: ['au.edu.az'],
   },
+  // An empty `domains` list is deliberate: the institution is selectable, but
+  // no domain is auto-detected until its official mail domain is confirmed.
+  // A guessed domain would silently attribute students to the wrong school.
+  { id: 'BSLU', az: 'Bakı Slavyan Universiteti', en: 'Baku Slavic University', ru: 'Бакинский славянский университет', domains: [] },
+  { id: 'ADMIU', az: 'Azərbaycan Dövlət Mədəniyyət və İncəsənət Universiteti', en: 'Azerbaijan State University of Culture and Arts', ru: 'Азербайджанский государственный университет культуры и искусств', domains: ['admiu.edu.az'] },
+  { id: 'UTECA', az: 'Azərbaycan Texnologiya Universiteti', en: 'Azerbaijan Technological University', ru: 'Азербайджанский технологический университет', domains: ['uteca.edu.az'] },
+  { id: 'ADRA', az: 'Azərbaycan Dövlət Rəssamlıq Akademiyası', en: 'Azerbaijan State Academy of Fine Arts', ru: 'Азербайджанская государственная академия художеств', domains: [] },
+  { id: 'AMK', az: 'Azərbaycan Milli Konservatoriyası', en: 'Azerbaijan National Conservatory', ru: 'Азербайджанская национальная консерватория', domains: [] },
+  { id: 'QU', az: 'Qarabağ Universiteti', en: 'Karabakh University', ru: 'Карабахский университет', domains: ['karabakh.edu.az'] },
+  { id: 'TAU', az: 'Türkiyə-Azərbaycan Universiteti', en: 'Turkish-Azerbaijani University', ru: 'Турецко-Азербайджанский университет', domains: ['tau.edu.az'] },
+  { id: 'AIA', az: 'Azərbaycan İdman Akademiyası', en: 'Azerbaijan Sport Academy', ru: 'Азербайджанская академия спорта', domains: ['sport.edu.az'] },
+  { id: 'DIA', az: 'Dövlət İdarəçilik Akademiyası', en: 'Academy of Public Administration', ru: 'Академия государственного управления', domains: ['dia.edu.az'] },
+  { id: 'ADDA', az: 'Azərbaycan Dövlət Dəniz Akademiyası', en: 'Azerbaijan State Marine Academy', ru: 'Азербайджанская государственная морская академия', domains: ['asma.edu.az'] },
+  { id: 'MAA', az: 'Milli Aviasiya Akademiyası', en: 'National Aviation Academy', ru: 'Национальная академия авиации', domains: ['naa.edu.az'] },
+  { id: 'BHOS', az: 'Bakı Ali Neft Məktəbi', en: 'Baku Higher Oil School', ru: 'Бакинская высшая школа нефти', domains: ['bhos.edu.az'] },
+  { id: 'ATMU', az: 'Azərbaycan Turizm və Menecment Universiteti', en: 'Azerbaijan Tourism and Management University', ru: 'Азербайджанский университет туризма и менеджмента', domains: ['atmu.edu.az'] },
+  { id: 'MSU_BAKU', az: 'MDU Bakı filialı', en: 'Lomonosov Moscow State University, Baku Branch', ru: 'Бакинский филиал МГУ имени М. В. Ломоносова', domains: ['msu.az'] },
+  { id: 'SECHENOV_BAKU', az: 'Seçenov Universitetinin Bakı filialı', en: 'Sechenov University, Baku Branch', ru: 'Бакинский филиал Сеченовского университета', domains: [] },
+  { id: 'BXA', az: 'Bakı Xoreoqrafiya Akademiyası', en: 'Baku Choreography Academy', ru: 'Бакинская академия хореографии', domains: [] },
+  { id: 'AII', az: 'Azərbaycan İlahiyyat İnstitutu', en: 'Azerbaijan Institute of Theology', ru: 'Азербайджанский институт теологии', domains: ['ait.edu.az'] },
+  { id: 'WCU', az: 'Qərbi Kaspi Universiteti', en: 'Western Caspian University', ru: 'Западно-Каспийский университет', domains: ['wcu.edu.az'] },
+  { id: 'OYU', az: 'Odlar Yurdu Universiteti', en: 'Odlar Yurdu University', ru: 'Университет Одлар Юрду', domains: ['oyu.edu.az'] },
+  { id: 'BAAU', az: 'Bakı Avrasiya Universiteti', en: 'Baku Eurasian University', ru: 'Бакинский Евразийский университет', domains: ['baau.edu.az'] },
+  { id: 'AKU', az: 'Azərbaycan Kooperasiya Universiteti', en: 'Azerbaijan Cooperation University', ru: 'Азербайджанский университет кооперации', domains: ['aku.edu.az'] },
+  { id: 'BBU', az: 'Bakı Biznes Universiteti', en: 'Baku Business University', ru: 'Бакинский университет бизнеса', domains: ['bbu.edu.az'] },
+  { id: 'AEMSMA', az: 'Azərbaycan Əmək və Sosial Münasibətlər Akademiyası', en: 'Azerbaijan Academy of Labour and Social Relations', ru: 'Азербайджанская академия труда и социальных отношений', domains: [] },
 ];
 
 /**
  * Reverse index: domain -> university id. Built once at module load.
  *
  * A flat map rather than a scan through `UNIVERSITIES` on every keystroke.
- * With 18 institutions the difference is irrelevant for correctness but the
+ * With ~40 institutions the difference is irrelevant for correctness but the
  * lookup runs on every character typed into the email field, and a map keeps
  * that honest as the list grows.
  */

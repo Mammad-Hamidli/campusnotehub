@@ -59,7 +59,7 @@ export default async function LoginPage({
   }
 
   return (
-    <main id="main" className="flex min-h-dvh items-center justify-center bg-canvas px-4 py-12">
+    <main id="main" className="flex min-h-dvh items-center justify-center px-4 py-12">
       <LoginForm />
     </main>
   );

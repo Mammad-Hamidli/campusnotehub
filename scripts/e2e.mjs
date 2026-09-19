@@ -1285,7 +1285,6 @@ GROUPS.registration = async (browser) => {
 
     assert((await page.locator('#department').count()) === 1, 'no organisation field');
     assert((await page.locator('#academicTitle').count()) === 1, 'no position field');
-    assert((await page.locator('#studentNumber').count()) === 0, 'student field leaked into mentor branch');
     assert((await page.locator('#gradYear').count()) === 0, 'mentor was asked for a graduation date');
 
     await page.selectOption('#university', 'ADA');
@@ -1313,16 +1312,15 @@ GROUPS.registration = async (browser) => {
     await page.click('button:has-text("Continue")');
     await page.waitForTimeout(900);
 
-    assert((await page.locator('#studentNumber').count()) === 1, 'no student number field');
+    assert((await page.locator('#studentNumber').count()) === 0, 'student number field is back');
     assert((await page.locator('#department').count()) === 0, 'teacher field leaked into student branch');
     assert((await page.locator('#gradYear').count()) === 1, 'no graduation date');
 
     // Fill the details and reach the documents step.
     await page.selectOption('#university', 'ADA');
-    await page.fill('#studentNumber', '20231234');
     await page.locator('#facultySlug').click();
     await page.waitForTimeout(400);
-    await page.locator('[role="option"]:has-text("Computer Science")').first().click();
+    await page.locator('[role="option"]:has-text("Kompüter elmləri")').first().click();
     await page.selectOption('#gradYear', String(new Date().getFullYear() + 1));
     await page.locator('select[aria-label="Graduation month"]').selectOption('06');
     await page.click('button:has-text("Continue")');
@@ -1348,7 +1346,6 @@ GROUPS.registration = async (browser) => {
 
     assert((await page.locator('#department').count()) === 1, 'no department field');
     assert((await page.locator('#academicTitle').count()) === 1, 'no academic position field');
-    assert((await page.locator('#studentNumber').count()) === 0, 'student field leaked into teacher branch');
     assert((await page.locator('#gradYear').count()) === 0, 'teacher was asked for a graduation date');
 
     await page.selectOption('#university', 'ADA');
@@ -1460,7 +1457,7 @@ GROUPS.registration = async (browser) => {
     return `400, missing: ${fields.join(', ')}`;
   });
 
-  await check('server REFUSES a student claim with no student number', async () => {
+  await check('server REFUSES a student claim with no faculty', async () => {
     const ctx = await browser.newContext();
     const res = await ctx.request.post(`${BASE}/api/auth/register`, {
       data: {
@@ -1469,14 +1466,14 @@ GROUPS.registration = async (browser) => {
         nickname: `bypass${stamp}`, email: `bypass${stamp}@ada.edu.az`,
         phone: `+99450${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
         universityId: 'ADA', locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
-        // studentNumber, facultySlug and graduation deliberately omitted
+        // facultySlug and graduation deliberately omitted
       },
     });
     const body = await res.json().catch(() => ({}));
     await ctx.close();
     assert(res.status() === 400, `expected 400, got ${res.status()}`);
     const fields = Object.keys(body.fields ?? {});
-    assert(fields.includes('studentNumber'), `fields were ${fields.join(',')}`);
+    assert(fields.includes('facultySlug'), `fields were ${fields.join(',')}`);
     return `400, missing: ${fields.join(', ')}`;
   });
 
@@ -1508,7 +1505,7 @@ GROUPS.registration = async (browser) => {
         dateOfBirth: '2020-01-01', // a four-year-old
         nickname: `dob${stamp}`, email: `dob${stamp}@ada.edu.az`,
         phone: `+99455${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
-        universityId: 'ADA', studentNumber: '20231234', facultySlug: 'computer-science',
+        universityId: 'ADA', facultySlug: 'computer-science',
         graduationYear: new Date().getFullYear() + 1, graduationMonth: 6,
         locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
       },

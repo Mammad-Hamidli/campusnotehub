@@ -52,7 +52,7 @@ export function StepAccount({
             aria-required="true"
             value={value.firstName}
             onChange={(e) => onChange({ firstName: e.target.value })}
-            placeholder="Aysel"
+            placeholder={t('auth.register.firstNamePlaceholder')}
             className={inputClass(!!errors.firstName)}
           />
         </Field>
@@ -71,7 +71,7 @@ export function StepAccount({
             aria-required="true"
             value={value.lastName}
             onChange={(e) => onChange({ lastName: e.target.value })}
-            placeholder="Məmmədova"
+            placeholder={t('auth.register.lastNamePlaceholder')}
             className={inputClass(!!errors.lastName)}
           />
         </Field>
@@ -124,7 +124,7 @@ export function StepAccount({
             maxLength={24}
             value={value.nickname}
             onChange={(e) => onChange({ nickname: e.target.value.replace(/\s/g, '') })}
-            placeholder="nickname"
+            placeholder={t('auth.register.nicknamePlaceholder')}
             className={`${inputClass(!!errors.nickname)} pl-8`}
           />
         </div>
@@ -151,7 +151,7 @@ export function StepAccount({
             // whether the domain is complete enough to act on.
             onEmailChange?.(e.target.value);
           }}
-          placeholder="aysel@ada.edu.az"
+          placeholder={t('auth.register.emailPlaceholder')}
           className={inputClass(!!errors.email)}
         />
       </Field>
@@ -172,7 +172,7 @@ export function StepAccount({
           aria-required="true"
           value={value.phone}
           onChange={(e) => onChange({ phone: e.target.value })}
-          placeholder="+994 50 123 45 67"
+          placeholder={t('auth.register.phonePlaceholder')}
           className={inputClass(!!errors.phone)}
         />
       </Field>

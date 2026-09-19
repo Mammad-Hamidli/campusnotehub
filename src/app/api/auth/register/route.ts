@@ -218,7 +218,6 @@ export async function POST(request: NextRequest) {
         // Type-specific. Each is null on the branch it does not belong to, and
         // the schema has already refused a request that omitted one its
         // account type requires.
-        studentNumber: input.studentNumber ?? null,
         department: input.department ?? null,
         academicTitle: input.academicTitle ?? null,
         facultySlug: input.facultySlug ?? null,

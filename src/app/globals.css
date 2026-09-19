@@ -459,6 +459,59 @@
     mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, #000 40%, transparent 100%);
   }
 
+  /* Warm decorative wash (orange / yellow / green / red), mounted once in the
+     root layout. Blurred radial blobs at low opacity so text contrast on the
+     canvas is unaffected; the dark theme halves them so they glow rather than
+     glare. The drift is decorative and stops under reduced motion (below). */
+  .warm-backdrop {
+    --blob-opacity: 0.32;
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  [data-theme='dark'] .warm-backdrop {
+    --blob-opacity: 0.16;
+  }
+  .warm-blob {
+    position: absolute;
+    width: 42vmax;
+    height: 42vmax;
+    border-radius: 9999px;
+    filter: blur(90px);
+    opacity: var(--blob-opacity);
+    animation: warm-drift 28s ease-in-out infinite alternate;
+  }
+  .warm-blob-orange {
+    top: -14vmax;
+    left: -10vmax;
+    background: radial-gradient(circle, #fb923c, transparent 70%);
+  }
+  .warm-blob-yellow {
+    top: -8vmax;
+    right: -12vmax;
+    background: radial-gradient(circle, #facc15, transparent 70%);
+    animation-delay: -7s;
+  }
+  .warm-blob-green {
+    bottom: -16vmax;
+    left: 18vw;
+    background: radial-gradient(circle, #4ade80, transparent 70%);
+    animation-delay: -14s;
+  }
+  .warm-blob-red {
+    bottom: -12vmax;
+    right: -8vmax;
+    background: radial-gradient(circle, #f87171, transparent 70%);
+    animation-delay: -21s;
+  }
+  @keyframes warm-drift {
+    to {
+      transform: translate3d(4vmax, 3vmax, 0) scale(1.08);
+    }
+  }
+
   .marquee-mask {
     mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
   }
