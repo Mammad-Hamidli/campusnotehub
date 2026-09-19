@@ -1,11 +1,11 @@
 'use client';
 
 import { useMemo, type ReactNode } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, GraduationCap, School } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { UNIVERSITIES } from '@/lib/universities';
 import { FacultySelect } from './FacultySelect';
-import type { AccountForm, FieldErrors } from './types';
+import type { AcademicStatus, AccountForm, FieldErrors } from './types';
 import { isProfessional } from './types';
 
 const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
@@ -13,25 +13,32 @@ const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11'
 /**
  * Step 3: the fields that depend on the account type.
  *
- * Both branches share the university selector, because a teacher and a student
+ * Both branches share the university selector, because a mentor and a student
  * both belong to an institution and the platform's whole model is
  * university-scoped. Everything below that differs:
  *
- *   STUDENT - student number, faculty, graduation date. These are the claims a
- *             student card can actually corroborate.
- *   TEACHER - department and academic position. There is no graduation date to
- *             ask for, and the graduation cron must never target a teacher.
- *   MENTOR  - the same two columns, asked in the mentor's own vocabulary
- *             (organisation and position) because a mentor is frequently an
- *             industry professional with no academic title. Reusing the
- *             existing fields rather than adding parallel ones keeps one
- *             meaning per column; the fuller mentor profile - headline, bio,
- *             expertise, rates - is collected later at /mentors/apply, where a
- *             moderator reviews it.
+ *   STUDENT - academic status, student number, faculty, graduation date.
+ *   MENTOR  - organisation and position, because a mentor is frequently an
+ *             industry professional with no academic title. The fuller mentor
+ *             profile - headline, bio, expertise, rates - is collected later
+ *             at /mentors/apply, where a moderator reviews it.
+ *
+ * ---------------------------------------------------------------------------
+ * ACADEMIC STATUS SITS WITH THE UNIVERSITY, NOT AFTER IT
+ * ---------------------------------------------------------------------------
+ * "Which university" and "are you still there" are one question asked twice,
+ * and separating them produced the failure this step exists to fix: a
+ * graduate picking their old university, being handed a form that assumes
+ * enrolment, and ending up with a student account that could never be
+ * verified because they have no valid student card.
+ *
+ * Answering it here also makes the graduation date legible. The same two
+ * dropdowns mean "when you finished" or "when you expect to finish" depending
+ * on this choice, and the labels below say which.
  *
  * The same split is enforced server-side by conditional refinements in
- * src/server/validators/auth.ts; this component decides what to SHOW, not what
- * is allowed.
+ * src/server/validators/auth.ts; this component decides what to SHOW, not
+ * what is allowed.
  */
 export function StepDetails({
   value,
@@ -44,30 +51,47 @@ export function StepDetails({
 }) {
   const t = useT();
 
+  const graduated = value.academicStatus === 'GRADUATED';
+
+  /**
+   * The year range follows the status.
+   *
+   * A graduate needs years behind them and a current student needs years
+   * ahead; offering both to both is how "graduated in 2029" gets submitted.
+   * The bounds stay inside the server's window (CURRENT_YEAR -15 .. +10).
+   */
   const years = useMemo(() => {
     const now = new Date().getFullYear();
-    return Array.from({ length: 12 }, (_, i) => now - 3 + i);
-  }, []);
+    if (graduated) return Array.from({ length: 16 }, (_, i) => now - i);
+    return Array.from({ length: 11 }, (_, i) => now + i);
+  }, [graduated]);
 
   const isStudent = !isProfessional(value.accountType);
   const isMentor = value.accountType === 'MENTOR';
 
   return (
     <div className="space-y-5">
+      {/* Required of a student; optional for a mentor, who is often an
+          industry professional with no university. The empty option then
+          means "not affiliated" rather than "not chosen yet". */}
       <Field
         id="university"
         label={t('auth.register.university')}
+        optional={isMentor}
+        hint={isMentor ? t('auth.register.universityMentorHint') : undefined}
         error={errors.universityId && t(errors.universityId)}
       >
         <select
           id="university"
-          required
-          aria-required="true"
+          required={!isMentor}
+          aria-required={!isMentor}
           value={value.universityId}
           onChange={(e) => onChange({ universityId: e.target.value })}
           className={inputClass(!!errors.universityId)}
         >
-          <option value="">{t('auth.register.universityPlaceholder')}</option>
+          <option value="">
+            {t(isMentor ? 'auth.register.universityNone' : 'auth.register.universityPlaceholder')}
+          </option>
           {UNIVERSITIES.map((uni) => (
             <option key={uni.id} value={uni.id}>
               {uni.id} — {uni.az}
@@ -78,12 +102,16 @@ export function StepDetails({
 
       {isStudent ? (
         <>
+          <AcademicStatusChoice
+            value={value.academicStatus}
+            error={errors.academicStatus && t(errors.academicStatus)}
+            onChange={(academicStatus) => onChange({ academicStatus })}
+          />
+
           <Field
             id="studentNumber"
             label={t('auth.register.studentNumber')}
-            /* The helper text the brief asks for: this value is cross-checked
-               against the student card, so it has to match exactly. */
-            hint={t('auth.register.documentNotice')}
+            hint={t('auth.register.studentNumberHint')}
             error={errors.studentNumber && t(errors.studentNumber)}
           >
             <input
@@ -93,6 +121,7 @@ export function StepDetails({
               value={value.studentNumber}
               onChange={(e) => onChange({ studentNumber: e.target.value })}
               maxLength={40}
+              inputMode="numeric"
               placeholder={t('auth.register.studentNumberPlaceholder')}
               className={inputClass(!!errors.studentNumber)}
             />
@@ -109,7 +138,11 @@ export function StepDetails({
 
           <Field
             id="gradYear"
-            label={t('auth.register.graduationDate')}
+            // The same two dropdowns, named for what they mean under the
+            // status chosen above.
+            label={t(
+              graduated ? 'auth.register.graduatedDate' : 'auth.register.expectedGraduationDate',
+            )}
             error={
               (errors.graduationYear && t(errors.graduationYear)) ||
               (errors.graduationMonth && t(errors.graduationMonth))
@@ -213,6 +246,105 @@ export function StepDetails({
   );
 }
 
+/**
+ * "Currently studying" / "Graduated".
+ *
+ * Two radio cards rather than a <select>, for the same reason the account
+ * type uses them: the answer changes what the rest of the form means, and a
+ * dropdown gives no room to say so. Stacked on a phone, side by side from
+ * `sm` up.
+ */
+function AcademicStatusChoice({
+  value,
+  error,
+  onChange,
+}: {
+  value: AcademicStatus | '';
+  error?: string | false;
+  onChange: (status: AcademicStatus) => void;
+}) {
+  const t = useT();
+
+  const options: { status: AcademicStatus; icon: typeof School; titleKey: string; bodyKey: string }[] = [
+    {
+      status: 'STUDYING',
+      icon: School,
+      titleKey: 'auth.register.status.studying.title',
+      bodyKey: 'auth.register.status.studying.body',
+    },
+    {
+      status: 'GRADUATED',
+      icon: GraduationCap,
+      titleKey: 'auth.register.status.graduated.title',
+      bodyKey: 'auth.register.status.graduated.body',
+    },
+  ];
+
+  return (
+    /*
+      The invalid state belongs to the GROUP, not to either radio. aria-invalid
+      is not a supported property of role="radio" - announcing it there would
+      say "this option is invalid", which is not what is wrong. The group is
+      what has no answer yet.
+    */
+    <fieldset aria-invalid={!!error} aria-describedby={error ? 'academic-status-error' : undefined}>
+      <legend className="mb-1.5 flex items-center gap-1 text-sm font-medium text-fg">
+        {t('auth.register.academicStatus')}
+        <span className="text-danger" aria-hidden="true">
+          *
+        </span>
+      </legend>
+
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        {options.map(({ status, icon: Icon, titleKey, bodyKey }) => {
+          const selected = value === status;
+          return (
+            <label
+              key={status}
+              className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3.5 transition-colors ${
+                selected
+                  ? 'border-accent bg-accent-soft'
+                  : 'border-edge bg-surface hover:border-edge-strong hover:bg-surface-muted'
+              }`}
+            >
+              <input
+                type="radio"
+                name="academicStatus"
+                value={status}
+                checked={selected}
+                onChange={() => onChange(status)}
+                className="sr-only"
+                required
+              />
+              <Icon
+                className={`mt-0.5 h-4 w-4 shrink-0 ${selected ? 'text-accent' : 'text-fg-subtle'}`}
+                aria-hidden="true"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-fg">{t(titleKey)}</span>
+                <span className="mt-0.5 block text-2xs leading-relaxed text-fg-muted">
+                  {t(bodyKey)}
+                </span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+
+      {error && (
+        <p
+          id="academic-status-error"
+          className="mt-1.5 flex items-center gap-1 text-xs text-danger"
+          role="alert"
+        >
+          <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+          {error}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
 function inputClass(invalid: boolean) {
   return `input ${invalid ? 'input-invalid' : ''}`;
 }
@@ -222,28 +354,36 @@ function Field({
   label,
   hint,
   error,
+  optional = false,
   children,
 }: {
   id: string;
   label: string;
   hint?: string;
-  error?: string;
+  error?: string | false;
+  /** Swaps the required asterisk for a visible "(optional)". */
+  optional?: boolean;
   children: ReactNode;
 }) {
+  const t = useT();
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-fg">
         {label}
-        <span className="ml-1 text-danger" aria-hidden="true">
-          *
-        </span>
+        {optional ? (
+          <span className="ml-1.5 text-xs font-normal text-fg-subtle">({t('common.optional')})</span>
+        ) : (
+          <span className="ml-1 text-danger" aria-hidden="true">
+            *
+          </span>
+        )}
       </label>
       {children}
-      {hint && !error && <p className="mt-1.5 text-xs text-fg-subtle">{hint}</p>}
+      {hint && !error && <p className="mt-1.5 text-xs leading-snug text-fg-subtle">{hint}</p>}
       {error && (
-        <p className="mt-1.5 flex items-center gap-1 text-xs text-danger" role="alert">
-          <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
-          {error}
+        <p className="mt-1.5 flex items-start gap-1 text-xs text-danger" role="alert">
+          <AlertCircle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+          <span className="min-w-0">{error}</span>
         </p>
       )}
     </div>

@@ -1,15 +1,38 @@
 import type { DocKind, DocState } from './DocumentDropzone';
+import { requiredKindsFor } from '@/lib/verification/requirements';
 
-/** Mirrors ACCOUNT_TYPES in src/server/validators/auth.ts. */
-export type AccountType = 'STUDENT' | 'TEACHER' | 'MENTOR';
+/**
+ * The account types a person may CHOOSE at signup.
+ *
+ * Mirrors ACCOUNT_TYPES in src/server/validators/auth.ts, which is now two
+ * values rather than three. TEACHER still exists as a UserRole - accounts
+ * already hold it and an administrator can still assign it - but it is no
+ * longer offered at registration: a teacher and a mentor were asked for
+ * exactly the same two fields and the same documents, so the third card
+ * bought a decision and nothing else.
+ */
+export type AccountType = 'STUDENT' | 'MENTOR';
 
 /**
  * The types that answer "where do you work" rather than "where do you study".
  * Mirrors PROFESSIONAL_TYPES in src/server/validators/auth.ts.
  */
-export const PROFESSIONAL_TYPES: readonly AccountType[] = ['TEACHER', 'MENTOR'];
-export const isProfessional = (t: AccountType | '') =>
-  t === 'TEACHER' || t === 'MENTOR';
+export const PROFESSIONAL_TYPES: readonly AccountType[] = ['MENTOR'];
+export const isProfessional = (t: AccountType | '') => t === 'MENTOR';
+
+/**
+ * Where a student is in their studies.
+ *
+ * This is the "Graduated / Currently studying" choice, and it is asked in the
+ * same block as the university because it is the same question: which
+ * institution, and are you still there. It decides three things downstream:
+ *
+ *   - the role written at registration (ALUMNI vs STUDENT);
+ *   - whether the graduation date is read as a past fact or a future plan;
+ *   - which documents verification asks for later - an alumnus has no current
+ *     student card, so demanding one would make their verification impossible.
+ */
+export type AcademicStatus = 'STUDYING' | 'GRADUATED';
 
 export type AccountForm = {
   /**
@@ -23,11 +46,13 @@ export type AccountForm = {
   lastName: string;
   /** YYYY-MM-DD. Checked against the identity document during verification. */
   dateOfBirth: string;
-  /** Chosen in step 2; decides which fields and documents follow. */
+  /** Chosen in step 2; decides which fields follow. */
   accountType: AccountType | '';
   /** STUDENT only. */
   studentNumber: string;
-  /** TEACHER only. */
+  /** STUDENT only: 'STUDYING' or 'GRADUATED'. See AcademicStatus. */
+  academicStatus: AcademicStatus | '';
+  /** MENTOR only. */
   department: string;
   academicTitle: string;
   fullName: string;
@@ -42,8 +67,15 @@ export type AccountForm = {
   facultyOther: string;
   graduationYear: string;
   graduationMonth: string;
+  /**
+   * MENTOR only: the weekly availability picked in the schedule step, as the
+   * AvailabilityGrid's "weekday:minute" cell keys. Sent as merged rules
+   * (cellsToRules) and carried into the mentor application later.
+   */
+  availability: Set<string>;
+  /** MENTOR only: IANA zone the availability is expressed in. */
+  timezone: string;
   acceptTerms: boolean;
-  consentDocuments: boolean;
 };
 
 /** Values are locale KEYS, not sentences, so errors render in the active language. */
@@ -68,6 +100,7 @@ export const FIELD_ORDER: (keyof AccountForm)[] = [
   'password',
   'accountType',
   'universityId',
+  'academicStatus',
   'studentNumber',
   'department',
   'academicTitle',
@@ -75,8 +108,9 @@ export const FIELD_ORDER: (keyof AccountForm)[] = [
   'facultyOther',
   'graduationYear',
   'graduationMonth',
+  'timezone',
+  'availability',
   'acceptTerms',
-  'consentDocuments',
 ];
 
 /** Label keys for the error summary, so it reads "Nickname: required". */
@@ -86,6 +120,7 @@ export const FIELD_LABEL_KEYS: Record<keyof AccountForm, string> = {
   dateOfBirth: 'auth.register.dateOfBirth',
   accountType: 'auth.register.accountType',
   studentNumber: 'auth.register.studentNumber',
+  academicStatus: 'auth.register.academicStatus',
   department: 'auth.register.department',
   academicTitle: 'auth.register.academicTitle',
   fullName: 'auth.register.fullName',
@@ -98,8 +133,9 @@ export const FIELD_LABEL_KEYS: Record<keyof AccountForm, string> = {
   facultyOther: 'auth.register.facultyOther',
   graduationYear: 'auth.register.graduationYear',
   graduationMonth: 'auth.register.graduationMonth',
+  availability: 'mentors.schedule.weekly',
+  timezone: 'mentors.schedule.timezone',
   acceptTerms: 'auth.register.termsShort',
-  consentDocuments: 'auth.register.consentShort',
 };
 
 export const EMPTY_ACCOUNT: AccountForm = {
@@ -108,6 +144,7 @@ export const EMPTY_ACCOUNT: AccountForm = {
   dateOfBirth: '',
   accountType: '',
   studentNumber: '',
+  academicStatus: '',
   department: '',
   academicTitle: '',
   fullName: '',
@@ -120,44 +157,30 @@ export const EMPTY_ACCOUNT: AccountForm = {
   facultyOther: '',
   graduationYear: '',
   graduationMonth: '',
+  // Never mutated in place - the grid always produces a new Set - so sharing
+  // this one instance between wizard mounts is safe.
+  availability: new Set<string>(),
+  timezone: 'Asia/Baku',
   acceptTerms: false,
-  consentDocuments: false,
+};
+
+const SLOT_LABELS: Record<DocKind, string> = {
+  ID_FRONT: 'verification.slots.idFront',
+  ID_BACK: 'verification.slots.idBack',
+  STUDENT_CARD_FRONT: 'verification.slots.studentFront',
+  STUDENT_CARD_BACK: 'verification.slots.studentBack',
 };
 
 /**
- * Identity documents, required of BOTH account types.
+ * The slots one ROLE must actually fill, in display order.
  *
- * Everyone proves who they are with the same two images.
+ * A thin view over requiredKindsFor() in src/lib/verification/requirements.ts,
+ * which the submit route enforces - so the screen can never ask for a
+ * different set than the server accepts. Takes the STORED role, which may be
+ * one signup cannot produce (TEACHER from an admin).
  */
-export const ID_SLOTS: { kind: DocKind; labelKey: string }[] = [
-  { kind: 'ID_FRONT', labelKey: 'verification.slots.idFront' },
-  { kind: 'ID_BACK', labelKey: 'verification.slots.idBack' },
-];
-
-/**
- * The student card, required of STUDENT only.
- *
- * Neither a teacher nor a mentor has a student card, so demanding one would
- * make their verification impossible to complete. The server applies the same
- * split in requiredKindsFor().
- */
-export const STUDENT_CARD_SLOTS: { kind: DocKind; labelKey: string }[] = [
-  { kind: 'STUDENT_CARD_FRONT', labelKey: 'verification.slots.studentFront' },
-  { kind: 'STUDENT_CARD_BACK', labelKey: 'verification.slots.studentBack' },
-];
-
-/** All four. Retained for callers that iterate every possible slot. */
-export const DOCUMENT_SLOTS: { kind: DocKind; labelKey: string }[] = [
-  ...STUDENT_CARD_SLOTS,
-  ...ID_SLOTS,
-];
-
-/** The slots one account type must actually fill. */
-export function slotsFor(accountType: AccountType | ''): { kind: DocKind; labelKey: string }[] {
-  // '' (not yet chosen) keeps the conservative full set, matching the server's
-  // default in requiredKindsFor(): asking for an extra document is recoverable,
-  // silently skipping one is not.
-  return isProfessional(accountType) ? ID_SLOTS : DOCUMENT_SLOTS;
+export function slotsFor(role: string): { kind: DocKind; labelKey: string }[] {
+  return requiredKindsFor(role).map((kind) => ({ kind, labelKey: SLOT_LABELS[kind] }));
 }
 
 export const EMPTY_DOCUMENTS: DocumentMap = {
@@ -174,17 +197,6 @@ const RESERVED_NICKNAMES = new Set([
 ]);
 
 /**
- * Client-side mirror of registerSchema in src/server/validators/auth.ts.
- *
- * Duplicated deliberately: this one gives instant inline feedback, the server
- * one is the enforcement. They stay in sync by returning the same locale keys,
- * so changing a message is a single edit in the message bundles.
- *
- * EVERY field is required. There are no optional inputs in registration any
- * more — including the phone number, which is now the strongest ban anchor the
- * platform has.
- */
-/**
  * Which fields a given step is responsible for.
  *
  * ---------------------------------------------------------------------------
@@ -195,11 +207,26 @@ const RESERVED_NICKNAMES = new Set([
  * impossible to advance past. The same trap applies in reverse: the
  * type-specific fields cannot be judged before the type exists.
  *
- * `scope` therefore says what is being checked right now. 'all' is the submit
- * path and is what the server mirrors.
+ * `scope` therefore says what is being checked right now:
+ *   basics  - step 1, the common fields;
+ *   details - everything except the mentor's schedule (step 4 for mentors);
+ *   all     - the submit path, and what the server mirrors.
  */
-export type ValidationScope = 'basics' | 'all';
+export type ValidationScope = 'basics' | 'details' | 'all';
 
+/**
+ * Client-side mirror of registerSchema in src/server/validators/auth.ts.
+ *
+ * Duplicated deliberately: this one gives instant inline feedback, the server
+ * one is the enforcement. They stay in sync by returning the same locale keys,
+ * so changing a message is a single edit in the message bundles.
+ *
+ * NOTE what is no longer here: the document-processing consent. Registration
+ * does not touch a document any more, so consenting to document processing at
+ * signup would be consent to something that is not happening yet - which is
+ * not valid consent. It is asked on /verify, at the moment the documents are
+ * actually handed over.
+ */
 export function validateAccount(
   form: AccountForm,
   scope: ValidationScope = 'all',
@@ -210,8 +237,7 @@ export function validateAccount(
    * Name halves.
    *
    * Digits and punctuation never appear on an ID; rejecting them here avoids a
-   * mismatch the document cross-check would otherwise flag much later, after
-   * the user has already uploaded four photographs.
+   * mismatch the document cross-check would otherwise flag much later.
    */
   const NAME_RE = /^[\p{L}\s'-]+$/u;
 
@@ -270,8 +296,10 @@ export function validateAccount(
    */
   if (scope === 'basics') return errors;
 
-  // Both account types belong to an institution.
-  if (!form.universityId) errors.universityId = 'errors.fieldRequired';
+  // A student is enrolled somewhere by definition. A mentor is often an
+  // industry professional with no university, so for them it is optional -
+  // mirrored by the STUDENT-only refinement in src/server/validators/auth.ts.
+  if (form.accountType !== 'MENTOR' && !form.universityId) errors.universityId = 'errors.fieldRequired';
 
   if (!form.accountType) errors.accountType = 'errors.fieldRequired';
 
@@ -280,21 +308,43 @@ export function validateAccount(
    * src/server/validators/auth.ts.
    *
    * This copy exists to show the error next to the field before a round trip -
-   * NOT instead of the server check. A client that skips this still meets the
-   * same rules on the server.
+   * NOT instead of the server check.
    */
   if (form.accountType === 'STUDENT') {
+    // Asked in the same block as the university: which institution, and are
+    // you still there. Everything below reads differently depending on it.
+    if (!form.academicStatus) errors.academicStatus = 'errors.fieldRequired';
+
     if (!form.studentNumber.trim()) errors.studentNumber = 'auth.errors.studentNumberRequired';
 
     // Faculty: a catalogue choice is required, and the free text is required
-    // only when that choice is 'other'. The same pairing is enforced by a zod
-    // refinement and by a CHECK constraint.
+    // only when that choice is 'other'.
     if (!form.facultySlug) errors.facultySlug = 'errors.fieldRequired';
     else if (form.facultySlug === 'other' && !form.facultyOther.trim())
       errors.facultyOther = 'auth.errors.facultyOtherRequired';
 
     if (!form.graduationYear) errors.graduationYear = 'errors.fieldRequired';
     if (!form.graduationMonth) errors.graduationMonth = 'errors.fieldRequired';
+
+    /**
+     * The date has to agree with the status.
+     *
+     * Someone who says they have graduated but names a date two years out has
+     * answered one of the two questions wrongly - and the wrong one silently
+     * decides their role and which documents they will be asked for. Catching
+     * it here is the difference between correcting a dropdown now and an
+     * alumni account that cannot complete verification later.
+     */
+    if (form.academicStatus && form.graduationYear && form.graduationMonth) {
+      const now = new Date();
+      const chosen = Number(form.graduationYear) * 12 + Number(form.graduationMonth);
+      const current = now.getFullYear() * 12 + (now.getMonth() + 1);
+
+      if (form.academicStatus === 'GRADUATED' && chosen > current)
+        errors.graduationYear = 'auth.errors.graduationNotPast';
+      if (form.academicStatus === 'STUDYING' && chosen < current)
+        errors.graduationYear = 'auth.errors.graduationNotFuture';
+    }
   }
 
   if (isProfessional(form.accountType)) {
@@ -302,7 +352,17 @@ export function validateAccount(
     if (!form.academicTitle.trim()) errors.academicTitle = 'auth.errors.academicTitleRequired';
   }
   if (!form.acceptTerms) errors.acceptTerms = 'auth.errors.termsRequired';
-  if (!form.consentDocuments) errors.consentDocuments = 'auth.errors.consentRequired';
+
+  /**
+   * The mentor's schedule is its own step, after details, so it is judged
+   * only on the submit path. Mirrors the MENTOR refinement in
+   * src/server/validators/auth.ts: at least one bookable slot, because a
+   * mentor with no availability can never be booked.
+   */
+  if (scope === 'all' && form.accountType === 'MENTOR') {
+    if (!form.timezone) errors.timezone = 'errors.fieldRequired';
+    if (form.availability.size === 0) errors.availability = 'mentors.schedule.errors.empty';
+  }
 
   return errors;
 }

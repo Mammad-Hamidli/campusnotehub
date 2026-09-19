@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { findUserById } from '@/lib/firebase/repositories/users';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
-import { can } from '@/lib/permissions';
+import { can, denialKey } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import {
   AlreadyPurchasedError,
@@ -80,14 +80,12 @@ export async function POST(
   }
 
   /**
-   * `notes:buy` - spending is open to UNVERIFIED accounts by design.
-   *
-   * The capability table gates EARNING and withdrawing behind verification,
-   * not spending, so a new student can buy notes on day one. A frozen account
-   * fails this check because 'notes:buy' is absent from ALWAYS_ALLOWED.
+   * `notes:buy` requires a VERIFIED identity (see REQUIRES_VERIFICATION in
+   * src/lib/permissions.ts). denialKey() tells an unverified buyer that
+   * verification is the fix; a frozen account gets the generic refusal.
    */
   if (!can(viewer, 'notes:buy')) {
-    return NextResponse.json({ error: 'errors.forbidden' }, { status: 403 });
+    return NextResponse.json({ error: denialKey(viewer, 'notes:buy') }, { status: 403 });
   }
 
   const rate = await rateLimit('orders:create', { userId, ip: clientIp(request.headers) });

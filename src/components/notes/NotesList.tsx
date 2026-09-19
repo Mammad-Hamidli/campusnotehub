@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Bookmark, Loader2, Plus, ShoppingBag, ShoppingCart, Star } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
+import { VERIFICATION_REQUIRED_KEY, VerifyToUnlock } from '@/components/account/VerifyToUnlock';
 import { FileChip } from './FileChip';
 import { CreatorHandle, type CreatorStats } from './CreatorHandle';
 import { StarRating } from './StarRating';
@@ -51,6 +53,7 @@ export function NotesList({
   source?: 'all' | 'saved';
 } = {}) {
   const t = useT();
+  const toast = useToast();
   const Heading = embedded ? 'h2' : 'h1';
   const [notes, setNotes] = useState<Note[] | null>(null);
   const [buying, setBuying] = useState<string | null>(null);
@@ -98,9 +101,15 @@ export function NotesList({
     broadcast(next); // optimistic
     try {
       const res = await fetch(`/api/notes/${note.id}/save`, { method: next ? 'PUT' : 'DELETE' });
-      if (!res.ok) broadcast(!next);
+      if (!res.ok) {
+        broadcast(!next);
+        toast.error(t('notes.saved.failed'));
+        return;
+      }
+      toast.success(t(next ? 'notes.saved.added' : 'notes.saved.removed'));
     } catch {
       broadcast(!next);
+      toast.error(t('notes.saved.failed'));
     }
   }
 
@@ -129,6 +138,8 @@ export function NotesList({
               : n,
           ) ?? prev,
       );
+      // 409 means it was already owned - the card is corrected silently.
+      if (response.ok) toast.success(t('notes.purchased'));
     } catch {
       setBuyError({ noteId, key: 'errors.generic' });
     } finally {
@@ -179,7 +190,7 @@ export function NotesList({
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <h2 className="truncate text-sm font-semibold text-fg">{note.title}</h2>
-                <p className="mt-0.5 text-2xs text-fg-muted">
+                <p className="mt-0.5 break-words text-2xs text-fg-muted">
                   {note.subject}
                   {note.courseCode ? ` · ${note.courseCode}` : ''}
                   {note.universities.length > 0 ? ` · ${note.universities.map((u) => u.code).join(', ')}` : ''}
@@ -264,11 +275,14 @@ export function NotesList({
               </div>
             </div>
 
-            {buyError?.noteId === note.id && (
-              <p className="mt-2 text-xs text-danger" role="alert">
-                {t(buyError.key)}
-              </p>
-            )}
+            {buyError?.noteId === note.id &&
+              (buyError.key === VERIFICATION_REQUIRED_KEY ? (
+                <VerifyToUnlock className="mt-2" />
+              ) : (
+                <p className="mt-2 text-xs text-danger" role="alert">
+                  {t(buyError.key)}
+                </p>
+              ))}
           </li>
         ))}
       </ul>

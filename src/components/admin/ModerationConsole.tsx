@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
 
 type QueueItem = {
   id: string;
@@ -96,7 +97,7 @@ export function ModerationConsole() {
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[22rem_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[22rem_minmax(0,1fr)]">
         <section aria-labelledby="queue-heading" className="min-w-0">
           <h2 id="queue-heading" className="mb-3 text-sm font-semibold text-fg">
             {t('admin.queue.title')}
@@ -203,6 +204,7 @@ export function ModerationConsole() {
 
 function ReviewPanel({ caseId, onDecided }: { caseId: string; onDecided: () => void }) {
   const t = useT();
+  const toast = useToast();
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [expired, setExpired] = useState(false);
   const [reason, setReason] = useState('');
@@ -246,17 +248,30 @@ function ReviewPanel({ caseId, onDecided }: { caseId: string; onDecided: () => v
     }
 
     setPending(decision);
-    const res = await fetch(`/api/admin/verification/${caseId}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        decision,
-        reason: reason.trim() || 'Approved after manual review of all four documents.',
-        codes: detail?.case.failureCodes ?? [],
-      }),
-    });
-    setPending(null);
-    if (res.ok) onDecided();
+    // A failed decision previously did nothing at all - the buttons simply
+    // re-enabled - so a 4xx looked identical to a click that never happened.
+    try {
+      const res = await fetch(`/api/admin/verification/${caseId}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          decision,
+          reason: reason.trim() || 'Approved after manual review of all four documents.',
+          codes: detail?.case.failureCodes ?? [],
+        }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        toast.error(t(payload?.error ?? 'errors.generic'));
+        return;
+      }
+      toast.success(t('admin.review.decided'));
+      onDecided();
+    } catch {
+      toast.error(t('errors.generic'));
+    } finally {
+      setPending(null);
+    }
   }
 
   if (expired) {

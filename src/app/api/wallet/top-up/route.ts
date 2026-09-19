@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
-import { can } from '@/lib/permissions';
+import { can, denialKey } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { ensureWallet } from '@/lib/firebase/repositories/wallets';
 import { findUserById } from '@/lib/firebase/repositories/users';
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   const { userId, viewer } = session;
 
   if (!can(viewer, 'wallet:topup')) {
-    return NextResponse.json({ error: 'errors.forbidden' }, { status: 403 });
+    return NextResponse.json({ error: denialKey(viewer, 'wallet:topup') }, { status: 403 });
   }
 
   const limit = await rateLimit('orders:create', { userId, ip: clientIp(request.headers) });

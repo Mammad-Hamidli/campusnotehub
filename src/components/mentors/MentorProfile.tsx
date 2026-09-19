@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { MentorReviewForm, type ViewerReview } from './MentorReviewForm';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -95,6 +96,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
   const [canBook, setCanBook] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [isSelf, setIsSelf] = useState(false);
+  const [viewerReview, setViewerReview] = useState<ViewerReview>({ eligible: false, rating: null, body: null });
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,8 +105,9 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
   const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'az' : 'az';
 
   const load = useCallback(
-    async (signal?: AbortSignal) => {
-      setLoading(true);
+    /** `silent` refreshes in place (after a review) instead of flashing the skeleton. */
+    async (signal?: AbortSignal, silent = false) => {
+      if (!silent) setLoading(true);
       setError(null);
       setNotFound(false);
       try {
@@ -122,6 +125,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
         setCanBook(Boolean(data.viewerCanBook));
         setSignedIn(Boolean(data.viewerSignedIn));
         setIsSelf(Boolean(data.viewerIsMentor));
+        if (data.viewerReview) setViewerReview(data.viewerReview);
       } catch (cause) {
         if ((cause as Error)?.name === 'AbortError') return;
         setError('mentors.loadFailed');
@@ -319,7 +323,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
         />
       )}
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_18rem]">
+      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="space-y-3">
           <section className="card p-5">
             <h2 className="text-sm font-semibold text-fg">{t('mentors.about')}</h2>
@@ -335,6 +339,19 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
                 <span className="tabular font-normal text-fg-subtle">({mentor.ratingCount})</span>
               )}
             </h2>
+
+            {/* Finished-session mentees get the review box; a signed-in reader
+                who has not had a session is told how to earn one. */}
+            {!isSelf &&
+              (viewerReview.eligible ? (
+                <MentorReviewForm
+                  mentorId={mentorId}
+                  initial={viewerReview}
+                  onSaved={() => void load(undefined, true)}
+                />
+              ) : (
+                signedIn && <p className="mt-2 text-xs text-fg-subtle">{t('mentors.reviewForm.afterSession')}</p>
+              ))}
 
             {mentor.reviews.length === 0 ? (
               <p className="mt-3 text-sm text-fg-muted">{t('mentors.noReviews')}</p>

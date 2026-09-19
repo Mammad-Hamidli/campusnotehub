@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   AtSign,
+  BadgeCheck,
   Check,
   ChevronRight,
   Download,
@@ -15,18 +17,20 @@ import {
   Palette,
   ShieldCheck,
   Sun,
-  Trash2,
   User,
 } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
 import { useTheme, type ThemePreference } from '@/lib/theme/ThemeProvider';
 import { LOCALES, LOCALE_META } from '@/lib/i18n/dictionaries';
 import { VisibilitySelect, type Visibility } from './VisibilitySelect';
 import { UNIVERSITIES } from '@/components/register/StepAccount';
+import { VerificationSection, type IdentityState } from './VerificationSection';
+import { DeletionRequestCard } from './DeletionRequestCard';
 
-type Section = 'profile' | 'privacy' | 'appearance' | 'account';
+type Section = 'profile' | 'verification' | 'privacy' | 'appearance' | 'account';
 
 export type SettingsData = {
   nickname: string;
@@ -98,19 +102,41 @@ const EMPTY: SettingsData = {
 
 const SECTIONS: { id: Section; icon: typeof User }[] = [
   { id: 'profile', icon: User },
+  { id: 'verification', icon: BadgeCheck },
   { id: 'privacy', icon: ShieldCheck },
   { id: 'appearance', icon: Palette },
   { id: 'account', icon: KeyRound },
 ];
 
+const isSection = (value: string | null): value is Section =>
+  SECTIONS.some(({ id }) => id === value);
+
 export function SettingsView() {
   const t = useT();
-  const [section, setSection] = useState<Section>('profile');
+  const toast = useToast();
+
+  /**
+   * The open section lives in the URL (?tab=verification), not in state, so
+   * the verification banner and the gated-feature messages can link straight
+   * to it, and so reload and back/forward keep the user where they were.
+   * Switching uses history.replaceState, which Next keeps in sync with
+   * useSearchParams without a server round trip.
+   */
+  const searchParams = useSearchParams();
+  const requested = searchParams.get('tab');
+  const section: Section = isSection(requested) ? requested : 'profile';
+  const setSection = (next: Section) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', next);
+    window.history.replaceState(null, '', `?${params.toString()}`);
+  };
+
+  /** Role and verification status: read-only here, and not part of the form. */
+  const [identity, setIdentity] = useState<IdentityState | null>(null);
   const [data, setData] = useState<SettingsData>(EMPTY);
   const [baseline, setBaseline] = useState<SettingsData>(EMPTY);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   /**
@@ -148,6 +174,11 @@ export function SettingsView() {
         };
         setData(next);
         setBaseline(next);
+        setIdentity({
+          role: u.role,
+          verificationStatus: u.verificationStatus,
+          verifiedAt: u.verifiedAt ?? null,
+        });
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
@@ -159,13 +190,6 @@ export function SettingsView() {
     [data, baseline],
   );
 
-  // Clear the "saved" confirmation after a few seconds. A permanent green tick
-  // stops meaning anything.
-  useEffect(() => {
-    if (savedAt === null) return;
-    const timer = setTimeout(() => setSavedAt(null), 3000);
-    return () => clearTimeout(timer);
-  }, [savedAt]);
 
   /**
    * Persists the form through PATCH /api/me.
@@ -228,7 +252,7 @@ export function SettingsView() {
       // body.
       if (Object.keys(patch).length === 0) {
         setBaseline(data);
-        setSavedAt(Date.now());
+        toast.success(t('settings.saved'));
         return;
       }
 
@@ -254,7 +278,7 @@ export function SettingsView() {
       }
 
       setBaseline(data);
-      setSavedAt(Date.now());
+      toast.success(t('settings.saved'));
     } catch {
       setSaveError('errors.generic');
     } finally {
@@ -282,7 +306,10 @@ export function SettingsView() {
       </header>
 
       <div className="mx-auto max-w-shell px-4 py-8 sm:px-6 lg:px-8">
-        <div className="grid gap-8 lg:grid-cols-[13rem_1fr]">
+        {/* minmax(0,1fr), not 1fr: a grid track defaults to min-content, so a
+            wide child (a table, a long unbroken string) stretches the column
+            past the viewport instead of scrolling inside it. */}
+        <div className="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)]">
           {/* Section nav. Horizontal scroll on mobile rather than a select:
               four items fit, and a dropdown hides where you are. */}
           <nav aria-label={t('settings.title')} className="lg:sticky lg:top-20 lg:self-start">
@@ -302,6 +329,23 @@ export function SettingsView() {
                   >
                     <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {t(`settings.nav.${id}`)}
+                    {/* The section's state at a glance, from any tab. Paired
+                        with a text alternative so it is not colour alone. */}
+                    {id === 'verification' && identity && (
+                      <span
+                        className={`ml-auto h-2 w-2 shrink-0 rounded-full ${
+                          identity.verificationStatus === 'VERIFIED' ? 'bg-verified' : 'bg-warn'
+                        }`}
+                      >
+                        <span className="sr-only">
+                          {t(
+                            identity.verificationStatus === 'VERIFIED'
+                              ? 'settings.verification.status.verified'
+                              : 'settings.verification.status.unverified',
+                          )}
+                        </span>
+                      </span>
+                    )}
                   </button>
                 </li>
               ))}
@@ -311,6 +355,15 @@ export function SettingsView() {
           <div className="min-w-0 space-y-6">
             {section === 'profile' && (
               <ProfileSection data={data} onChange={patch} />
+            )}
+            {section === 'verification' && (
+              <VerificationSection
+                identity={identity}
+                loadFailed={loaded && !identity}
+                onStatusChange={(verificationStatus) =>
+                  setIdentity((prev) => (prev ? { ...prev, verificationStatus } : prev))
+                }
+              />
             )}
             {section === 'privacy' && (
               <PrivacySection privacy={data.privacy} onChange={patchPrivacy} />
@@ -327,7 +380,9 @@ export function SettingsView() {
         people to hunt for it; one that appears on the first edit tells them
         there is something to save without them having to look.
       */}
-      {(dirty || savedAt !== null || saveError !== null) && section !== 'appearance' && (
+      {(dirty || saveError !== null) &&
+        section !== 'appearance' &&
+        section !== 'verification' && (
         <div className="sticky bottom-0 z-30 border-t border-edge bg-surface/95 backdrop-blur">
           <div className="mx-auto flex max-w-shell items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
             <p className="text-xs text-fg-muted" aria-live="polite">
@@ -335,11 +390,6 @@ export function SettingsView() {
                 // A failure must be visible. The previous version could not
                 // fail, so there was nowhere for this to go.
                 <span className="text-danger">{t(saveError)}</span>
-              ) : savedAt !== null ? (
-                <span className="flex items-center gap-1.5 text-verified">
-                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                  {t('settings.saved')}
-                </span>
               ) : (
                 t('common.saveChanges')
               )}
@@ -564,8 +614,8 @@ function AppearanceSection() {
               return (
                 <label
                   key={value}
-                  className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border p-4
-                              transition-colors duration-150 ${
+                  className={`flex min-w-0 cursor-pointer flex-col items-center gap-2 rounded-lg
+                              border p-3 text-center transition-colors duration-150 sm:p-4 ${
                                 active
                                   ? 'border-accent bg-accent-soft'
                                   : 'border-edge hover:border-edge-strong hover:bg-surface-muted'
@@ -583,7 +633,13 @@ function AppearanceSection() {
                     className={`h-5 w-5 ${active ? 'text-accent' : 'text-fg-subtle'}`}
                     aria-hidden="true"
                   />
-                  <span className={`text-xs ${active ? 'font-medium text-fg' : 'text-fg-muted'}`}>
+                  {/* break-anywhere: "Системная" does not fit a ~95px column
+                      at 360px and would otherwise widen the grid track. */}
+                  <span
+                    className={`break-anywhere text-xs ${
+                      active ? 'font-medium text-fg' : 'text-fg-muted'
+                    }`}
+                  >
                     {t(`settings.theme.${value}`)}
                   </span>
                 </label>
@@ -667,20 +723,9 @@ function AccountSection() {
       </Card>
 
       {/* Destructive actions get their own card with a danger border, well
-          away from everything else. Putting "delete account" one row below
- "change password" is how people delete their account by accident. */}
-      <div className="rounded-xl border border-danger/30 bg-surface p-6">
-        <h2 className="text-sm font-medium text-danger-fg">
-          {t('settings.account.deleteAccount')}
-        </h2>
-        <p className="mt-1 text-xs leading-relaxed text-fg-muted">
-          {t('settings.account.deleteHint')}
-        </p>
-        <button type="button" className="btn-secondary mt-4 h-8 border-danger/40 text-xs text-danger-fg">
-          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('settings.account.deleteAccount')}
-        </button>
-      </div>
+          away from everything else. It files a request an administrator
+          reviews; see DeletionRequestCard. */}
+      <DeletionRequestCard />
     </>
   );
 }
@@ -719,7 +764,7 @@ function Row({
   children: ReactNode;
 }) {
   return (
-    <div className="grid gap-1.5 sm:grid-cols-[11rem_1fr] sm:items-start sm:gap-4">
+    <div className="grid gap-1.5 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-4">
       <label htmlFor={htmlFor} className="pt-2 text-sm font-medium text-fg">
         {label}
       </label>

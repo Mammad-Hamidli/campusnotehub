@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Compass, GraduationCap, School } from 'lucide-react';
+import { Check, Compass, GraduationCap } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import type { AccountType } from './types';
 
@@ -8,13 +8,21 @@ import type { AccountType } from './types';
  * Step 2: which kind of account is this.
  *
  * ---------------------------------------------------------------------------
+ * TWO CHOICES, NOT THREE
+ * ---------------------------------------------------------------------------
+ * There used to be a third card, TEACHER, and it asked for exactly the same
+ * two fields as MENTOR and exactly the same documents. A choice that changes
+ * nothing downstream is not a choice - it is a fork in the road where both
+ * lanes rejoin ten metres later, and every person who stops to read it pays
+ * for it. TEACHER survives as a UserRole an administrator can assign; it is
+ * simply not a thing you pick about yourself at signup.
+ *
+ * ---------------------------------------------------------------------------
  * WHY RADIO CARDS AND NOT A <select>
  * ---------------------------------------------------------------------------
- * This choice changes the rest of the form - which fields appear, which
- * documents are demanded, and what the account may eventually do on the
- * platform. A dropdown hides the alternatives behind a click and gives no room
- * to explain the consequence, so people pick wrong and discover it three steps
- * later at the document upload.
+ * This choice changes the rest of the form. A dropdown hides the alternatives
+ * behind a click and gives no room to explain the consequence, so people pick
+ * wrong and discover it a step later.
  *
  * Two large cards with a sentence each make the difference legible before the
  * commitment. They are real radio inputs underneath, so keyboard and screen
@@ -48,16 +56,6 @@ export function StepAccountType({
         'auth.register.types.student.point2',
       ],
     },
-    {
-      type: 'TEACHER',
-      icon: School,
-      titleKey: 'auth.register.types.teacher.title',
-      bodyKey: 'auth.register.types.teacher.body',
-      pointsKey: [
-        'auth.register.types.teacher.point1',
-        'auth.register.types.teacher.point2',
-      ],
-    },
     /**
      * Mentor is a first-class signup choice, not a later upgrade.
      *
@@ -89,7 +87,9 @@ export function StepAccountType({
       </legend>
       <p className="mb-3 text-sm text-fg-muted">{t('auth.register.accountTypeHint')}</p>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/* One column on a phone. Two cards side by side at 360px leave ~160px
+          each, which is narrower than the body text they carry. */}
+      <div className="grid gap-3 sm:grid-cols-2">
         {options.map((option) => {
           const selected = value === option.type;
           const Icon = option.icon;
@@ -124,7 +124,7 @@ export function StepAccountType({
                 >
                   <Icon className="h-4.5 w-4.5" />
                 </span>
-                <span className="text-sm font-semibold text-fg">{t(option.titleKey)}</span>
+                <span className="min-w-0 text-sm font-semibold text-fg">{t(option.titleKey)}</span>
                 {selected && (
                   <Check className="ml-auto h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
                 )}
@@ -134,14 +134,15 @@ export function StepAccountType({
                 {t(option.bodyKey)}
               </span>
 
-              {/* States the concrete consequence - which documents this branch
-                  will ask for - so the choice is made with that known rather
-                  than discovered at the upload step. */}
+              {/* States the concrete consequence so the choice is made with it
+                  known. It no longer names documents: nothing is uploaded here
+                  any more, and promising an upload that does not happen on the
+                  next screen is worse than saying nothing. */}
               <ul className="mt-2.5 space-y-1">
                 {option.pointsKey.map((key) => (
                   <li key={key} className="flex items-start gap-1.5 text-2xs text-fg-subtle">
                     <span aria-hidden="true">·</span>
-                    <span>{t(key)}</span>
+                    <span className="min-w-0">{t(key)}</span>
                   </li>
                 ))}
               </ul>

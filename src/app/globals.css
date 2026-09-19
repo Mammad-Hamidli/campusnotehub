@@ -164,6 +164,67 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    /*
+     * A sticky header is 3.5rem tall on every signed-in screen. Without this,
+     * following an in-page anchor (the error summary's "jump to field" links,
+     * most of all) scrolls the target underneath that bar and the user sees
+     * the field above the one they were sent to.
+     */
+    scroll-padding-top: 4.5rem;
+  }
+
+  /*
+   * ---------------------------------------------------------------------------
+   * THE 16px FLOOR ON FORM CONTROLS
+   * ---------------------------------------------------------------------------
+   * `.input` is `text-md`, which is 15px - and iOS Safari AUTO-ZOOMS the whole
+   * page whenever a focused control's font is under 16px. That zoom is what
+   * produced the reported symptom: tapping a field on a phone blew the layout
+   * up, the viewport stayed wide after blur, and every screen afterwards
+   * looked shoved to one side with content running off the right edge. It is
+   * not a layout bug at all - it is the browser's accessibility zoom, and no
+   * amount of flex/overflow work fixes it.
+   *
+   * 16px is therefore a FLOOR on touch-sized viewports, applied to the element
+   * types rather than to `.input` so a bare <input> somebody adds later is
+   * covered too. Above `sm` the design's own 15px returns, where no zoom
+   * behaviour exists to trigger.
+   */
+  @media (max-width: 639px) {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
+
+  /*
+   * Touch targets.
+   *
+   * The design's controls are 34-36px tall: right for a mouse, under the 44px
+   * a fingertip needs. Raised only on a COARSE pointer, so the desktop density
+   * the rest of the product is tuned for is untouched, and only on the shared
+   * button classes and form controls - NOT on every <button>, because the
+   * product uses bare buttons as inline text links ("Edit", "Show more") and
+   * a 44px floor there would punch holes through paragraphs and inflate every
+   * card header.
+   */
+  @media (pointer: coarse) {
+    .btn,
+    .input,
+    select,
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea {
+      min-height: 2.75rem;
+    }
+
+    /* Checkbox and radio hit areas. The box stays visually 16px; the padding
+       around it is what the finger actually lands on. */
+    input[type='checkbox'],
+    input[type='radio'] {
+      min-height: 1.25rem;
+      min-width: 1.25rem;
+    }
   }
 
   body {
@@ -328,6 +389,33 @@
   }
   .btn-danger {
     @apply btn bg-danger text-white hover:opacity-90;
+  }
+
+  /*
+   * Icon-only controls: a toggle, a close (x), a hamburger. Their visible box
+   * is the icon, which is 16-20px, so the tap area has to be stated. Opt-in
+   * rather than automatic because the product also uses bare <button>s as
+   * inline text links, where a 44px floor would be wrong.
+   */
+  .touch-target {
+    @apply inline-flex items-center justify-center;
+  }
+  @media (pointer: coarse) {
+    .touch-target {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+    }
+  }
+
+  /*
+   * Long unbroken strings - a pasted URL, an email address, a 40-character
+   * student number - are the single most common cause of a card growing wider
+   * than the phone. `anywhere` rather than `break-all` so ordinary words still
+   * break at their boundaries.
+   */
+  .break-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   /*

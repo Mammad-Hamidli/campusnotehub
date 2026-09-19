@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Star } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
 
 /**
  * 1-5 star input. Rendered only for verified buyers (viewerOwns); the server
@@ -18,6 +19,7 @@ export function StarRating({
   onRated: (result: { rating: number; ratingAvg: number; ratingCount: number }) => void;
 }) {
   const t = useT();
+  const toast = useToast();
   const [value, setValue] = useState(initial ?? 0);
   const [hover, setHover] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -38,6 +40,7 @@ export function StarRating({
       const payload = await res.json().catch(() => null);
       if (!res.ok) throw new Error(payload?.error ?? 'errors.generic');
       onRated(payload);
+      toast.success(t('notes.reviews.saved'));
     } catch (cause) {
       setValue(previous);
       setError(cause instanceof Error ? cause.message : 'errors.generic');

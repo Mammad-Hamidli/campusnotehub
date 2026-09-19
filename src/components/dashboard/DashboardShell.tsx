@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { BookOpen, UserRoundSearch, Wallet } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
 import { mediaUrlFromKey } from '@/lib/media/constants';
 import { Sidebar, type DashboardTab } from './Sidebar';
-import { VerificationBanner, type VerificationState } from './VerificationBanner';
 import { Composer } from './Composer';
 import { PostCard, type Post } from './PostCard';
 import { GraduationCountdown, TrendingNotes, type TrendingNote } from './RightPanel';
@@ -167,14 +167,9 @@ function toPost(row: ApiPost): Post {
   };
 }
 
-export function DashboardShell({
-  initialTab = 'feed',
-  verificationState = 'PENDING',
-}: {
-  initialTab?: DashboardTab;
-  verificationState?: VerificationState;
-}) {
+export function DashboardShell({ initialTab = 'feed' }: { initialTab?: DashboardTab }) {
   const t = useT();
+  const toast = useToast();
   const [tab, setTab] = useState<DashboardTab>(initialTab);
   const [filter, setFilter] = useState<UniversityFilter>('all');
   const [posts, setPosts] = useState<Post[]>([]);
@@ -384,6 +379,7 @@ export function DashboardShell({
         // author carries a nickname. This is what fixes `row.tags.map` on a
         // freshly created post.
         setPosts((prev) => [toPost(payload.post as ApiPost), ...prev]);
+        toast.success(t('feed.posted'));
         return;
       }
 
@@ -394,8 +390,9 @@ export function DashboardShell({
         const { posts: rows } = await refreshed.json();
         setPosts((rows as ApiPost[]).map(toPost));
       }
+      toast.success(t('feed.posted'));
     },
-    [],
+    [t, toast],
   );
 
   /**
@@ -407,7 +404,7 @@ export function DashboardShell({
    */
   if (loading || !viewer) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-surface-muted">
+      <div className="flex min-h-dvh w-full max-w-full items-center justify-center overflow-x-clip bg-surface-muted">
         <div className="w-full max-w-md space-y-3 px-4" aria-busy="true">
           <div className="h-8 w-40 animate-pulse rounded bg-surface" />
           <div className="h-28 animate-pulse rounded-xl bg-surface" />
@@ -419,7 +416,7 @@ export function DashboardShell({
 
   /**
    * Same capability table the server enforces, evaluated on the live /api/me
-   * record (not the `?verification=` display override). A UI hint only:
+   * record. A UI hint only:
    * POST /api/notes re-checks `notes:sell` on every upload.
    */
   const canUploadNotes = can(
@@ -433,14 +430,19 @@ export function DashboardShell({
   );
 
   return (
-    <div className="flex min-h-dvh bg-surface-muted lg:flex-row">
+    /*
+      flex-COL below lg. This was `flex lg:flex-row` with no base direction, so
+      on mobile the Sidebar's top bar sat BESIDE <main> as a row item, squeezing
+      the feed and pushing it past the right edge. overflow-x-clip (not hidden)
+      bounds the page without creating a scroll container, which would break
+      the sticky mobile bar and desktop rail.
+    */
+    <div className="flex min-h-dvh w-full max-w-full flex-col overflow-x-clip bg-surface-muted lg:flex-row">
       <Sidebar active={tab} onSelect={setTab} user={viewer} />
 
-      <main id="main" className="min-w-0 flex-1">
-        <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <main id="main" className="w-full min-w-0 max-w-full flex-1">
+        <div className="mx-auto flex w-full max-w-6xl gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
           <div className="min-w-0 flex-1">
-            <VerificationBanner state={verificationState} />
-
             {mentorTodo && (
               <div className="card animate-rise mb-5 border-accent/30 bg-accent-soft p-4">
                 <h2 className="text-sm font-semibold text-fg">

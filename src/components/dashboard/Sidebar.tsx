@@ -187,9 +187,11 @@ export function Sidebar({
     <>
       {/* Mobile bar. The rail is hidden below lg; duplicating into a sheet
           beats squeezing a 240px rail onto a 360px screen. */}
-      <div className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-edge bg-canvas/85 px-4 backdrop-blur lg:hidden">
-        <Logo />
-        <div className="flex items-center gap-1">
+      <div className="sticky top-0 z-40 flex h-14 w-full max-w-full items-center justify-between gap-2 border-b border-edge bg-canvas/85 px-3 backdrop-blur sm:px-4 lg:hidden">
+        <div className="min-w-0 shrink">
+          <Logo />
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
           <LanguageToggle />
           <ThemeToggle />
           <button
@@ -205,7 +207,9 @@ export function Sidebar({
       </div>
 
       {mobileOpen && (
-        <div className="sticky top-14 z-40 animate-fade-in border-b border-edge bg-canvas p-3 lg:hidden">
+        // Overlay drawer under the bar: fixed so it does not push the feed down,
+        // and scrollable so the account menu stays reachable on short phones.
+        <div className="fixed inset-x-0 top-14 z-40 max-h-[calc(100dvh-3.5rem)] animate-fade-in overflow-y-auto border-b border-edge bg-canvas p-3 shadow-raised lg:hidden">
           {nav}
           <div className="mt-3">{account}</div>
         </div>

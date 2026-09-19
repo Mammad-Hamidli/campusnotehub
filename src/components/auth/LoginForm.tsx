@@ -8,9 +8,11 @@ import { Logo } from '@/components/ui/Logo';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
 
 export function LoginForm() {
   const t = useT();
+  const toast = useToast();
   const router = useRouter();
   const params = useSearchParams();
 
@@ -64,6 +66,7 @@ export function LoginForm() {
         const requested = params.get('next');
         const suggested = payload?.next?.href;
 
+        toast.success(t('auth.login.welcomeBack'));
         router.push(
           samePath(requested) ? requested : samePath(suggested) ? suggested : '/dashboard',
         );
@@ -169,6 +172,16 @@ export function LoginForm() {
         {t('auth.login.noAccount')}{' '}
         <Link href="/register" className="font-medium text-accent underline-offset-2 hover:underline">
           {t('nav.register')}
+        </Link>
+      </p>
+
+      <p className="mt-8 flex items-center justify-center gap-3 text-2xs text-fg-subtle">
+        <Link href="/legal/terms" className="transition-colors hover:text-fg">
+          {t('landing.footer.terms')}
+        </Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/legal/privacy" className="transition-colors hover:text-fg">
+          {t('landing.footer.privacy')}
         </Link>
       </p>
     </div>

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { UserRole } from '@/lib/enums';
 import { UNIVERSITIES } from '@/lib/universities';
 import { FACULTY_OTHER, FACULTY_SLUGS } from '@/lib/faculties';
+import { timezoneSchema, weeklyRulesSchema } from '@/lib/mentors/schedule';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -41,7 +42,7 @@ const password = z
  * The two account types a person can register as.
  *
  * Deliberately a SUBSET of UserRole rather than a new enum. UserRole already
- * has STUDENT and TEACHER, already drives permissions, and is already what the
+ * has STUDENT and MENTOR, already drives permissions, and is already what the
  * admin panel reads - so registration writes into the existing concept instead
  * of adding a parallel `accountType` that could disagree with it.
  *
@@ -52,19 +53,44 @@ const password = z
  * identity verification, and it only becomes listable in the directory once a
  * moderator approves its application (POST /api/mentors/apply).
  *
- * ALUMNI, MODERATOR and ADMIN remain absent on purpose: those are granted by an
- * administrator or by the graduation cron, never claimed at signup.
+ * ---------------------------------------------------------------------------
+ * WHY TEACHER IS NO LONGER ONE OF THEM
+ * ---------------------------------------------------------------------------
+ * TEACHER and MENTOR were validated by the same refinements, asked for the
+ * same two fields, and required the same documents - the choice between them
+ * changed nothing downstream. It remains a perfectly good UserRole, assigned
+ * by an administrator in the panel; it is simply not something a stranger
+ * claims about themselves at signup. Removing it narrows what this endpoint
+ * accepts, which is the safe direction: an existing TEACHER account is
+ * untouched, and no other route reads ACCOUNT_TYPES.
+ *
+ * ALUMNI is likewise absent, but for a different reason: it is REACHED through
+ * this endpoint rather than claimed at it. Someone registering as a student
+ * who says they have already graduated is written as ALUMNI by the route - see
+ * academicStatus below - and the graduation cron does the same for those who
+ * finish later. MODERATOR and ADMIN are granted by an administrator only.
  */
-export const ACCOUNT_TYPES = [UserRole.STUDENT, UserRole.TEACHER, UserRole.MENTOR] as const;
+export const ACCOUNT_TYPES = [UserRole.STUDENT, UserRole.MENTOR] as const;
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 
 /**
  * The account types that describe a professional rather than an enrolled
- * student. Both state where they work and what they do there, and neither has a
- * student card or a graduation date - so they share one branch of the
- * refinements below and one document set in requiredKindsFor().
+ * student: they state where they work and what they do there, and have neither
+ * a student card nor a graduation date - so they take one branch of the
+ * refinements below and the identity-only document set in requiredKindsFor().
  */
-const PROFESSIONAL_TYPES: ReadonlySet<AccountType> = new Set([UserRole.TEACHER, UserRole.MENTOR]);
+const PROFESSIONAL_TYPES: ReadonlySet<AccountType> = new Set([UserRole.MENTOR]);
+
+/**
+ * Where a student is in their studies, asked alongside the university.
+ *
+ * GRADUATED is what turns a registration into an ALUMNI account (done in the
+ * route, not here - this schema validates, it does not decide roles), and it
+ * is what stops the platform demanding a current student card from someone who
+ * finished three years ago.
+ */
+export const ACADEMIC_STATUSES = ['STUDYING', 'GRADUATED'] as const;
+export type AcademicStatus = (typeof ACADEMIC_STATUSES)[number];
 
 /** One half of a legal name, as printed on an identity document. */
 const nameHalf = z
@@ -142,11 +168,19 @@ export const registerSchema = z
     email: z.string().trim().toLowerCase().email().max(254),
     password,
     passwordConfirm: z.string(),
-    /** University CODE, e.g. 'ADA'. See UNIVERSITY_CODES above. */
+    /**
+     * University CODE, e.g. 'ADA'. See UNIVERSITY_CODES above.
+     *
+     * Optional at the field level because a MENTOR need not belong to a
+     * university; the refinement below requires it for a STUDENT. An unknown
+     * code is still refused - optional means "may be absent", not "may be
+     * anything".
+     */
     universityId: z
       .string()
       .trim()
-      .refine((v) => UNIVERSITY_CODES.has(v), 'errors.validationFailed'),
+      .refine((v) => UNIVERSITY_CODES.has(v), 'errors.validationFailed')
+      .optional(),
     /**
      * A Firestore document id, NOT a cuid.
      *
@@ -184,12 +218,27 @@ export const registerSchema = z
      * Required for a STUDENT registration; see the refinement below.
      */
     studentNumber: z.string().trim().min(3).max(40).optional(),
+    /**
+     * "Currently studying" or "Graduated". Required for a STUDENT
+     * registration; meaningless for a MENTOR, and refused on that branch by
+     * the refinement below so a mentor account cannot carry one.
+     */
+    academicStatus: z.enum(ACADEMIC_STATUSES).optional(),
 
-    // ---- TEACHER-specific --------------------------------------------------
-    /** Department or faculty the teacher works in. */
+    // ---- MENTOR-specific ---------------------------------------------------
+    /** Organisation the mentor works in (column shared with TEACHER accounts). */
     department: z.string().trim().min(2).max(120).optional(),
-    /** Academic position, e.g. "Lecturer", "Assistant Professor". */
+    /** Position, e.g. "Senior Product Manager", "Assistant Professor". */
     academicTitle: z.string().trim().min(2).max(120).optional(),
+    /**
+     * Weekly availability, picked on the wizard's schedule step. The same
+     * rule shape and normalisation as POST /api/mentors/apply, so what is
+     * chosen here can prefill that form unchanged. Required for a MENTOR (see
+     * the refinement below); refused on the student branch.
+     */
+    availability: weeklyRulesSchema.optional(),
+    /** IANA zone the availability is expressed in. */
+    timezone: timezoneSchema.optional(),
     /**
      * Graduation date. Required for a STUDENT, meaningless for a TEACHER.
      *
@@ -215,9 +264,22 @@ export const registerSchema = z
       .regex(/^(\+994|0)(50|51|55|70|77|10|60|99)\d{7}$/, 'auth.errors.phoneInvalid'),
     locale: z.enum(['az', 'en', 'ru']).default('az'),
     acceptTerms: z.literal(true, { errorMap: () => ({ message: 'auth.errors.termsRequired' }) }),
-    // Separate, explicit consent for biometric-adjacent document processing.
-    // Bundling it into the terms checkbox would not be valid consent.
-    consentDocumentProcessing: z.literal(true),
+    /**
+     * Consent to identity-document processing is NO LONGER COLLECTED HERE.
+     *
+     * Registration does not touch a document any more, so a consent taken at
+     * signup would be consent to processing that is not happening - and under
+     * GDPR Art. 9 and the AZ personal data law, consent given before the
+     * processing is specified is not consent at all. It is asked instead at
+     * the moment the documents are handed over: POST /api/verification/submit
+     * requires `consentDocumentProcessing` in its multipart body and refuses
+     * the upload without it.
+     *
+     * The field stays accepted-but-ignored here so a client from the previous
+     * deploy that still sends `true` is not answered with a 400 mid-rollout.
+     * It is deliberately not passed to the user record.
+     */
+    consentDocumentProcessing: z.literal(true).optional(),
     /** Client-side signal only; never trusted on its own. */
     deviceFingerprint: z.string().max(128).optional(),
   })
@@ -237,10 +299,58 @@ export const registerSchema = z
    * Each refinement names its own `path`, so the error lands on the offending
    * field rather than at the form root where nobody can act on it.
    */
+  .refine((d) => d.accountType !== UserRole.STUDENT || Boolean(d.universityId), {
+    path: ['universityId'],
+    message: 'errors.fieldRequired',
+  })
   .refine((d) => d.accountType !== UserRole.STUDENT || Boolean(d.studentNumber), {
     path: ['studentNumber'],
     message: 'auth.errors.studentNumberRequired',
   })
+  .refine((d) => d.accountType !== UserRole.STUDENT || Boolean(d.academicStatus), {
+    path: ['academicStatus'],
+    message: 'errors.fieldRequired',
+  })
+  /**
+   * A mentor has no academic status, and accepting one would write a claim the
+   * account type does not make. Refused rather than silently dropped, so a
+   * client sending it learns that it is wrong instead of believing it landed.
+   */
+  .refine((d) => d.accountType === UserRole.STUDENT || d.academicStatus === undefined, {
+    path: ['academicStatus'],
+    message: 'errors.validationFailed',
+  })
+  /**
+   * ---------------------------------------------------------------------
+   * THE DATE MUST AGREE WITH THE STATUS
+   * ---------------------------------------------------------------------
+   * These two fields answer the same question twice, and when they disagree
+   * the platform cannot tell which answer to believe - while the consequences
+   * differ sharply: the status decides the ROLE written to the account, which
+   * decides which documents verification will demand. "Graduated, finishing in
+   * 2029" would produce an alumni account that can never complete
+   * verification, because it would be asked for a student card it does not
+   * have. Refusing here is the only point at which that is cheap to fix.
+   *
+   * The comparison is in whole months, at UTC, to match how the graduation
+   * sweep reads the same pair. The CURRENT month is valid for BOTH: someone
+   * defending this month is plausibly either.
+   */
+  .refine(
+    (d) => {
+      if (d.accountType !== UserRole.STUDENT) return true;
+      if (d.graduationYear === undefined || d.graduationMonth === undefined) return true;
+
+      const now = new Date();
+      const chosen = d.graduationYear * 12 + d.graduationMonth;
+      const current = now.getUTCFullYear() * 12 + (now.getUTCMonth() + 1);
+
+      if (d.academicStatus === 'GRADUATED') return chosen <= current;
+      if (d.academicStatus === 'STUDYING') return chosen >= current;
+      return true;
+    },
+    { path: ['graduationYear'], message: 'auth.errors.graduationStatusMismatch' },
+  )
   .refine((d) => d.accountType !== UserRole.STUDENT || d.graduationYear !== undefined, {
     path: ['graduationYear'],
     message: 'errors.fieldRequired',
@@ -260,6 +370,18 @@ export const registerSchema = z
   .refine((d) => !PROFESSIONAL_TYPES.has(d.accountType) || Boolean(d.academicTitle), {
     path: ['academicTitle'],
     message: 'auth.errors.academicTitleRequired',
+  })
+  /**
+   * A mentor states when they can be booked. At least one slot, because a
+   * mentor with no availability is a listing nobody can ever book.
+   */
+  .refine((d) => d.accountType !== UserRole.MENTOR || (d.availability?.length ?? 0) > 0, {
+    path: ['availability'],
+    message: 'mentors.schedule.errors.empty',
+  })
+  .refine((d) => d.accountType === UserRole.MENTOR || d.availability === undefined, {
+    path: ['availability'],
+    message: 'errors.validationFailed',
   })
   /**
    * The two faculty columns are only coherent together, and the same pairing

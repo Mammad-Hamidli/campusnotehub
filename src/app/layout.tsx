@@ -5,6 +5,8 @@ import { LocaleProvider } from '@/lib/i18n/LocaleProvider';
 import { DEFAULT_LOCALE, LOCALE_COOKIE, isLocale } from '@/lib/i18n/dictionaries';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 import { SessionKeeper } from '@/components/auth/SessionKeeper';
+import { IdentityPromptSlot } from '@/components/account/IdentityPromptSlot';
+import { FeedbackProvider } from '@/components/ui/Feedback';
 // Imported from constants.ts, NOT from the 'use client' provider: a plain
 // export read across that boundary resolves to undefined on the server.
 // See src/lib/theme/constants.ts.
@@ -117,7 +119,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
         />
       </head>
-      <body className="min-h-dvh bg-canvas font-sans text-fg">
+      {/* Last-resort guard: one overflowing element must never make the whole
+          page pan sideways on a phone. `clip`, not `hidden`, keeps sticky
+          headers working. */}
+      <body className="min-h-dvh max-w-full overflow-x-clip bg-canvas font-sans text-fg">
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100]
@@ -128,8 +133,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </a>
         <ThemeProvider initialPreference={themePreference}>
           <LocaleProvider initialLocale={locale}>
-            <SessionKeeper />
-            {children}
+            {/* Toasts and confirmation dialogs for every route, admin included.
+                Inside LocaleProvider so their built-in labels are translated. */}
+            <FeedbackProvider>
+              <SessionKeeper />
+              {/*
+                The standing "Verify your identity" banner, mounted once for the
+                WHOLE app rather than per page, and BEFORE {children} so it is
+                the first thing on every screen.
+
+                It lives here because the state it reports follows the account,
+                not the route: an unverified user is unverified on the feed, in
+                the notes listing, in their wallet and on their profile, and a
+                banner that only appears on /dashboard is one a person can spend
+                a week never seeing. The slot decides whether anything renders
+                at all; see IdentityPromptSlot for why the session read is free.
+              */}
+              <IdentityPromptSlot />
+              {children}
+            </FeedbackProvider>
           </LocaleProvider>
         </ThemeProvider>
       </body>

@@ -1,5 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import type { AccountStatus, UserRole, VerificationStatus } from '@/lib/enums';
+import type { WeeklyRule } from '@/lib/mentors/schedule';
 import { adminDb } from '../admin.core';
 import { COLLECTIONS, SUBCOLLECTIONS } from '../collections';
 import { docToObject, docsToObjects, forFirestore } from '../convert';
@@ -69,6 +70,13 @@ export type UserRecord = {
   graduationMonth: number | null;
   alumniTransitionedAt: Date | null;
   graduationPromptedAt: Date | null;
+  /**
+   * MENTOR accounts: the weekly availability stated at signup, in `timezone`.
+   * A draft only - bookings read mentorProfiles/{id}/availability, which the
+   * mentor application creates. This prefills that application. Absent
+   * (undefined) on documents written before the field existed.
+   */
+  mentorAvailability?: WeeklyRule[] | null;
   frozenUntil: Date | null;
   frozenReason: string | null;
   frozenById: string | null;
@@ -252,6 +260,7 @@ export function newUserDefaults(): Omit<
     graduationMonth: null,
     alumniTransitionedAt: null,
     graduationPromptedAt: null,
+    mentorAvailability: null,
     frozenUntil: null,
     frozenReason: null,
     frozenById: null,

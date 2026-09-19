@@ -3,6 +3,8 @@
 import { useRef, useState } from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
+import { VERIFICATION_REQUIRED_KEY, VerifyToUnlock } from '@/components/account/VerifyToUnlock';
 
 const QUICK_AMOUNTS = [5, 10, 20, 50];
 const MIN_AZN = 1;
@@ -25,16 +27,15 @@ function newAttemptKey(): string {
  */
 export function TopUpCard({ disabled = false, onDone }: { disabled?: boolean; onDone: () => void }) {
   const t = useT();
+  const toast = useToast();
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const attemptKey = useRef(newAttemptKey());
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    setSuccess(null);
 
     const value = Number(amount.replace(',', '.'));
     if (!Number.isFinite(value) || value < MIN_AZN || value > MAX_AZN) {
@@ -52,12 +53,16 @@ export function TopUpCard({ disabled = false, onDone }: { disabled?: boolean; on
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(t(payload.error ?? 'errors.generic', { min: MIN_AZN, max: MAX_AZN }));
+        setError(
+          payload.error === VERIFICATION_REQUIRED_KEY
+            ? VERIFICATION_REQUIRED_KEY
+            : t(payload.error ?? 'errors.generic', { min: MIN_AZN, max: MAX_AZN }),
+        );
         return;
       }
       attemptKey.current = newAttemptKey();
       setAmount('');
-      setSuccess(t('wallet.topUpForm.success', { amount: value.toFixed(2) }));
+      toast.success(t('wallet.topUpForm.success', { amount: value.toFixed(2) }));
       onDone();
     } catch {
       setError(t('errors.network'));
@@ -72,7 +77,7 @@ export function TopUpCard({ disabled = false, onDone }: { disabled?: boolean; on
       <p className="mt-0.5 text-2xs text-fg-muted">{t('wallet.topUpForm.hint', { min: MIN_AZN, max: MAX_AZN })}</p>
 
       <form onSubmit={submit} className="mt-3 flex flex-wrap items-end gap-2">
-        <label className="flex min-w-[9rem] flex-1 flex-col gap-1">
+        <label className="flex w-full min-w-0 flex-1 basis-36 flex-col gap-1">
           <span className="text-2xs font-medium text-fg-muted">{t('wallet.topUpForm.amount')}</span>
           <input
             type="number"
@@ -110,15 +115,14 @@ export function TopUpCard({ disabled = false, onDone }: { disabled?: boolean; on
         </button>
       </form>
 
-      {error && (
-        <p role="alert" className="mt-2 text-sm text-danger-fg">
-          {error}
-        </p>
-      )}
-      {success && (
-        <p role="status" className="mt-2 text-sm text-verified">
-          {success}
-        </p>
+      {error === VERIFICATION_REQUIRED_KEY ? (
+        <VerifyToUnlock className="mt-2" />
+      ) : (
+        error && (
+          <p role="alert" className="mt-2 text-sm text-danger-fg">
+            {error}
+          </p>
+        )
       )}
       <p className="mt-2 text-2xs text-fg-subtle">{t('wallet.topUpForm.providerNote')}</p>
     </section>

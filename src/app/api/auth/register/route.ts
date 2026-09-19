@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { VerificationStatus } from '@/lib/enums';
+import { UserRole, VerificationStatus } from '@/lib/enums';
 import {
   createUser,
   newUserDefaults,
@@ -128,13 +128,42 @@ export async function POST(request: NextRequest) {
   }
 
   // Looked up by `code`, which is what the form submits; `university.id` below
-  // is the document id the user record actually stores.
-  const university = await findUniversityByCode(input.universityId);
-  if (!university) {
+  // is the document id the user record actually stores. Absent only for a
+  // MENTOR (the schema requires it of a student); a code that was SENT must
+  // still resolve to a real, seeded university.
+  const university = input.universityId ? await findUniversityByCode(input.universityId) : null;
+  if (input.universityId && !university) {
     return NextResponse.json({ error: 'errors.validationFailed' }, { status: 400 });
   }
 
   const passwordHash = await hashPassword(input.password);
+
+  /**
+   * ---------------------------------------------------------------------------
+   * "GRADUATED" IS A ROLE, NOT A FLAG
+   * ---------------------------------------------------------------------------
+   * The account type answers "student or mentor"; academicStatus answers "are
+   * you still there". Someone who registers as a student and says they have
+   * already graduated IS an alumnus, and writing them as STUDENT would leave
+   * the product lying about them in three places at once:
+   *
+   *   - verification would demand a current student card they do not hold
+   *     (requiredKindsFor() branches on the role, and ALUMNI is identity-only);
+   *   - the 1 May graduation sweep would prompt them to "switch to alumni"
+   *     for a transition that already happened;
+   *   - the profile would show "Verified student" over a date in the past.
+   *
+   * ALUMNI is absent from ACCOUNT_TYPES on purpose - it is not a thing a
+   * stranger claims at signup, it is a thing the server concludes. This is the
+   * one place it concludes it, from a validated pair the schema has already
+   * checked for internal agreement.
+   *
+   * alumniTransitionedAt is stamped for the same reason: the sweep skips
+   * anyone who already carries it, so without it the first 1 May after signup
+   * would prompt a fresh alumni account to become alumni.
+   */
+  const graduated = input.accountType === UserRole.STUDENT && input.academicStatus === 'GRADUATED';
+  const role = graduated ? UserRole.ALUMNI : input.accountType;
 
   try {
     /**
@@ -178,12 +207,13 @@ export async function POST(request: NextRequest) {
         /**
          * The account type IS the role. There is no separate accountType
          * field - see the note in the schema for why a parallel field would
-         * be a duplicate concept.
+         * be a duplicate concept. The one transformation is GRADUATED, which
+         * resolves to ALUMNI; see the block above.
          */
-        role: input.accountType,
+        role,
         nickname: input.nickname,
         locale: input.locale,
-        universityId: university.id,
+        universityId: university?.id ?? null,
         facultyId: input.facultyId ?? null,
         // Type-specific. Each is null on the branch it does not belong to, and
         // the schema has already refused a request that omitted one its
@@ -198,6 +228,14 @@ export async function POST(request: NextRequest) {
         facultyOther: input.facultySlug === FACULTY_OTHER ? input.facultyOther ?? null : null,
         graduationYear: input.graduationYear ?? null,
         graduationMonth: input.graduationMonth ?? null,
+        // MENTOR only (the schema refuses it elsewhere): the schedule chosen
+        // in the wizard, kept as a draft that prefills /mentors/apply. The
+        // profile timezone follows it so the two cannot disagree.
+        mentorAvailability: input.availability ?? null,
+        ...(input.timezone ? { timezone: input.timezone } : {}),
+        // Already an alumnus at signup: stamped so the 1 May sweep does not
+        // prompt them to make a transition that is already recorded.
+        alumniTransitionedAt: graduated ? new Date() : null,
         verificationStatus: VerificationStatus.UNVERIFIED,
         phone: input.phone ?? null,
         createdAt: new Date(),
@@ -285,7 +323,7 @@ export async function POST(request: NextRequest) {
       'welcome',
       {
         nickname: user.nickname,
-        university: university.nameEn,
+        university: university?.nameEn ?? null,
         faculty: facultyLabel(input.facultySlug ?? null, input.facultyOther ?? null),
       },
       { dedupeKey: `welcome:${user.id}` },

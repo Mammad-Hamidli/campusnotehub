@@ -281,6 +281,8 @@ service cloud.firestore {
     match /mediaAssets/{id}    { allow read, write: if false; }
     // Email dedupe keys (SHA-256 only) - see src/lib/email/send.ts.
     match /emailDispatches/{id} { allow read, write: if false; }
+    // Deletion requests: server-only; read and decided through the admin API.
+    match /accountDeletionRequests/{id} { allow read, write: if false; }
 
     // =========================================================================
     // DEFAULT DENY

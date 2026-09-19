@@ -113,11 +113,13 @@ export type BookingRecord = {
 export type MentorReviewRecord = {
   id: string;
   mentorId: string;
+  /** The most recent finished session that made the review possible. */
   bookingId: string;
   menteeId: string;
   rating: number;
   body: string | null;
   createdAt: Date;
+  updatedAt?: Date;
 };
 
 /** Statuses that occupy a slot. A cancelled booking frees the time. */
@@ -331,6 +333,126 @@ export async function listBookingsForMentee(
 ): Promise<BookingRecord[]> {
   const snap = await bookings().where('menteeId', '==', menteeId).limit(take).get();
   return sortBy(docsToObjects<BookingRecord>(snap.docs) as BookingRecord[], 'startsAt', 'desc');
+}
+
+// ---------------------------------------------------------------- reviews
+//
+// The same mechanics as note reviews (upsertNoteReview in notes.ts), with a
+// finished session standing in for the PAID order:
+//
+//   eligibility - the mentee has a booking with this mentor that was confirmed
+//                 and whose end time has passed. Re-read INSIDE the review
+//                 transaction, never inferred from the client.
+//   identity    - review id = mentorId__menteeId, so one mentee is one
+//                 reviewer (ratingCount counts unique reviewers) and re-rating
+//                 replaces rather than adds.
+//   aggregates  - ratingSum / ratingCount / ratingAvg on the mentor profile,
+//                 updated in the same transaction as the review.
+
+/**
+ * Booking statuses that mean the session was ON. Nothing moves a booking to
+ * COMPLETED today, so a CONFIRMED (or RESCHEDULED) booking whose end time has
+ * passed is what "the session happened" means; COMPLETED is included so the
+ * rule keeps working once something does set it.
+ */
+const REVIEWABLE_BOOKING_STATUSES: ReadonlySet<string> = new Set(['CONFIRMED', 'RESCHEDULED', 'COMPLETED']);
+
+export class MentorReviewError extends Error {
+  constructor(readonly messageKey: string, readonly status: number) {
+    super(messageKey);
+  }
+}
+
+export function mentorReviewIdFor(mentorId: string, menteeId: string): string {
+  return `${mentorId}__${menteeId}`;
+}
+
+/** Equality on two fields only: served by single-field indexes, no composite needed. */
+function bookingsBetween(mentorId: string, menteeId: string) {
+  return bookings().where('mentorId', '==', mentorId).where('menteeId', '==', menteeId).limit(100);
+}
+
+/** The latest finished session between the two, or null. */
+function latestFinished(docs: FirebaseFirestore.QueryDocumentSnapshot[], now: Date): string | null {
+  let best: { id: string; endsAt: number } | null = null;
+  for (const doc of docs) {
+    const data = doc.data();
+    const endsAt = (data.endsAt as FirebaseFirestore.Timestamp | undefined)?.toMillis?.() ?? 0;
+    if (!REVIEWABLE_BOOKING_STATUSES.has(String(data.status)) || endsAt > now.getTime()) continue;
+    if (!best || endsAt > best.endsAt) best = { id: doc.id, endsAt };
+  }
+  return best?.id ?? null;
+}
+
+/**
+ * What the viewer may do in the review box on a mentor's page: whether they
+ * have had a session (so may review), and their existing review to pre-fill.
+ */
+export async function findViewerMentorReview(
+  mentorId: string,
+  menteeId: string,
+): Promise<{ eligible: boolean; rating: number | null; body: string | null }> {
+  const [sessions, review] = await Promise.all([
+    bookingsBetween(mentorId, menteeId).get(),
+    reviews().doc(mentorReviewIdFor(mentorId, menteeId)).get(),
+  ]);
+  return {
+    eligible: latestFinished(sessions.docs, new Date()) !== null,
+    rating: review.exists ? Number(review.data()!.rating) : null,
+    body: review.exists ? ((review.data()!.body as string | null) ?? null) : null,
+  };
+}
+
+/**
+ * Creates or updates a mentee's review of a mentor.
+ *
+ * The eligibility read is inside the transaction, as the PAID-order read is
+ * for notes: a booking cancelled while the review is being written aborts and
+ * re-runs it rather than letting a review land on a session that never was.
+ */
+export async function upsertMentorReview(p: {
+  mentorId: string;
+  menteeId: string;
+  rating: number;
+  body: string | null;
+}): Promise<{ ratingAvg: number; ratingCount: number; rating: number; body: string | null }> {
+  const db = adminDb();
+  const mentorRef = mentors().doc(p.mentorId);
+  const reviewRef = reviews().doc(mentorReviewIdFor(p.mentorId, p.menteeId));
+
+  return db.runTransaction(async (tx) => {
+    const sessions = await tx.get(bookingsBetween(p.mentorId, p.menteeId));
+    const [mentorSnap, reviewSnap] = await tx.getAll(mentorRef, reviewRef);
+
+    if (!mentorSnap.exists || !mentorSnap.data()!.isApproved) {
+      throw new MentorReviewError('errors.notFound', 404);
+    }
+    const mentor = mentorSnap.data()!;
+    if (mentor.userId === p.menteeId) throw new MentorReviewError('mentors.reviewForm.errors.self', 403);
+
+    const now = new Date();
+    const bookingId = latestFinished(sessions.docs, now);
+    if (!bookingId) throw new MentorReviewError('mentors.reviewForm.errors.sessionRequired', 403);
+
+    const previous = reviewSnap.exists ? Number(reviewSnap.data()!.rating) : null;
+    const prevCount = Number(mentor.ratingCount ?? 0);
+    const prevSum = Number(mentor.ratingSum ?? Number(mentor.ratingAvg ?? 0) * prevCount);
+    const ratingCount = prevCount + (previous === null ? 1 : 0);
+    const ratingSum = prevSum - (previous ?? 0) + p.rating;
+    const ratingAvg = Math.round((ratingSum / ratingCount) * 100) / 100;
+
+    tx.set(reviewRef, {
+      mentorId: p.mentorId,
+      menteeId: p.menteeId,
+      bookingId,
+      rating: p.rating,
+      body: p.body,
+      createdAt: reviewSnap.data()?.createdAt ?? now,
+      updatedAt: now,
+    });
+    tx.update(mentorRef, { ratingSum, ratingCount, ratingAvg, updatedAt: now });
+    return { ratingAvg, ratingCount, rating: p.rating, body: p.body };
+  });
 }
 
 export async function listReviewsForMentor(

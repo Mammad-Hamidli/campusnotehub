@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
 import {
   SLOT_MINUTES,
   cellsToRules,
@@ -34,11 +35,12 @@ export function timezones(current: string): string[] {
 /** Mentor settings: weekly grid, blocked dates, booking rules. PUT /api/mentors/me/schedule. */
 export function MentorScheduleSettings() {
   const t = useT();
+  const toast = useToast();
   const [state, setState] = useState<'loading' | 'notMentor' | 'error' | 'ready'>('loading');
   const [settings, setSettings] = useState<Omit<Settings, 'rules'> | null>(null);
   const [cells, setCells] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; key: string } | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [draft, setDraft] = useState<BlockedDate>({ date: '', startMinute: null, endMinute: null });
 
   useEffect(() => {
@@ -84,7 +86,7 @@ export function MentorScheduleSettings() {
   async function save() {
     if (!settings) return;
     setSaving(true);
-    setNotice(null);
+    setSaveError(null);
     try {
       const res = await fetch('/api/mentors/me/schedule', {
         method: 'PUT',
@@ -92,9 +94,10 @@ export function MentorScheduleSettings() {
         body: JSON.stringify({ ...settings, rules: cellsToRules(cells) }),
       });
       const payload = await res.json().catch(() => ({}));
-      setNotice(res.ok ? { tone: 'ok', key: 'mentors.schedule.saved' } : { tone: 'error', key: payload.error ?? 'errors.generic' });
+      if (res.ok) toast.success(t('mentors.schedule.saved'));
+      else setSaveError(payload.error ?? 'errors.generic');
     } catch {
-      setNotice({ tone: 'error', key: 'errors.network' });
+      setSaveError('errors.network');
     } finally {
       setSaving(false);
     }
@@ -190,9 +193,9 @@ export function MentorScheduleSettings() {
           {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
           {t('mentors.schedule.save')}
         </button>
-        {notice && (
-          <p role="status" className={`text-sm ${notice.tone === 'ok' ? 'text-verified' : 'text-danger-fg'}`}>
-            {t(notice.key)}
+        {saveError && (
+          <p role="alert" className="text-sm text-danger-fg">
+            {t(saveError)}
           </p>
         )}
       </div>

@@ -71,13 +71,22 @@ export async function GET(request: NextRequest) {
   const auth = await session(request);
   if (!auth) return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
 
-  const [application, profile] = await Promise.all([
+  const [application, profile, user] = await Promise.all([
     findMentorApplication(auth.userId),
     findMentorByUserId(auth.userId),
+    findUserById(auth.userId),
   ]);
 
   return NextResponse.json(
     {
+      /**
+       * The weekly schedule the mentor picked at registration, so the form
+       * opens with it instead of an empty grid. A draft only: nothing is
+       * bookable until a moderator approves the application.
+       */
+      draft: user?.mentorAvailability?.length
+        ? { availability: user.mentorAvailability, timezone: user.timezone }
+        : null,
       application: application
         ? {
             status: application.status,

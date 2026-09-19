@@ -91,6 +91,9 @@ export const LIMITS = {
   'mentors:apply': { limit: 5, windowMs: 24 * 60 * 60_000 },
   'orders:create': { limit: 30, windowMs: 60 * 60_000 },
   'notes:review': { limit: 30, windowMs: 60 * 60_000 },
+  'mentors:review': { limit: 30, windowMs: 60 * 60_000 },
+  // Checks a password, so it is kept tight like the auth buckets.
+  'account:deletion': { limit: 5, windowMs: 24 * 60 * 60_000 },
   'notes:save': { limit: 120, windowMs: 60 * 60_000 },
   'notes:download': { limit: 60, windowMs: 60 * 60_000 },
   'mentors:schedule': { limit: 60, windowMs: 60 * 60_000 },

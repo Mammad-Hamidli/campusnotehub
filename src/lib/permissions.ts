@@ -1,4 +1,5 @@
 import { AccountStatus, UserRole, VerificationStatus } from '@/lib/enums';
+import { VERIFICATION_SETTINGS_HREF } from '@/lib/verification/requirements';
 
 export type Capability =
   | 'feed:read'
@@ -31,19 +32,24 @@ export type Viewer = {
 };
 
 /**
- * The gate behind the "Account Unverified" banner, in one table.
+ * The gate behind the "Verify your identity" banner, in one table.
  *
- * The shape of this list is the product decision: unverified users get the
- * full *social* product and can *spend* money, but cannot *earn* money, cannot
- * *withdraw* money, and cannot get in front of a mentor. Anything that moves
- * value out of the platform or puts a stranger in a 1-on-1 call with a student
- * requires a verified identity; everything else stays open so the platform is
- * useful on day one and people actually finish the funnel.
+ * The product decision: an unverified account gets the full SOCIAL product
+ * (read, post, comment, browse notes and mentors), and verification unlocks
+ * everything that moves money or puts two strangers in a room - buying and
+ * selling notes, topping up and withdrawing, booking or offering mentorship.
+ *
+ * Spending used to be open on day one. It moved behind verification so that
+ * every transaction on the platform has a verified person on both sides.
+ * `wallet:topup` moved with `notes:buy`: an account that can load money but
+ * cannot spend or withdraw it would just have money stuck in the wallet.
  */
 const REQUIRES_VERIFICATION: ReadonlySet<Capability> = new Set([
+  'notes:buy',
   'notes:sell',
   'mentors:book',
   'mentors:offer',
+  'wallet:topup',
   'wallet:withdraw',
 ]);
 
@@ -86,6 +92,25 @@ export function can(viewer: Viewer | null, capability: Capability): boolean {
   return true;
 }
 
+/**
+ * The message key for a refusal, so the client can say WHY and point at the
+ * fix. When the only thing between the viewer and the capability is
+ * verification, that is what the user is told (and the UI links to the
+ * settings section); every other refusal stays the generic forbidden, which
+ * leaks nothing about bans or freezes to a caller who should not learn it.
+ */
+export function denialKey(viewer: Viewer | null, capability: Capability): string {
+  if (
+    viewer &&
+    REQUIRES_VERIFICATION.has(capability) &&
+    viewer.verificationStatus !== VerificationStatus.VERIFIED &&
+    can({ ...viewer, verificationStatus: VerificationStatus.VERIFIED }, capability)
+  ) {
+    return 'verification.restricted.action';
+  }
+  return 'errors.forbidden';
+}
+
 export class ForbiddenError extends Error {
   constructor(
     public readonly capability: Capability,
@@ -104,13 +129,13 @@ export function verificationBannerState(viewer: Viewer | null) {
   if (!viewer) return null;
   switch (viewer.verificationStatus) {
     case VerificationStatus.UNVERIFIED:
-      return { tone: 'warning', key: 'verification.banner.unverified', ctaKey: 'verification.banner.unverifiedCta', href: '/verify' } as const;
+      return { tone: 'warning', key: 'verification.banner.unverified', ctaKey: 'verification.banner.unverifiedCta', href: VERIFICATION_SETTINGS_HREF } as const;
     case VerificationStatus.PROCESSING:
       return { tone: 'info', key: 'verification.banner.pending', ctaKey: null, href: null } as const;
     case VerificationStatus.NEEDS_REVIEW:
       return { tone: 'info', key: 'verification.banner.needsReview', ctaKey: null, href: null } as const;
     case VerificationStatus.REJECTED:
-      return { tone: 'danger', key: 'verification.banner.rejected', ctaKey: 'verification.banner.rejectedCta', href: '/verify' } as const;
+      return { tone: 'danger', key: 'verification.banner.rejected', ctaKey: 'verification.banner.rejectedCta', href: VERIFICATION_SETTINGS_HREF } as const;
     default:
       return null;
   }

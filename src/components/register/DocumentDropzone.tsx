@@ -215,12 +215,23 @@ export function DocumentDropzone({ kind, labelKey, state, onChange }: Props) {
         )}
       </button>
 
+      {/*
+        NO `capture` attribute, deliberately.
+
+        It used to be capture="environment". On Android, Chrome treats that as
+        a hard constraint rather than a hint: the rear camera opens directly
+        and there is no way to reach the gallery. That was survivable when
+        verification happened DURING signup, with the card in the user's hand -
+        it is wrong now that verification is something people come back to
+        later, frequently with photographs they already took. Omitting it gives
+        the OS picker, which offers the camera AND the gallery, so neither
+        person is blocked.
+      */}
       <input
         ref={inputRef}
         id={id}
         type="file"
         accept={ACCEPTED.join(',')}
-        capture="environment"
         className="sr-only"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -250,11 +261,13 @@ export function DocumentDropzone({ kind, labelKey, state, onChange }: Props) {
 
         {(isReady || isRejected) && (
           <div className="flex shrink-0 gap-1">
+            {/* touch-target: these are 26px icon buttons, and they are the
+                only way to correct a bad photo. A fingertip needs 44px. */}
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
               aria-label={t('verification.upload.replace')}
-              className="rounded-md p-1.5 text-fg-subtle transition hover:bg-surface-inset hover:text-fg"
+              className="touch-target rounded-md p-1.5 text-fg-subtle transition hover:bg-surface-inset hover:text-fg"
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
@@ -262,7 +275,7 @@ export function DocumentDropzone({ kind, labelKey, state, onChange }: Props) {
               type="button"
               onClick={clear}
               aria-label={t('verification.upload.remove')}
-              className="rounded-md p-1.5 text-fg-subtle transition hover:bg-danger-soft hover:text-danger"
+              className="touch-target rounded-md p-1.5 text-fg-subtle transition hover:bg-danger-soft hover:text-danger"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>

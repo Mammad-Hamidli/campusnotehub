@@ -89,7 +89,7 @@
       "firstName": "First name",
       "lastName": "Last name",
       "dateOfBirth": "Date of birth",
-      "documentNotice": "Şəxsiyyət vəsiqəsində olduğu kimi yazın. Məlumatlar sənədlə yoxlanılacaq.",
+      "documentNotice": "Write it exactly as it appears on your national ID — it is checked against the document when you verify.",
       "accountType": "Account type",
       "accountTypeHint": "This decides what you can do on UniPath and which documents we ask for.",
       "detailsTitle": "Your details",
@@ -111,7 +111,7 @@
           "title": "Student",
           "body": "For university students studying now.",
           "point1": "Sell notes and book mentors once verified",
-          "point2": "Needs an ID document and your student card"
+          "point2": "Verify later with your national ID and student card"
         },
         "teacher": {
           "title": "Teacher",
@@ -123,9 +123,38 @@
           "title": "Mentor",
           "body": "For professionals who will guide students on UniPath.",
           "point1": "Offer mentoring sessions once verified and approved",
-          "point2": "Needs an ID document only"
+          "point2": "Verify later with your national ID alone"
         }
-      }
+      },
+      "academicStatus": "Academic status",
+      "status": {
+        "studying": {
+          "title": "Currently studying",
+          "body": "You are enrolled at this university right now."
+        },
+        "graduated": {
+          "title": "Graduated",
+          "body": "You have already finished your studies here."
+        }
+      },
+      "graduatedDate": "Graduation date",
+      "expectedGraduationDate": "Expected graduation date",
+      "studentNumberHint": "The number your university issued you. It is checked against your student card when you verify.",
+      "verifyLater": "No documents are needed to sign up. Your account is ready immediately — verify your identity in Settings whenever it suits you to unlock buying and selling notes, your wallet and mentor bookings.",
+      "schedule": {
+        "title": "Your availability",
+        "subtitle": "Choose the times students can book sessions with you each week.",
+        "presetsTitle": "Quick picks",
+        "presets": {
+          "evenings": "Weekday evenings (18:00–21:00)",
+          "lunch": "Weekday lunch (12:00–14:00)",
+          "weekends": "Weekends (10:00–16:00)"
+        },
+        "total": "{hours} h per week",
+        "later": "You can change this at any time. Nobody can book you until your mentor application is approved."
+      },
+      "universityNone": "No university affiliation",
+      "universityMentorHint": "Mentors do not need a university. Pick one only if you teach or work at one."
     },
     "login": {
       "title": "Welcome back",
@@ -133,7 +162,8 @@
       "password": "Password",
       "forgotPassword": "Forgot your password?",
       "submit": "Log in",
-      "noAccount": "No account yet?"
+      "noAccount": "No account yet?",
+      "welcomeBack": "Welcome back!"
     },
     "errors": {
       "invalidCredentials": "Username (email) or password is incorrect",
@@ -158,7 +188,10 @@
       "dobImplausible": "That date of birth does not look right",
       "studentNumberRequired": "Your student number is required",
       "departmentRequired": "Your department is required",
-      "academicTitleRequired": "Your academic position is required"
+      "academicTitleRequired": "Your academic position is required",
+      "graduationNotPast": "You chose “Graduated”, so this date cannot be in the future.",
+      "graduationNotFuture": "You chose “Currently studying”, so this date cannot be in the past.",
+      "graduationStatusMismatch": "The graduation date does not match the academic status you chose."
     }
   },
   "verification": {
@@ -224,8 +257,9 @@
     },
     "restricted": {
       "title": "This feature requires verification",
-      "body": "Unverified accounts cannot sell notes, book mentors, or withdraw funds.",
-      "allowed": "You can still: read the feed, post, and buy notes."
+      "body": "Unverified accounts cannot buy or sell notes, top up or withdraw, or book mentors.",
+      "allowed": "You can still: read the feed, post, and browse notes and mentors.",
+      "action": "Verify your identity to buy notes and top up your wallet."
     },
     "graduation": {
       "promptTitle": "Have you graduated?",
@@ -240,6 +274,14 @@
     },
     "errors": {
       "allFourRequired": "Upload all four documents to continue"
+    },
+    "prompt": {
+      "title": "Verify your identity",
+      "body": "Upload your documents to buy and sell notes, top up your wallet, book mentors and withdraw money. It takes a couple of minutes.",
+      "rejectedBody": "Your last check did not pass. Upload clearer photos to try again.",
+      "cta": "Verify now",
+      "reviewTitle": "Your documents are being reviewed",
+      "reviewBody": "We will notify you as soon as the result is ready."
     }
   },
   "feed": {
@@ -294,14 +336,19 @@
     "menu": {
       "label": "Post actions",
       "delete": "Delete",
-      "deleteConfirm": "Delete this post? This cannot be undone.",
       "deleteFailed": "The post could not be deleted.",
       "report": "Report",
       "reported": "Thanks - the post was reported to moderators.",
       "reportFailed": "The report could not be sent.",
       "copyLink": "Copy link",
-      "linkCopied": "Link copied."
-    }
+      "linkCopied": "Link copied.",
+      "deleteTitle": "Delete this post?",
+      "deleteBody": "It will be removed from the feed for everyone. This cannot be undone.",
+      "deleted": "Your post was deleted successfully.",
+      "likeFailed": "Your like could not be saved. Try again."
+    },
+    "posted": "Your post was published.",
+    "commentPosted": "Your comment was added."
   },
   "notes": {
     "title": "UniNotes",
@@ -427,15 +474,20 @@
       "summary": "{avg} ({count} reviewers)",
       "errors": {
         "purchaseRequired": "Only buyers of this note can rate it."
-      }
+      },
+      "saved": "Thanks - your rating was saved."
     },
     "saved": {
       "title": "Saved items",
       "subtitle": "Notes you saved for later",
       "empty": "Nothing saved yet. Tap the bookmark on any note to keep it here.",
       "add": "Save for later",
-      "remove": "Remove from saved"
-    }
+      "remove": "Remove from saved",
+      "added": "Note saved. You will find it under Saved items.",
+      "removed": "Removed from saved items.",
+      "failed": "Your saved items could not be updated. Try again."
+    },
+    "purchased": "Purchase complete - the note is ready to download."
   },
   "mentors": {
     "title": "PocketMentor",
@@ -569,7 +621,8 @@
       "errors": {
         "pending": "You already have an application under review.",
         "alreadyMentor": "You are already an approved mentor."
-      }
+      },
+      "submitted": "Your mentor application was submitted successfully."
     },
     "schedule": {
       "title": "Availability",
@@ -597,6 +650,20 @@
       "applyHint": "Select the time slots you can usually take sessions. You can change this later.",
       "errors": {
         "empty": "Select at least one available time slot."
+      }
+    },
+    "reviewForm": {
+      "title": "Rate your session",
+      "editTitle": "Your review",
+      "comment": "Comment",
+      "commentPlaceholder": "What was helpful? (optional)",
+      "submit": "Post review",
+      "update": "Update review",
+      "saved": "Review saved.",
+      "afterSession": "You can review this mentor after your first session with them.",
+      "errors": {
+        "self": "You cannot review yourself.",
+        "sessionRequired": "You can review a mentor once you have had a session with them."
       }
     }
   },
@@ -704,7 +771,15 @@
     "wallet": {
       "topUpTitle": "Balance topped up",
       "topUpBody": "{amount} was added to your wallet."
-    }
+    },
+    "deletionRequest": {
+      "title": "Account deletion requested",
+      "body": "@{nickname} asked to delete their account. Review it in the admin panel.",
+      "rejectedTitle": "Deletion request declined",
+      "rejectedBody": "Your account was not deleted. See your email for the reason."
+    },
+    "allRead": "All notifications marked as read.",
+    "updateFailed": "Notifications could not be updated. Try again."
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",
@@ -813,7 +888,8 @@
       "type": "Account type",
       "details": "Details",
       "documents": "Documents",
-      "review": "Review"
+      "review": "Review",
+      "schedule": "Schedule"
     },
     "stepHint": {
       "account": "Basic details",
@@ -824,11 +900,11 @@
     "back": "Back",
     "finish": "Submit for verification",
     "aside": {
-      "title": "Why we ask for documents",
-      "b1": "Keeps fake profiles and stolen notes off the platform",
-      "b2": "Mentors know who they are talking to",
-      "b3": "Makes payments safe for both sides",
-      "privacy": "Images are stored in an encrypted vault and destroyed 30 days after the check completes."
+      "title": "Sign up now, verify later",
+      "b1": "No documents to find right now — the account is created from this form alone",
+      "b2": "Verification, when you choose to do it, keeps fake profiles and stolen notes off the platform",
+      "b3": "It unlocks buying and selling notes, your wallet and mentor bookings",
+      "privacy": "When you do verify, the images are processed at that moment and destroyed immediately. They are never kept on our servers."
     },
     "scanner": {
       "title": "Document integrity scanner",
@@ -859,7 +935,8 @@
       "flagsOnly": "The database keeps only \"verified: yes/no\"",
       "humanReview": "A moderator may look if the check is inconclusive",
       "window": "In that case the image is held encrypted for at most 24 hours"
-    }
+    },
+    "created": "Your account was created. Welcome to CampusHub!"
   },
   "dashboard": {
     "greeting": "Hi, {name}",
@@ -908,7 +985,8 @@
       "reasonHint": "At least 10 characters. Recorded in the audit log.",
       "bufferExpired": "The images have expired. Ask the applicant to submit again.",
       "confirmBan": "This permanently bans the account. Continue?",
-      "noteAutoBan": "The system never bans automatically — this decision is yours."
+      "noteAutoBan": "The system never bans automatically — this decision is yours.",
+      "decided": "Decision recorded."
     },
     "nav": {
       "label": "Admin navigation",
@@ -1211,7 +1289,8 @@
       "subtitle": "Mentor applications and uploaded notes waiting for a decision.",
       "tabs": {
         "mentors": "Mentor applications",
-        "notes": "Notes"
+        "notes": "Notes",
+        "deletions": "Deletion requests"
       },
       "reason": "Reason (required to reject)",
       "reasonHint": "Shown to the applicant",
@@ -1230,6 +1309,19 @@
         "reasonRequired": "Give a reason of at least 5 characters.",
         "alreadyDecided": "This item was already decided."
       }
+    },
+    "deletions": {
+      "empty": "No pending deletion requests",
+      "approve": "Approve and delete",
+      "approved": "Account deleted.",
+      "alreadyDeleted": "Already deleted",
+      "memberSince": "Member since",
+      "balance": "Wallet",
+      "noReason": "No reason given.",
+      "balanceWarning": "This account still holds {amount}. Deleting it strands that money - settle it first.",
+      "rejectHint": "Reason for declining (emailed to the user)",
+      "confirmTitle": "Delete this account?",
+      "confirmBody": "This soft-deletes @{nickname}, signs them out everywhere and emails them. Type the nickname to confirm."
     }
   },
   "settings": {
@@ -1240,7 +1332,8 @@
       "profile": "Profile",
       "privacy": "Privacy",
       "appearance": "Appearance",
-      "account": "Account"
+      "account": "Account",
+      "verification": "Verification"
     },
     "profile": {
       "title": "Profile",
@@ -1296,8 +1389,60 @@
       "devicesHint": "Devices that have signed in to your account",
       "exportData": "Download my data",
       "exportHint": "A JSON copy of everything we hold",
-      "deleteAccount": "Delete account",
-      "deleteHint": "This cannot be undone"
+      "deleteAccount": "Delete account"
+    },
+    "verification": {
+      "title": "Identity verification",
+      "description": "Upload your documents to unlock everything on the platform.",
+      "status": {
+        "verified": "Verified",
+        "inReview": "In review",
+        "rejected": "Rejected",
+        "unverified": "Not verified"
+      },
+      "verifiedTitle": "Your identity is verified",
+      "verifiedOn": "Verified on {date}. Every feature is unlocked.",
+      "verifiedBody": "Every feature is unlocked.",
+      "unlockedTitle": "Unlocked for you",
+      "unlocksTitle": "Verification unlocks",
+      "unlocks": {
+        "buy": "Buying notes",
+        "topup": "Topping up your wallet",
+        "sell": "Selling your notes",
+        "book": "Booking mentor sessions",
+        "withdraw": "Withdrawing earnings"
+      },
+      "needTitle": "Documents we need from you",
+      "need": {
+        "nationalId": "National ID — front and back",
+        "studentId": "Student ID — front and back"
+      },
+      "reason": {
+        "studying": "You told us you are currently studying, so we need your national ID to confirm who you are and your student ID to confirm enrolment.",
+        "graduated": "You have graduated, so your national ID is enough — no student ID needed.",
+        "professional": "Mentor accounts only need a national ID."
+      }
+    },
+    "deletion": {
+      "hint": "Request permanent deletion of your account. An administrator reviews every request before anything is deleted.",
+      "request": "Request account deletion",
+      "what": {
+        "review": "An administrator reviews your request; you will get an email with the outcome.",
+        "signOut": "Once approved, your account is deleted and you are signed out everywhere.",
+        "wallet": "Withdraw any wallet balance first - it cannot be recovered after deletion."
+      },
+      "reason": "Why are you leaving?",
+      "password": "Confirm with your password",
+      "submit": "Send deletion request",
+      "pending": "You requested deletion on {date}. An administrator will review it; your account works as usual until then.",
+      "cancel": "Cancel request",
+      "rejected": "Your request from {date} was declined:",
+      "errors": {
+        "wrongPassword": "That password is not correct.",
+        "alreadyPending": "You already have a deletion request under review."
+      },
+      "submitted": "Your deletion request was sent for review.",
+      "cancelled": "Your deletion request was cancelled."
     }
   },
   "stub": {
@@ -1335,5 +1480,13 @@
     },
     "headline": "Headline",
     "bio": "About you"
+  },
+  "legal": {
+    "onThisPage": "On this page",
+    "effective": "Effective {date}",
+    "draftNotice": "This is placeholder text that has not yet been reviewed by a lawyer. The final version may differ.",
+    "related": "Related document",
+    "backToTop": "Back to top",
+    "opensInNewTab": "(opens in a new tab)"
   }
 }

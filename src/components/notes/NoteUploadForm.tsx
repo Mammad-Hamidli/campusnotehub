@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FileText, Loader2, Upload, X } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { NOTE_UPLOAD_ACCEPT, MAX_NOTE_BYTES, MAX_NOTE_MB } from '@/lib/notes/fileTypes';
+import { useToast } from '@/components/ui/Feedback';
 import { FileChip } from './FileChip';
 
 /**
@@ -20,6 +21,7 @@ import { FileChip } from './FileChip';
  */
 export function NoteUploadForm({ universities }: { universities: { id: string; code: string }[] }) {
   const t = useT();
+  const toast = useToast();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -140,7 +142,8 @@ export function NoteUploadForm({ universities }: { universities: { id: string; c
 
       if (xhr.status >= 200 && xhr.status < 300) {
         // Uploaded notes wait for moderator approval before they are listed.
-        window.alert(t('notes.upload.pendingReview'));
+        // The toast outlives the navigation: its provider is in the root layout.
+        toast.success(t('notes.upload.pendingReview'));
         router.push('/notes');
         return;
       }

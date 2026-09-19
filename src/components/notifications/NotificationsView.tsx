@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
 
 /**
  * The notifications screen.
@@ -97,6 +98,7 @@ function when(iso: string, locale: string): string {
 
 export function NotificationsView() {
   const t = useT();
+  const toast = useToast();
   const [items, setItems] = useState<ApiNotification[]>([]);
   const [unread, setUnread] = useState(0);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
@@ -162,20 +164,25 @@ export function NotificationsView() {
         });
         if (!response.ok) {
           setItems(previous);
+          toast.error(t('notifications.updateFailed'));
           return;
         }
         const data = await response.json();
         setUnread(data.unreadCount ?? 0);
+        // Only the bulk action is announced. Opening a single notification
+        // marks it read as a side effect, and a toast for that would be noise.
+        if (ids === 'all') toast.success(t('notifications.allRead'));
         // The unread FILTER shows rows that just stopped matching it, so the
         // list is re-read rather than left showing stale membership.
         if (filter === 'unread') void load();
       } catch {
         setItems(previous);
+        toast.error(t('notifications.updateFailed'));
       } finally {
         setBusy(false);
       }
     },
-    [busy, items, filter, load],
+    [busy, items, filter, load, t, toast],
   );
 
   const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'az' : 'az';

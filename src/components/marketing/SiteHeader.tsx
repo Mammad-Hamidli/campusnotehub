@@ -50,8 +50,11 @@ export function SiteHeader() {
         scrolled ? 'border-b border-edge' : 'border-b border-transparent'
       }`}
     >
-      <div className="mx-auto flex h-14 max-w-shell items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-7">
+      {/* gap-3 below sm: at 360px the logo, two toggles and the hamburger are
+          already 300px of content, and a 24px gap pushed the menu button off
+          the right edge. */}
+      <div className="mx-auto flex h-14 w-full max-w-shell items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-7">
           <Logo />
           <nav className="hidden items-center gap-6 md:flex" aria-label="Main">
             {links.map((link) => (
@@ -66,7 +69,7 @@ export function SiteHeader() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <LanguageToggle />
           <ThemeToggle />
 

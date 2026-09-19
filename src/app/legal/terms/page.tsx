@@ -1,15 +1,29 @@
 import type { Metadata } from 'next';
-import { StubPage } from '@/components/ui/UnderConstruction';
+import { SiteHeader } from '@/components/marketing/SiteHeader';
+import { SiteFooter } from '@/components/marketing/SiteFooter';
+import { LegalDocumentView } from '@/components/legal/LegalDocumentView';
+import { TERMS } from '@/content/legal/terms';
 
-export const metadata: Metadata = { title: 'Terms of Service' };
+export const metadata: Metadata = {
+  title: 'Terms of Service',
+  description: 'The rules for using CampusHub: accounts, verification, acceptable use, UniNotes, PocketMentor and the wallet.',
+  alternates: { canonical: '/legal/terms' },
+};
 
 /**
- * Stub route. Returns 200 with an honest "not built yet" state.
+ * /legal/terms - public, linked from the site footer, the sign-up consent
+ * checkbox and every transactional email (src/lib/email/layout.ts).
  *
- * Every link in the navigation resolves to a real page, so a 404 in the logs
- * is always a genuine bug rather than a known gap. See
- * src/components/ui/UnderConstruction.tsx for the reasoning.
+ * The copy is in src/content/legal/terms.ts; this file is only the page frame.
  */
 export default function Page() {
-  return <StubPage titleKey="landing.footer.terms" />;
+  return (
+    <>
+      <SiteHeader />
+      <main id="main">
+        <LegalDocumentView document={TERMS} slug="terms" />
+      </main>
+      <SiteFooter />
+    </>
+  );
 }

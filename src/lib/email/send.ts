@@ -85,6 +85,20 @@ let smtp: Transporter | null = null;
 let resend: Resend | null = null;
 const warned = new Set<string>();
 
+/**
+ * Auth-failure cooldown.
+ *
+ * A rejected login (SMTP 535 / EAUTH) will be rejected again on the next
+ * request until someone replaces the credential - and every one of those
+ * attempts is a failed login against the mailbox. Gmail answers a burst of
+ * them by temporarily locking the account ("454 4.7.0 Too many login
+ * attempts"), which turns a config fix into a wait. So after one rejection the
+ * transport is not tried again for AUTH_COOLDOWN_MS: messages go straight to
+ * the outbox, which delivers them once the credential works.
+ */
+const AUTH_COOLDOWN_MS = 5 * 60_000;
+let authRejectedUntil = 0;
+
 function warnOnce(key: string, message: string) {
   if (warned.has(key)) return;
   warned.add(key);
@@ -321,6 +335,12 @@ export async function sendEmail<K extends TemplateName>(
       claimed = true;
     }
 
+    if (transport.kind === 'smtp' && Date.now() < authRejectedUntil) {
+      throw Object.assign(new Error('SMTP credentials rejected recently; skipping login attempt'), {
+        code: 'EAUTH',
+      });
+    }
+
     const { subject, html, text, attachments } = buildEmail(name, params);
 
     for (let attempt = 1; ; attempt++) {
@@ -329,6 +349,16 @@ export async function sendEmail<K extends TemplateName>(
         console.info('[email] sent "' + name + '" to ' + maskAddress(to) + (id ? ' (' + id + ')' : ''));
         return { ok: true, id };
       } catch (error) {
+        if ((error as { code?: string }).code === 'EAUTH') {
+          authRejectedUntil = Date.now() + AUTH_COOLDOWN_MS;
+          warnOnce(
+            'eauth',
+            '[email] The mail server REJECTED the login (SMTP 535). Every email is being queued in ' +
+              'emailOutbox until this is fixed. For Gmail: create a new App Password at ' +
+              'https://myaccount.google.com/apppasswords for the SMTP_USER mailbox, put it in ' +
+              'SMTP_PASSWORD (or GMAIL_APP_PASSWORD), restart, and check with "npm run email:verify".',
+          );
+        }
         if (attempt >= MAX_ATTEMPTS || !isTransient(error)) throw error;
         await sleep(attempt * 1_500);
       }
@@ -368,7 +398,11 @@ export function sendEmailAsync<K extends TemplateName>(
   options?: SendOptions,
 ): void {
   const task = async () => {
-    await sendEmail(to, name, params, options);
+    const result = await sendEmail(to, name, params, options);
+    // A real delivery proves the transport works right now, which is the
+    // moment to flush anything parked while it did not. Runs inside the same
+    // after() task, so a serverless invocation stays alive until it is done.
+    if (result.ok && !result.skipped) await drainOutboxOpportunistically();
   };
   try {
     after(task);
@@ -445,7 +479,32 @@ async function queueForRetry(to: string, name: TemplateName, params: unknown, er
     });
 }
 
-/** Retries due outbox entries. Safe to run concurrently with itself. */
+/**
+ * How long a runner holds an outbox row while it sends it. Long enough to
+ * cover one send with its in-process retries (well under a minute), short
+ * enough that a runner that died mid-send does not strand the row.
+ */
+const OUTBOX_LEASE_MS = 5 * 60_000;
+
+/**
+ * Takes a due row for this runner by pushing its nextAttemptAt past the lease,
+ * in a transaction. Returns false when another runner got there first.
+ *
+ * This is what makes concurrent runners safe: the scheduler, the cron route
+ * and the opportunistic drain below can all overlap, and without the lease
+ * two of them would read the same due row and each send it.
+ */
+async function leaseOutboxRow(ref: FirebaseFirestore.DocumentReference): Promise<boolean> {
+  return adminDb().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const next = snap.get('nextAttemptAt') as FirebaseFirestore.Timestamp | null | undefined;
+    if (!snap.exists || !next || next.toMillis() > Date.now()) return false;
+    tx.update(ref, { nextAttemptAt: new Date(Date.now() + OUTBOX_LEASE_MS) });
+    return true;
+  });
+}
+
+/** Retries due outbox entries. Safe to run concurrently with itself (see leaseOutboxRow). */
 export async function retryQueuedEmails(
   limit = 20,
 ): Promise<{ attempted: number; sent: number; failed: number }> {
@@ -457,6 +516,7 @@ export async function retryQueuedEmails(
   let sent = 0;
   let failed = 0;
   for (const doc of due.docs) {
+    if (!(await leaseOutboxRow(doc.ref))) continue;
     const item = doc.data() as { to: string; template: TemplateName; params: unknown; attempts?: number };
     const result = await sendEmail(item.to, item.template, item.params as never, { noQueue: true });
     if (result.ok) {
@@ -475,4 +535,28 @@ export async function retryQueuedEmails(
 
   if (due.size) console.info('[email] outbox retry: ' + sent + ' sent, ' + failed + ' failed of ' + due.size);
   return { attempted: due.size, sent, failed };
+}
+
+/**
+ * Minimum gap between opportunistic drains on one server instance. The drain
+ * is one indexed query when the outbox is empty, but a busy instance sends
+ * many emails a minute and only needs to ask once.
+ */
+const DRAIN_INTERVAL_MS = 60_000;
+let lastDrainAt = 0;
+
+/**
+ * Flushes the outbox from the app itself, so parked mail does not depend on
+ * a separate worker being deployed.
+ *
+ * Without it the outbox drains only while `npm run worker:scheduler` runs or
+ * something calls GET /api/cron/email-outbox - and when neither is set up,
+ * every email queued during an SMTP outage stays queued forever, even after
+ * the credential is fixed. Called after a SUCCESSFUL send, because that is
+ * the one moment we know delivery works.
+ */
+async function drainOutboxOpportunistically(): Promise<void> {
+  if (Date.now() - lastDrainAt < DRAIN_INTERVAL_MS) return;
+  lastDrainAt = Date.now();
+  await retryQueuedEmails(10).catch((error) => console.error('[email] opportunistic outbox drain failed', error));
 }

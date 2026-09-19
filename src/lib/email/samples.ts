@@ -57,6 +57,11 @@ export const SAMPLE_PARAMS = {
   },
   accountReactivated: { nickname: 'aysel' },
   accountDeleted: { nickname: 'aysel' },
+  accountDeletionRequested: { nickname: 'aysel' },
+  accountDeletionRejected: {
+    nickname: 'aysel',
+    reason: 'Your wallet still holds 12.50 AZN. Withdraw it first so it is not lost.',
+  },
   newNotification: {
     nickname: 'aysel',
     title: 'Someone replied to your post',

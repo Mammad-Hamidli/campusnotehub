@@ -89,7 +89,7 @@
       "firstName": "Ad",
       "lastName": "Soyad",
       "dateOfBirth": "Doğum tarixi",
-      "documentNotice": "Şəxsiyyət vəsiqəsində olduğu kimi yazın. Məlumatlar sənədlə yoxlanılacaq.",
+      "documentNotice": "Şəxsiyyət vəsiqəsində olduğu kimi yazın — doğrulama zamanı sənədlə yoxlanılır.",
       "accountType": "Hesab növü",
       "accountTypeHint": "Bu, UniPath-də nə edə biləcəyinizi və hansı sənədləri istəyəcəyimizi müəyyən edir.",
       "detailsTitle": "Məlumatlarınız",
@@ -110,8 +110,8 @@
         "student": {
           "title": "Tələbə",
           "body": "Hazırda universitetdə oxuyan tələbələr üçün.",
-          "point1": "Təsdiqdən sonra konspekt sata və mentor sifariş edə bilərsiniz",
-          "point2": "Şəxsiyyət vəsiqəsi və tələbə bileti tələb olunur"
+          "point1": "Doğrulamadan sonra konspekt sata və mentor sifariş edə bilərsiniz",
+          "point2": "Sonra şəxsiyyət vəsiqəsi və tələbə bileti ilə doğrulayın"
         },
         "teacher": {
           "title": "Müəllim",
@@ -122,10 +122,39 @@
         "mentor": {
           "title": "Mentor",
           "body": "UniPath-də tələbələrə yol göstərəcək peşəkarlar üçün.",
-          "point1": "Təsdiq və moderator təsdiqindən sonra mentorluq sessiyaları təklif edə bilərsiniz",
-          "point2": "Yalnız şəxsiyyət vəsiqəsi tələb olunur"
+          "point1": "Doğrulama və moderator təsdiqindən sonra mentorluq sessiyaları təklif edin",
+          "point2": "Sonra yalnız şəxsiyyət vəsiqəsi ilə doğrulayın"
         }
-      }
+      },
+      "academicStatus": "Təhsil statusu",
+      "status": {
+        "studying": {
+          "title": "Hazırda oxuyuram",
+          "body": "Hazırda bu universitetdə təhsil alırsınız."
+        },
+        "graduated": {
+          "title": "Məzun olmuşam",
+          "body": "Bu universitetdə təhsilinizi artıq bitirmisiniz."
+        }
+      },
+      "graduatedDate": "Məzuniyyət tarixi",
+      "expectedGraduationDate": "Gözlənilən məzuniyyət tarixi",
+      "studentNumberHint": "Universitetin sizə verdiyi nömrə. Doğrulama zamanı tələbə biletinizlə yoxlanılır.",
+      "verifyLater": "Qeydiyyat üçün sənəd tələb olunmur. Hesabınız dərhal hazır olur — konspekt alıb-satmaq, balans və mentor sifarişləri üçün şəxsiyyətinizi istədiyiniz vaxt Tənzimləmələr bölməsində doğrulayın.",
+      "schedule": {
+        "title": "İş qrafikiniz",
+        "subtitle": "Tələbələrin hər həftə sizinlə görüş təyin edə biləcəyi vaxtları seçin.",
+        "presetsTitle": "Tez seçim",
+        "presets": {
+          "evenings": "Həftəiçi axşamlar (18:00–21:00)",
+          "lunch": "Həftəiçi nahar vaxtı (12:00–14:00)",
+          "weekends": "Həftəsonu (10:00–16:00)"
+        },
+        "total": "Həftədə {hours} saat",
+        "later": "Qrafiki istənilən vaxt dəyişə bilərsiniz. Mentor müraciətiniz təsdiqlənənə qədər heç kim sizinlə görüş təyin edə bilməz."
+      },
+      "universityNone": "Universitetlə əlaqəm yoxdur",
+      "universityMentorHint": "Mentorlar üçün universitet tələb olunmur. Yalnız universitetdə dərs deyirsinizsə və ya işləyirsinizsə seçin."
     },
     "login": {
       "title": "Xoş gəlmisiniz",
@@ -133,7 +162,8 @@
       "password": "Şifrə",
       "forgotPassword": "Şifrəni unutmusunuz?",
       "submit": "Daxil ol",
-      "noAccount": "Hesabınız yoxdur?"
+      "noAccount": "Hesabınız yoxdur?",
+      "welcomeBack": "Yenidən xoş gəlmisiniz!"
     },
     "errors": {
       "invalidCredentials": "İstifadəçi adı (e-poçt) və ya şifrə yanlışdır",
@@ -158,7 +188,10 @@
       "dobImplausible": "Bu doğum tarixi düzgün görünmür",
       "studentNumberRequired": "Tələbə nömrəsi tələb olunur",
       "departmentRequired": "Kafedra tələb olunur",
-      "academicTitleRequired": "Akademik vəzifə tələb olunur"
+      "academicTitleRequired": "Akademik vəzifə tələb olunur",
+      "graduationNotPast": "«Məzun olmuşam» seçdiniz, ona görə bu tarix gələcəkdə ola bilməz.",
+      "graduationNotFuture": "«Hazırda oxuyuram» seçdiniz, ona görə bu tarix keçmişdə ola bilməz.",
+      "graduationStatusMismatch": "Məzuniyyət tarixi seçdiyiniz təhsil statusuna uyğun gəlmir."
     }
   },
   "verification": {
@@ -224,8 +257,9 @@
     },
     "restricted": {
       "title": "Bu funksiya doğrulama tələb edir",
-      "body": "Doğrulanmayan hesablar konspekt sata, mentor sifarişi verə və ya balans çıxara bilmir.",
-      "allowed": "İndi edə bilərsiniz: lenti oxumaq, paylaşım etmək, konspekt almaq."
+      "body": "Doğrulanmayan hesablar konspekt ala və ya sata, balans artıra və ya çıxara, mentor sifarişi verə bilmir.",
+      "allowed": "İndi edə bilərsiniz: lenti oxumaq, paylaşım etmək, konspektlərə və mentorlara baxmaq.",
+      "action": "Konspekt almaq və balansı artırmaq üçün şəxsiyyətinizi doğrulayın."
     },
     "graduation": {
       "promptTitle": "Məzun olmusunuz?",
@@ -240,6 +274,14 @@
     },
     "errors": {
       "allFourRequired": "Dörd sənədin hamısını yükləyin"
+    },
+    "prompt": {
+      "title": "Şəxsiyyətinizi doğrulayın",
+      "body": "Konspekt almaq və satmaq, balansı artırmaq, mentor sifariş etmək və pul çıxarmaq üçün sənədlərinizi yükləyin. Bir neçə dəqiqə çəkir.",
+      "rejectedBody": "Son yoxlama alınmadı. Daha aydın şəkillər yükləyib yenidən cəhd edin.",
+      "cta": "İndi doğrula",
+      "reviewTitle": "Sənədləriniz yoxlanılır",
+      "reviewBody": "Nəticə hazır olan kimi sizə bildiriş göndərəcəyik."
     }
   },
   "feed": {
@@ -294,14 +336,19 @@
     "menu": {
       "label": "Paylaşım əməliyyatları",
       "delete": "Sil",
-      "deleteConfirm": "Bu paylaşım silinsin? Bu əməliyyat geri qaytarıla bilməz.",
       "deleteFailed": "Paylaşım silinmədi.",
       "report": "Şikayət et",
       "reported": "Təşəkkürlər — paylaşım moderatorlara bildirildi.",
       "reportFailed": "Şikayət göndərilmədi.",
       "copyLink": "Linki kopyala",
-      "linkCopied": "Link kopyalandı."
-    }
+      "linkCopied": "Link kopyalandı.",
+      "deleteTitle": "Bu paylaşım silinsin?",
+      "deleteBody": "Paylaşım hamı üçün lentdən silinəcək. Bu əməliyyat geri qaytarıla bilməz.",
+      "deleted": "Paylaşımınız uğurla silindi.",
+      "likeFailed": "Bəyənməniz yadda saxlanılmadı. Yenidən cəhd edin."
+    },
+    "posted": "Paylaşımınız uğurla dərc olundu.",
+    "commentPosted": "Şərhiniz əlavə olundu."
   },
   "notes": {
     "title": "UniNotes",
@@ -427,15 +474,20 @@
       "summary": "{avg} ({count} rəy)",
       "errors": {
         "purchaseRequired": "Yalnız bu konspekti alanlar qiymət verə bilər."
-      }
+      },
+      "saved": "Təşəkkürlər - qiymətləndirməniz yadda saxlanıldı."
     },
     "saved": {
       "title": "Saxlanılanlar",
       "subtitle": "Sonra baxmaq üçün saxladığınız konspektlər",
       "empty": "Hələ heç nə saxlanılmayıb. Konspektdəki əlfəcin işarəsinə toxunun.",
       "add": "Sonraya saxla",
-      "remove": "Saxlanılanlardan çıxar"
-    }
+      "remove": "Saxlanılanlardan çıxar",
+      "added": "Konspekt saxlanıldı. Onu \"Saxlanılanlar\" bölməsində tapa bilərsiniz.",
+      "removed": "Saxlanılanlardan çıxarıldı.",
+      "failed": "Saxlanılanlar yenilənmədi. Yenidən cəhd edin."
+    },
+    "purchased": "Alış uğurla tamamlandı - konspekti artıq yükləyə bilərsiniz."
   },
   "mentors": {
     "title": "PocketMentor",
@@ -569,7 +621,8 @@
       "errors": {
         "pending": "Artıq yoxlanılan müraciətiniz var.",
         "alreadyMentor": "Siz artıq təsdiqlənmiş mentorsunuz."
-      }
+      },
+      "submitted": "Mentor müraciətiniz uğurla göndərildi."
     },
     "schedule": {
       "title": "Əlçatanlıq",
@@ -597,6 +650,20 @@
       "applyHint": "Adətən sessiya keçirə biləcəyiniz vaxtları seçin. Sonra dəyişə bilərsiniz.",
       "errors": {
         "empty": "Ən azı bir əlçatan vaxt seçin."
+      }
+    },
+    "reviewForm": {
+      "title": "Görüşü qiymətləndirin",
+      "editTitle": "Rəyiniz",
+      "comment": "Şərh",
+      "commentPlaceholder": "Nə faydalı oldu? (istəyə bağlı)",
+      "submit": "Rəy yaz",
+      "update": "Rəyi yenilə",
+      "saved": "Rəy yadda saxlanıldı.",
+      "afterSession": "Bu mentorla ilk görüşünüzdən sonra rəy yaza bilərsiniz.",
+      "errors": {
+        "self": "Özünüzə rəy yaza bilməzsiniz.",
+        "sessionRequired": "Mentorla görüşünüz olduqdan sonra rəy yaza bilərsiniz."
       }
     }
   },
@@ -704,7 +771,15 @@
     "wallet": {
       "topUpTitle": "Balans artırıldı",
       "topUpBody": "Pul kisənizə {amount} əlavə olundu."
-    }
+    },
+    "deletionRequest": {
+      "title": "Hesabın silinməsi tələb olunub",
+      "body": "@{nickname} hesabının silinməsini istəyir. Admin panelində yoxlayın.",
+      "rejectedTitle": "Silinmə sorğusu rədd edildi",
+      "rejectedBody": "Hesabınız silinmədi. Səbəbi e-poçtunuzda görə bilərsiniz."
+    },
+    "allRead": "Bütün bildirişlər oxunmuş kimi qeyd olundu.",
+    "updateFailed": "Bildirişlər yenilənmədi. Yenidən cəhd edin."
   },
   "errors": {
     "generic": "Xəta baş verdi. Yenidən cəhd edin.",
@@ -813,7 +888,8 @@
       "type": "Hesab növü",
       "details": "Məlumatlar",
       "documents": "Sənədlər",
-      "review": "Yoxlama"
+      "review": "Yoxlama",
+      "schedule": "Qrafik"
     },
     "stepHint": {
       "account": "Əsas məlumatlar",
@@ -824,11 +900,11 @@
     "back": "Geri",
     "finish": "Doğrulamaya göndər",
     "aside": {
-      "title": "Niyə sənəd tələb edirik?",
-      "b1": "Saxta profillər və konspekt oğurluğunun qarşısını alır",
-      "b2": "Mentorlar kiminlə danışdığını bilir",
-      "b3": "Ödənişlərin təhlükəsizliyini təmin edir",
-      "privacy": "Şəkillər şifrələnmiş anbarda saxlanılır və yoxlama bitdikdən 30 gün sonra silinir."
+      "title": "İndi qeydiyyatdan keçin, sonra doğrulayın",
+      "b1": "İndi sənəd axtarmağa ehtiyac yoxdur — hesab yalnız bu formadan yaradılır",
+      "b2": "Doğrulama — nə vaxt istəsəniz — saxta profillərin və oğurlanmış konspektlərin qarşısını alır",
+      "b3": "O, konspekt alqı-satqısını, balansı və mentor sifarişini açır",
+      "privacy": "Doğrulama zamanı şəkillər həmin anda emal olunur və dərhal silinir. Serverlərimizdə heç vaxt saxlanılmır."
     },
     "scanner": {
       "title": "Sənəd bütövlüyü skaneri",
@@ -859,7 +935,8 @@
       "flagsOnly": "Bazada yalnız \"doğrulanıb: bəli/xeyr\" saxlanılır",
       "humanReview": "Şübhəli hallarda moderator baxa bilər",
       "window": "Belə hallarda şəkil ən çox 24 saat şifrələnmiş qalır"
-    }
+    },
+    "created": "Hesabınız uğurla yaradıldı. CampusHub-a xoş gəlmisiniz!"
   },
   "dashboard": {
     "greeting": "Salam, {name}",
@@ -908,7 +985,8 @@
       "reasonHint": "Ən azı 10 simvol. Audit jurnalında saxlanılır.",
       "bufferExpired": "Şəkillərin saxlanma müddəti bitib. İstifadəçidən yenidən yükləmə tələb edin.",
       "confirmBan": "Bu hesab birdəfəlik bloklanacaq. Davam edilsin?",
-      "noteAutoBan": "Sistem avtomatik bloklamır — qərarı siz verirsiniz."
+      "noteAutoBan": "Sistem avtomatik bloklamır — qərarı siz verirsiniz.",
+      "decided": "Qərar qeydə alındı."
     },
     "nav": {
       "label": "Admin naviqasiyası",
@@ -1211,7 +1289,8 @@
       "subtitle": "Qərar gözləyən mentor müraciətləri və yüklənmiş qeydlər.",
       "tabs": {
         "mentors": "Mentor müraciətləri",
-        "notes": "Qeydlər"
+        "notes": "Qeydlər",
+        "deletions": "Silinmə sorğuları"
       },
       "reason": "Səbəb (rədd üçün vacibdir)",
       "reasonHint": "Müraciət edənə göstərilir",
@@ -1230,6 +1309,19 @@
         "reasonRequired": "Ən azı 5 simvolluq səbəb yazın.",
         "alreadyDecided": "Bu barədə artıq qərar verilib."
       }
+    },
+    "deletions": {
+      "empty": "Gözləyən silinmə sorğusu yoxdur",
+      "approve": "Təsdiqlə və sil",
+      "approved": "Hesab silindi.",
+      "alreadyDeleted": "Artıq silinib",
+      "memberSince": "Üzvlük tarixi",
+      "balance": "Balans",
+      "noReason": "Səbəb göstərilməyib.",
+      "balanceWarning": "Bu hesabda hələ {amount} var. Silmək bu vəsaiti itirər - əvvəlcə həll edin.",
+      "rejectHint": "Rədd səbəbi (istifadəçiyə e-poçtla göndərilir)",
+      "confirmTitle": "Bu hesab silinsin?",
+      "confirmBody": "@{nickname} hesabı silinəcək, bütün cihazlardan çıxış ediləcək və ona e-poçt göndəriləcək. Təsdiq üçün ləqəbi yazın."
     }
   },
   "settings": {
@@ -1240,7 +1332,8 @@
       "profile": "Profil",
       "privacy": "Məxfilik",
       "appearance": "Görünüş",
-      "account": "Hesab"
+      "account": "Hesab",
+      "verification": "Doğrulama"
     },
     "profile": {
       "title": "Profil",
@@ -1296,8 +1389,60 @@
       "devicesHint": "Hesabınıza daxil olmuş cihazlar",
       "exportData": "Məlumatlarımı yüklə",
       "exportHint": "Bütün məlumatlarınızın JSON kopyası",
-      "deleteAccount": "Hesabı sil",
-      "deleteHint": "Bu əməliyyat geri qaytarıla bilməz"
+      "deleteAccount": "Hesabı sil"
+    },
+    "verification": {
+      "title": "Şəxsiyyətin doğrulanması",
+      "description": "Platformanın bütün imkanlarını açmaq üçün sənədlərinizi yükləyin.",
+      "status": {
+        "verified": "Doğrulanıb",
+        "inReview": "Yoxlanılır",
+        "rejected": "Rədd edilib",
+        "unverified": "Doğrulanmayıb"
+      },
+      "verifiedTitle": "Şəxsiyyətiniz doğrulanıb",
+      "verifiedOn": "{date} tarixində doğrulanıb. Bütün imkanlar açıqdır.",
+      "verifiedBody": "Bütün imkanlar açıqdır.",
+      "unlockedTitle": "Sizin üçün açıqdır",
+      "unlocksTitle": "Doğrulamadan sonra açılır",
+      "unlocks": {
+        "buy": "Konspekt almaq",
+        "topup": "Balansı artırmaq",
+        "sell": "Konspektlərinizi satmaq",
+        "book": "Mentorla görüş sifariş etmək",
+        "withdraw": "Qazancı çıxarmaq"
+      },
+      "needTitle": "Sizdən tələb olunan sənədlər",
+      "need": {
+        "nationalId": "Şəxsiyyət vəsiqəsi — ön və arxa tərəf",
+        "studentId": "Tələbə bileti — ön və arxa tərəf"
+      },
+      "reason": {
+        "studying": "Hazırda təhsil aldığınızı qeyd etmisiniz: kim olduğunuzu təsdiqləmək üçün şəxsiyyət vəsiqəsi, təhsil aldığınızı təsdiqləmək üçün tələbə bileti lazımdır.",
+        "graduated": "Məzun olduğunuz üçün şəxsiyyət vəsiqəsi kifayətdir — tələbə bileti tələb olunmur.",
+        "professional": "Mentor hesabları üçün yalnız şəxsiyyət vəsiqəsi tələb olunur."
+      }
+    },
+    "deletion": {
+      "hint": "Hesabınızın həmişəlik silinməsini tələb edin. Heç nə silinməzdən əvvəl hər sorğunu administrator yoxlayır.",
+      "request": "Hesabın silinməsini tələb et",
+      "what": {
+        "review": "Sorğunuzu administrator yoxlayır; nəticə barədə sizə e-poçt göndəriləcək.",
+        "signOut": "Təsdiqləndikdən sonra hesabınız silinir və bütün cihazlardan çıxış edilir.",
+        "wallet": "Balansınızdakı vəsaiti əvvəlcədən çıxarın - silindikdən sonra geri qaytarıla bilməz."
+      },
+      "reason": "Niyə ayrılırsınız?",
+      "password": "Şifrənizlə təsdiqləyin",
+      "submit": "Silinmə sorğusu göndər",
+      "pending": "{date} tarixində silinmə sorğusu göndərdiniz. Administrator onu yoxlayacaq; o vaxta qədər hesabınız adi qaydada işləyir.",
+      "cancel": "Sorğunu ləğv et",
+      "rejected": "{date} tarixli sorğunuz rədd edildi:",
+      "errors": {
+        "wrongPassword": "Şifrə düzgün deyil.",
+        "alreadyPending": "Artıq yoxlanılan silinmə sorğunuz var."
+      },
+      "submitted": "Silinmə sorğunuz yoxlanılmaq üçün göndərildi.",
+      "cancelled": "Silinmə sorğunuz ləğv edildi."
     }
   },
   "stub": {
@@ -1335,5 +1480,13 @@
     },
     "headline": "Başlıq",
     "bio": "Haqqınızda"
+  },
+  "legal": {
+    "onThisPage": "Bu səhifədə",
+    "effective": "Qüvvəyəminmə tarixi: {date}",
+    "draftNotice": "Bu, hələ hüquqşünas tərəfindən yoxlanılmamış ilkin mətndir. Yekun versiya fərqlənə bilər.",
+    "related": "Əlaqəli sənəd",
+    "backToTop": "Yuxarı qayıt",
+    "opensInNewTab": "(yeni vərəqdə açılır)"
   }
 }

@@ -10,7 +10,7 @@
  */
 import 'server-only';
 import sharp from 'sharp';
-import { ACCEPTED_IMAGE_MIME, FEED_IMAGE_HEIGHT, FEED_IMAGE_WIDTH, MAX_IMAGE_BYTES } from './constants';
+import { ACCEPTED_IMAGE_MIME, FEED_IMAGE_MAX_WIDTH, MAX_IMAGE_BYTES, clampFeedAspect } from './constants';
 
 /**
  * Re-exported so server code has one import for everything image-related,
@@ -134,19 +134,15 @@ export async function processImage(input: Buffer): Promise<ImageResult> {
       return { ok: false, reason: 'DIMENSIONS_TOO_SMALL' };
     }
 
+    const { width, height } = feedTargetSize(metadata);
     const bytes = await pipeline
       .rotate() // Applies the EXIF orientation flag BEFORE that metadata is dropped.
-      // Strict uniform output: every feed image is exactly FEED_IMAGE_WIDTH x
-      // FEED_IMAGE_HEIGHT. `cover` + `attention` crops to the most salient
-      // region instead of letterboxing; small inputs are upscaled so the
-      // stored size never varies.
-      .resize({
-        width: FEED_IMAGE_WIDTH,
-        height: FEED_IMAGE_HEIGHT,
-        fit: 'cover',
-        // Saliency cropping is single-frame only; animated GIFs crop centred.
-        position: sniffed === 'image/gif' ? 'centre' : sharp.strategy.attention,
-      })
+      // Keeps the photo's own ratio (see FEED_MIN_ASPECT / FEED_MAX_ASPECT).
+      // The target box has the CLAMPED ratio, so `cover` crops nothing from
+      // an in-range photo and trims only the excess, centred, from an
+      // out-of-range one. The box never exceeds the source, so nothing is
+      // upscaled.
+      .resize({ width, height, fit: 'cover', position: 'centre' })
       .webp({ quality: 82 })
       .toBuffer();
 
@@ -172,6 +168,28 @@ export async function processImage(input: Buffer): Promise<ImageResult> {
     // are the user's problem to fix, not an error to page anyone about.
     return { ok: false, reason: 'DECODE_FAILED' };
   }
+}
+
+/**
+ * Output size for one upload: the clamped aspect ratio, at most
+ * FEED_IMAGE_MAX_WIDTH wide, and never larger than the (post-crop) source.
+ *
+ * Works from the ORIENTED size - EXIF orientations 5-8 are 90-degree turns,
+ * so a portrait phone photo is stored landscape with a flag - and from the
+ * per-frame height of an animated GIF, whose `height` is every frame stacked.
+ */
+function feedTargetSize(metadata: sharp.Metadata): { width: number; height: number } {
+  const rawWidth = metadata.width!;
+  const rawHeight = metadata.pageHeight ?? metadata.height!;
+  const turned = (metadata.orientation ?? 1) >= 5;
+  const w = turned ? rawHeight : rawWidth;
+  const h = turned ? rawWidth : rawHeight;
+
+  const aspect = clampFeedAspect(w, h);
+  // The largest box of that ratio that fits inside the source.
+  const fitWidth = Math.min(w, h * aspect);
+  const width = Math.max(1, Math.round(Math.min(FEED_IMAGE_MAX_WIDTH, fitWidth)));
+  return { width, height: Math.max(1, Math.round(width / aspect)) };
 }
 
 /** Locale keys, so a rejection tells the uploader what to actually do. */

@@ -52,7 +52,7 @@ export function SiteFooter() {
   return (
     <footer className="bg-canvas">
       <div className="mx-auto max-w-shell px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
           <div className="max-w-xs">
             <Logo />
             <p className="mt-3 text-xs leading-relaxed text-fg-muted">

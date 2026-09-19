@@ -25,6 +25,7 @@ import {
   PipelineUnavailableError,
   type PipelineInput,
 } from '@/lib/verification/pipeline';
+import { requiredKindsFor } from '@/lib/verification/requirements';
 
 // Must be the Node runtime: the pipeline holds Buffers and calls node:crypto.
 export const runtime = 'nodejs';
@@ -35,41 +36,15 @@ export const maxDuration = 60;
 const MAX_ATTEMPTS = Number(process.env.VERIFICATION_MAX_ATTEMPTS ?? 3);
 
 /**
- * Which documents each account type must submit.
+ * Which documents each account must submit is decided by requiredKindsFor()
+ * in src/lib/verification/requirements.ts - the same function the settings
+ * screen renders from - applied to the role read from the DATABASE below, not
+ * to anything in the request. A client cannot shrink its own requirements.
  *
- * ---------------------------------------------------------------------------
- * WHY THIS IS NO LONGER A SINGLE LIST
- * ---------------------------------------------------------------------------
- * It used to be four fixed kinds, which assumed every account is a student. A
- * TEACHER has no student card, so demanding one would make teacher
- * verification impossible to complete - the submission would be refused for a
- * document that does not exist.
- *
- * Both types still prove IDENTITY with the same two ID images. Students
- * additionally prove ENROLMENT with the student card, which is the claim only
- * they are making.
- *
- * The set is chosen from the account's role on the SERVER. A client cannot
- * shrink its own requirements by claiming to be a teacher, because the role is
- * read from the database row, not from the request.
+ *   STUDENT          - national ID + student ID
+ *   ALUMNI, MENTOR,
+ *   TEACHER          - national ID only
  */
-const ID_KINDS = ['ID_FRONT', 'ID_BACK'] as const;
-const STUDENT_CARD_KINDS = ['STUDENT_CARD_FRONT', 'STUDENT_CARD_BACK'] as const;
-
-type RequiredKind =
-  | (typeof ID_KINDS)[number]
-  | (typeof STUDENT_CARD_KINDS)[number];
-
-function requiredKindsFor(role: string): readonly RequiredKind[] {
-  // TEACHER and MENTOR prove identity only - neither holds a student card, so
-  // demanding one would make their verification impossible to complete. Every
-  // other role - STUDENT, and the applicant-facing ones that can still be
-  // unverified - also proves enrolment, which is the conservative default:
-  // requiring an extra document is recoverable, silently skipping one is not.
-  return role === 'TEACHER' || role === 'MENTOR'
-    ? ID_KINDS
-    : [...STUDENT_CARD_KINDS, ...ID_KINDS];
-}
 
 /**
  * POST /api/verification/submit
@@ -164,6 +139,23 @@ export async function POST(request: NextRequest) {
     }
 
     const form = await request.formData();
+
+    /**
+     * Consent, taken HERE rather than at registration.
+     *
+     * Identity documents are special-category data. Consent to process them
+     * has to be specific and informed, which means it has to be given at the
+     * point the processing is actually described and about to happen - not
+     * bundled into a signup checkbox weeks earlier, next to the terms of
+     * service, for an upload the person had not yet been shown.
+     *
+     * So this is the gate: no consent, no processing, and the bytes are never
+     * read. The refusal comes before formData's files are touched for exactly
+     * that reason.
+     */
+    if (form.get('consentDocumentProcessing') !== 'true') {
+      return NextResponse.json({ error: 'auth.errors.consentRequired' }, { status: 400 });
+    }
 
     // Chosen from the account's own role, read from the database above.
     const requiredKinds = requiredKindsFor(user.role);

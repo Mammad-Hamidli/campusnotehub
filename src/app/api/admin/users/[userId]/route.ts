@@ -27,6 +27,7 @@ import { writeModerationAction } from '@/lib/firebase/repositories/moderation';
 import { sendEmailAsync } from '@/lib/email/send';
 import { hashEmail, hashPhone } from '@/lib/crypto/hash';
 import { shortFingerprint } from '@/lib/admin/redact';
+import { AccountDeletionError, softDeleteAccount } from '@/lib/accounts/softDelete';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -742,48 +743,29 @@ export async function DELETE(
     if (!target || target.deletedAt) {
       return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
     }
-    if (target.id === actor.id) {
-      return NextResponse.json({ error: 'admin.users.errors.cannotActOnSelf' }, { status: 409 });
-    }
     // Server-side re-check of the confirmation the dialog asked for. A client
     // that skips the dialog must not skip the safeguard.
     if (parsed.data.confirmNickname !== target.nickname) {
       return NextResponse.json({ error: 'admin.users.errors.confirmMismatch' }, { status: 400 });
     }
-    if (target.role === UserRole.ADMIN) {
-      // See the note on the same guard in the role branch above.
-      const admins = await countUsers({ role: UserRole.ADMIN, deletedAt: null });
-      const remaining = admins - 1;
-      if (remaining <= 0) {
-        return NextResponse.json({ error: 'admin.users.errors.lastAdmin' }, { status: 409 });
+
+    // Self-action, last-admin guard, the soft delete itself, sessions, email,
+    // moderation record and audit: one shared implementation, also used when
+    // an admin approves a user's own deletion request.
+    try {
+      const deletedAt = await softDeleteAccount({
+        userId,
+        actorId: actor.id,
+        reason: parsed.data.reason,
+        source: 'ADMIN',
+        request,
+      });
+      return NextResponse.json({ ok: true, deletedAt: deletedAt.toISOString() });
+    } catch (error) {
+      if (error instanceof AccountDeletionError) {
+        return NextResponse.json({ error: error.messageKey }, { status: error.status });
       }
+      throw error;
     }
-
-    const now = new Date();
-
-    // The act, then the record - see the note in the status branch above.
-    await updateUser(userId, { deletedAt: now, accountStatus: AccountStatus.DELETED });
-    await revokeUserSessions(userId);
-    sendEmailAsync(target.email, 'accountDeleted', { nickname: target.nickname });
-
-    await writeModerationAction({
-      moderatorId: actor.id,
-      targetType: 'user',
-      targetId: userId,
-      action: 'delete',
-      reason: parsed.data.reason,
-    });
-
-    await adminAudit({
-      actorId: actor.id,
-      action: 'ADMIN_USER_DELETED',
-      entityType: 'user',
-      entityId: userId,
-      before: { accountStatus: target.accountStatus, deletedAt: null },
-      after: { accountStatus: AccountStatus.DELETED, reason: parsed.data.reason },
-      request,
-    });
-
-    return NextResponse.json({ ok: true, deletedAt: now.toISOString() });
   });
 }

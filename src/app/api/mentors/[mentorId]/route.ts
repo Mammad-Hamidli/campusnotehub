@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   findMentorById,
+  findViewerMentorReview,
   listAvailabilityRules,
   listReviewsForMentor,
 } from '@/lib/firebase/repositories/mentors';
@@ -61,6 +62,11 @@ export async function GET(
 
   // Reviews, availability and the mentor's university: three independent reads
   // that the `include` used to fold into one query. Issued concurrently.
+  // The mentor cannot review themselves, and a signed-out reader has no
+  // sessions; neither costs a read.
+  const viewerReview =
+    viewer && viewer.id !== owner.id ? await findViewerMentorReview(mentor.id, viewer.id) : null;
+
   const [reviews, availabilityRules, university] = await Promise.all([
     // Newest first, capped: a profile page is not a review archive, and an
     // unbounded read would grow without limit on a popular mentor.
@@ -143,6 +149,12 @@ export async function GET(
         }),
       },
       viewerCanBook: can(viewer, 'mentors:book'),
+      /**
+       * The review box: shown when the viewer has had a finished session with
+       * this mentor, pre-filled with their own review. The PUT re-checks the
+       * session inside its transaction; this is display only.
+       */
+      viewerReview: viewerReview ?? { eligible: false, rating: null, body: null },
       viewerSignedIn: viewer !== null,
       /** True when the viewer IS this mentor - hides "message yourself". */
       viewerIsMentor: viewer?.id === owner.id,

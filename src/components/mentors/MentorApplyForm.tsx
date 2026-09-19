@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
-import { cellsToRules } from '@/lib/mentors/schedule';
+import { useToast } from '@/components/ui/Feedback';
+import { cellsToRules, rulesToCells, type WeeklyRule } from '@/lib/mentors/schedule';
 import { AvailabilityGrid } from './AvailabilityGrid';
 import { timezones } from './MentorScheduleSettings';
 
@@ -28,6 +29,8 @@ type Status = {
   application: { status: 'PENDING' | 'APPROVED' | 'REJECTED'; rejectionReason: string | null } | null;
   isMentor: boolean;
   canApply: boolean;
+  /** The schedule picked at registration, if any. Prefills the grid once. */
+  draft?: { availability: WeeklyRule[]; timezone: string } | null;
 };
 
 const emptyExperience = (): Experience => ({ company: '', role: '', years: '' });
@@ -35,6 +38,7 @@ const emptyEducation = (): Education => ({ institution: '', degree: '', field: '
 
 export function MentorApplyForm() {
   const t = useT();
+  const toast = useToast();
   const [status, setStatus] = useState<Status | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -65,7 +69,14 @@ export function MentorApplyForm() {
     fetch('/api/mentors/apply', { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error(String(response.status));
-        setStatus(await response.json());
+        const next = (await response.json()) as Status;
+        setStatus(next);
+        // Arrives after the browser-zone effect above, so the zone the
+        // schedule was actually picked in wins over the device's.
+        if (next.draft) {
+          setAvailability(rulesToCells(next.draft.availability));
+          setTimezone(next.draft.timezone);
+        }
       })
       .catch((cause) => {
         if ((cause as Error)?.name !== 'AbortError') setLoadError(true);
@@ -138,6 +149,7 @@ export function MentorApplyForm() {
         ...(s ?? {}),
         application: { status: 'PENDING', rejectionReason: null },
       }));
+      toast.success(t('mentors.apply.submitted'));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
       setError('errors.network');
@@ -226,7 +238,7 @@ export function MentorApplyForm() {
           </button>
         </div>
         {experiences.map((row, index) => (
-          <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr_6rem_auto]">
+          <div key={index} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_6rem_auto]">
             <input className={`${field} ${invalid('experiences')}`} placeholder={t('mentors.apply.company')} value={row.company} onChange={(e) => updateExperience(index, { company: e.target.value })} required minLength={2} />
             <input className={`${field} ${invalid('experiences')}`} placeholder={t('mentors.apply.role')} value={row.role} onChange={(e) => updateExperience(index, { role: e.target.value })} required minLength={2} />
             <input className={`${field} ${invalid('experiences')}`} type="number" min={0} max={60} step="0.5" placeholder={t('mentors.apply.years')} value={row.years} onChange={(e) => updateExperience(index, { years: e.target.value })} required />
@@ -247,7 +259,7 @@ export function MentorApplyForm() {
         </div>
         {education.length === 0 && <p className="text-2xs text-fg-subtle">{t('mentors.apply.educationHint')}</p>}
         {education.map((row, index) => (
-          <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_6rem_auto]">
+          <div key={index} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_6rem_auto]">
             <input className={field} placeholder={t('mentors.apply.institution')} value={row.institution} onChange={(e) => updateEducation(index, { institution: e.target.value })} required minLength={2} />
             <input className={field} placeholder={t('mentors.apply.degree')} value={row.degree} onChange={(e) => updateEducation(index, { degree: e.target.value })} required minLength={2} />
             <input className={field} placeholder={t('mentors.apply.field')} value={row.field} onChange={(e) => updateEducation(index, { field: e.target.value })} />

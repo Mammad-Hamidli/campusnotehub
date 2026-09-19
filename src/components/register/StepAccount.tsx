@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AlertCircle, AtSign, Eye, EyeOff } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import type { AccountForm, FieldErrors } from './types';
@@ -225,16 +225,21 @@ export function StepAccount({
 
 
       {/*
-        Two SEPARATE consents.
-        Bundling document processing into the general ToS checkbox is not valid
-        consent for special-category data under GDPR Art. 9 or the AZ personal
-        data law, and a bundled consent is worth nothing in a dispute.
+        ONE consent here, not two.
 
-        Each now renders its OWN error message. Previously they only tinted a
-        16px border, so failing validation here looked exactly like a dead
-        button — which is precisely the reported bug.
+        The second checkbox used to ask for consent to process identity
+        documents. Registration no longer handles a document, so consenting to
+        it here would be consent to something that is not happening - which is
+        not valid consent for special-category data under GDPR Art. 9 or the AZ
+        personal data law, and is worth nothing in a dispute. That consent moved
+        to /verify, where it is asked at the moment the documents are actually
+        handed over. See VerifyDocuments.tsx.
+
+        The error renders as its own message. Previously the checkboxes only
+        tinted a 16px border when they failed, so pressing Continue looked
+        exactly like a dead button — which is precisely the reported bug.
       */}
-      <fieldset className="space-y-3 rounded-xl border border-edge bg-surface-muted p-4">
+      <fieldset className="rounded-xl border border-edge bg-surface-muted p-4">
         <legend className="sr-only">{t('auth.register.consentsLegend')}</legend>
 
         <Checkbox
@@ -243,20 +248,50 @@ export function StepAccount({
           onChange={(checked) => onChange({ acceptTerms: checked })}
           error={errors.acceptTerms && t(errors.acceptTerms)}
         >
-          {t('auth.register.termsAccept').replace(/<\/?terms>|<\/?privacy>/g, '')}
-        </Checkbox>
-
-        <Checkbox
-          id="consent"
-          checked={value.consentDocuments}
-          onChange={(checked) => onChange({ consentDocuments: checked })}
-          error={errors.consentDocuments && t(errors.consentDocuments)}
-        >
-          {t('auth.register.dataConsent')}
+          <ConsentText template={t('auth.register.termsAccept')} />
         </Checkbox>
       </fieldset>
     </div>
   );
+}
+
+/**
+ * "I agree to the <terms>Terms of Service</terms> and <privacy>Privacy
+ * Policy</privacy>" with the tagged spans rendered as links.
+ *
+ * The markers used to be stripped, so the checkbox asked people to accept two
+ * documents it gave them no way to open. The links open in a new tab: this is
+ * step one of a multi-step wizard, and navigating away in the same tab would
+ * throw away everything typed so far.
+ *
+ * Clicking a link inside the <label> follows the link and does NOT toggle the
+ * checkbox - interactive content is excluded from a label's activation.
+ */
+const CONSENT_LINKS: Record<string, string> = { terms: '/legal/terms', privacy: '/legal/privacy' };
+
+function ConsentText({ template }: { template: string }) {
+  const t = useT();
+  const parts = template.split(/<(terms|privacy)>(.*?)<\/\1>/);
+  // split() with two capture groups yields [text, tag, label, text, tag, label, ..., text].
+  const nodes: ReactNode[] = [];
+  for (let i = 0; i < parts.length; i += 3) {
+    if (parts[i]) nodes.push(parts[i]);
+    const tag = parts[i + 1];
+    if (!tag) continue;
+    nodes.push(
+      <a
+        key={tag}
+        href={CONSENT_LINKS[tag]}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-medium text-accent underline underline-offset-2 hover:no-underline"
+      >
+        {parts[i + 2]}
+        <span className="sr-only"> {t('legal.opensInNewTab')}</span>
+      </a>,
+    );
+  }
+  return <>{nodes}</>;
 }
 
 function inputClass(invalid: boolean) {

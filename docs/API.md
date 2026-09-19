@@ -28,26 +28,67 @@ hashed IP otherwise. `429` responses carry `Retry-After`.
 | `POST` | `/auth/password/reset` | reset token | 5 / h | Single-use token, revokes all sessions on success. |
 | `GET` | `/auth/me` | session | — | Viewer + capability flags for the client. |
 
-**`POST /auth/register`**
+**`POST /auth/register`** — JSON only. This endpoint accepts **no files**;
+identity documents belong to `/verification/submit`, which the user reaches
+when they choose to.
+
 ```jsonc
 {
-  "fullName": "Aysel Məmmədova",
+  "accountType": "STUDENT",      // STUDENT | MENTOR — the only two on offer
+  "firstName": "Aysel",
+  "lastName": "Məmmədova",
+  "dateOfBirth": "2003-04-19",
+  "nickname": "aysel_m",
   "email": "aysel@ada.edu.az",
-  "password": "…",              // ≥ 12 chars, ≥ 5 distinct
+  "password": "…",               // ≥ 12 chars, ≥ 5 distinct
   "passwordConfirm": "…",
-  "universityId": "clx…",
-  "facultyId": "clx…",          // optional
-  "phone": "+994501234567",      // optional; strongest ban anchor we have
+  "universityId": "ADA",         // university CODE, not a document id
+  "phone": "+994501234567",      // required; strongest ban anchor we have
+
+  // ---- STUDENT only ----
+  "academicStatus": "STUDYING",  // STUDYING | GRADUATED
+  "studentNumber": "20231234",
+  "facultySlug": "computer-science",
+  "facultyOther": "…",           // required iff facultySlug === "other"
   "graduationYear": 2026,
   "graduationMonth": 5,          // required - the 1 May sweep needs both halves
+
+  // ---- MENTOR only ----
+  "department": "Azercell",      // organisation
+  "academicTitle": "Senior PM",  // position
+  "availability": [              // required, >= 1 slot; refused for STUDENT
+    { "weekday": 1, "startMinute": 1080, "endMinute": 1260 }  // 0=Sun, 30-min steps
+  ],
+  "timezone": "Asia/Baku",       // IANA zone the availability is in
+
   "locale": "az",
   "acceptTerms": true,
-  "consentDocumentProcessing": true,   // separate consent, not bundled
   "deviceFingerprint": "…"       // client half only; combined server-side with TLS JA4
 }
 ```
+
+`academicStatus: "GRADUATED"` writes the account as **`ALUMNI`**, not
+`STUDENT`, and stamps `alumniTransitionedAt`. The status and the graduation
+date must agree (a graduate's date cannot be in the future, a current
+student's cannot be in the past) or the request is a `400` on
+`graduationYear`.
+
+`universityId` is required for `STUDENT` and **optional for `MENTOR`** (often
+an industry professional). When sent, it must still be a known, seeded code.
+
+A mentor's `availability` is normalised like `POST /mentors/apply` (overlaps
+merged) and stored on the user as `mentorAvailability` - a DRAFT: nothing is
+bookable until the mentor application is approved. `GET /mentors/apply`
+returns it as `draft: { availability, timezone }` so the application form opens
+with the grid already painted.
+
+`consentDocumentProcessing` is **no longer read here** — it moved to
+`/verification/submit`, where the processing it consents to actually happens.
+It is still accepted and ignored so a stale client is not broken mid-rollout.
+
 → `201` `{ user: { id, verificationStatus }, next: { step: "VERIFY_DOCUMENTS", href: "/verify" } }`
-→ `409` `auth.errors.emailTaken` · `403` `verification.failure.generic` (blocklisted — same generic body as any other rejection)
+→ `409` `auth.errors.nicknameTaken` | `auth.errors.credentialsUnavailable` (email and phone share one message on purpose — see the route)
+→ `403` `verification.failure.generic` (blocklisted — same generic body as any other rejection)
 
 ---
 
@@ -55,7 +96,7 @@ hashed IP otherwise. `429` responses carry `Retry-After`.
 
 | Method | Path | Auth | Limit | Notes |
 |---|---|---|---|---|
-| `POST` | `/verification/submit` | session | 3 / day | **multipart**, 4 files. Runs the whole pipeline inline. |
+| `POST` | `/verification/submit` | session | 3 / day | **multipart**, 2 or 4 files by role. Runs the whole pipeline inline. |
 | `GET` | `/verification/status` | session | — | `{ status, attempt, remainingAttempts, messageKey }` |
 | `POST` | `/me/graduation` | session | — | Answers the alumni prompt: `alumni` \| `still_studying` \| `later`. |
 
@@ -63,14 +104,27 @@ There is **no** `/verification/presign`. Documents no longer go to object
 storage, so there is nothing to presign. See
 [SECURITY.md §3](SECURITY.md#3-zero-retention).
 
-**`POST /verification/submit`** — `multipart/form-data`, four parts:
+**`POST /verification/submit`** — `multipart/form-data`. Which parts are
+required is decided from the account's **stored role**, never from anything the
+client sends, so a caller cannot shrink its own requirements:
 
 ```
-STUDENT_CARD_FRONT   image/jpeg | image/png | application/pdf, <= 5 MB
-STUDENT_CARD_BACK    "
-ID_FRONT             "
-ID_BACK              "
+consentDocumentProcessing   "true"  — required; checked before any file is read
+
+ID_FRONT                    image/jpeg | image/png | application/pdf, <= 5 MB
+ID_BACK                     "
+
+STUDENT_CARD_FRONT          "   — STUDENT only
+STUDENT_CARD_BACK           "   — STUDENT only
 ```
+
+`MENTOR`, `TEACHER` and `ALUMNI` submit the national ID alone: none of them
+holds a *current* student card, so demanding one would make their verification
+impossible to complete. Every other role also proves enrolment, which is the
+conservative default.
+
+Without `consentDocumentProcessing: "true"` the request is a `400`
+(`auth.errors.consentRequired`) and no byte of any file is read.
 
 The rate limit is checked **before** the body is read, so a flood costs a Redis
 round trip rather than 20 MB of buffering. Every part is validated against its
@@ -131,6 +185,21 @@ Redis", which nothing would ever clean up.
 
 This is the only endpoint in the platform that can ban for document fraud. The
 automated pipeline has no `BANNED` outcome.
+
+### Account deletion requests
+
+A user cannot delete their own account; they file a request that an **ADMIN**
+reviews. Approving runs the same soft delete as `DELETE /admin/users/:id`
+(`softDeleteAccount()` in `src/lib/accounts/softDelete.ts`), including the
+self-action and last-admin guards.
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/me/deletion-request` | session | The caller's request, or `null`. |
+| `POST` | `/me/deletion-request` | session, 5 / day | `{ password, reason? }`. Re-checks the password; `409` if one is already pending. Notifies every ADMIN in-app (and by email) with a link to the queue. |
+| `DELETE` | `/me/deletion-request` | session | Cancels a `PENDING` request. |
+| `GET` | `/admin/deletion-requests?status=PENDING` | ADMIN | Queue, oldest first, with the account's wallet balance (available + escrow). |
+| `PATCH` | `/admin/deletion-requests/:userId` | ADMIN | `{ decision: "APPROVE" \| "REJECT", reason? }`. A rejection needs a reason (≥ 5 chars); it is emailed to the user. |
 
 ---
 
@@ -194,7 +263,7 @@ existing order — safe to retry)
 | `POST` | `/bookings/:id/cancel` | participant | — | Full refund >24h out. |
 | `POST` | `/bookings/:id/complete` | mentor | — | Releases escrow. |
 | `GET` | `/bookings/:id/join` | participant | — | Jitsi JWT, only within ±30 min of the session. |
-| `POST` | `/bookings/:id/review` | mentee | — | After `COMPLETED` only. |
+| `PUT` | `/mentors/:id/reviews` | session + `mentors:book` | 30 / h | `{ rating: 1-5, body? }`, create or update. See below. |
 
 **`POST /mentors/:id/bookings`**
 ```jsonc
@@ -204,6 +273,17 @@ existing order — safe to retry)
 → `409` `mentors.errors.slotTaken` (lost the race — the GiST exclusion
 constraint is authoritative) · `409` `mentors.errors.tooSoon` · `402`
 insufficient funds
+
+**`PUT /mentors/:id/reviews`** — the same mechanics as
+`PUT /notes/:id/reviews`, with a finished session in place of a PAID order.
+Eligible when the caller has a `CONFIRMED` / `RESCHEDULED` / `COMPLETED`
+booking with this mentor whose `endsAt` has passed, re-read inside the review
+transaction. One review per mentee per mentor (id `mentorId__menteeId`), so
+rating again replaces the old review. `ratingSum` / `ratingCount` / `ratingAvg`
+on the mentor profile update in the same transaction. `GET /mentors/:id` carries
+`viewerReview: { eligible, rating, body }` for the review box.
+→ `403` `mentors.reviewForm.errors.sessionRequired` · `403`
+`verification.restricted.action` (unverified) · `404` unapproved mentor
 
 ---
 

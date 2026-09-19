@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import { SignJWT, jwtVerify, compactVerify, importPKCS8, importSPKI } from 'jose';
@@ -292,11 +293,40 @@ export function clearSessionCookies(response: NextResponse): NextResponse {
  * The cost is one indexed lookup per request, and it is fetched in the SAME
  * query as the user via a relation include, so it is not an extra round trip.
  */
-export async function requireSession(request?: NextRequest): Promise<{
-  userId: string;
-  sessionId: string;
-  viewer: Viewer;
-}> {
+export type SessionResult = { userId: string; sessionId: string; viewer: Viewer };
+
+/**
+ * ---------------------------------------------------------------------------
+ * WHY THE COOKIE PATH IS MEMOISED PER REQUEST
+ * ---------------------------------------------------------------------------
+ * A server-rendered page resolves the session at least twice now: once in the
+ * root layout, which mounts the identity prompt, and once in the page itself
+ * through requirePageSession(). Both run in the same React render pass for the
+ * same request, and each one costs two Firestore document reads - so without
+ * this, adding one global component would have doubled the read volume of
+ * every signed-in page view. Firestore is billed per read and each one is a
+ * network round trip, so that is latency AND money for an answer we already
+ * had.
+ *
+ * React's cache() memoises for the lifetime of a single request and nothing
+ * longer. Two callers in one render share one lookup; the next request starts
+ * clean, which is what keeps revocation immediate - the property the whole
+ * function exists to provide.
+ *
+ * It is applied ONLY to the no-argument (cookie) path. When a NextRequest is
+ * passed - route handlers, middleware - the arguments are not comparable by
+ * identity across calls and there is no render pass to scope the cache to, so
+ * that path calls straight through, exactly as before.
+ */
+const cachedCookieSession = cache(
+  async (): Promise<SessionResult> => loadSession(undefined),
+);
+
+export async function requireSession(request?: NextRequest): Promise<SessionResult> {
+  return request ? loadSession(request) : cachedCookieSession();
+}
+
+async function loadSession(request?: NextRequest): Promise<SessionResult> {
   const jar = request ? request.cookies : await cookies();
   const token = jar.get(COOKIE_ACCESS)?.value;
   if (!token) throw new UnauthorizedError();

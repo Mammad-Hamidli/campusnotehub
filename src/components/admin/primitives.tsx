@@ -1,9 +1,7 @@
 'use client';
 
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useId,
   useMemo,
@@ -11,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { AlertTriangle, Check, ChevronLeft, ChevronRight, Inbox, Loader2, X } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, Inbox, Loader2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 
 /**
@@ -256,65 +254,12 @@ export function SortHeader({
 // Toasts
 // ---------------------------------------------------------------------------
 
-type Toast = { id: number; message: string; tone: 'success' | 'error' };
-const ToastContext = createContext<((message: string, tone?: 'success' | 'error') => void) | null>(null);
-
-export function useToast() {
-  const push = useContext(ToastContext);
-  if (!push) throw new Error('useToast must be used inside <ToastProvider>');
-  return push;
-}
-
-export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const nextId = useRef(0);
-
-  const push = useCallback((message: string, tone: 'success' | 'error' = 'success') => {
-    const id = nextId.current++;
-    setToasts((prev) => [...prev, { id, message, tone }]);
-    setTimeout(() => setToasts((prev) => prev.filter((toast) => toast.id !== id)), 5000);
-  }, []);
-
-  return (
-    <ToastContext.Provider value={push}>
-      {children}
-      {/*
-        role="status" + aria-live="polite" rather than "alert": these announce
-        the result of an action the operator just took, so interrupting them
-        mid-sentence would be rude. Errors still reach a screen reader, just
-        at the next natural pause.
-      */}
-      <div
-        role="status"
-        aria-live="polite"
-        className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-full max-w-sm flex-col gap-2"
-      >
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`overlay pointer-events-auto flex items-start gap-2 px-3.5 py-2.5 text-sm ${
-              toast.tone === 'error' ? 'border-danger/40 text-danger-fg' : 'text-fg'
-            }`}
-          >
-            {toast.tone === 'error' ? (
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            ) : (
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-verified-fg" aria-hidden="true" />
-            )}
-            <span className="flex-1">{toast.message}</span>
-            <button
-              type="button"
-              onClick={() => setToasts((prev) => prev.filter((item) => item.id !== toast.id))}
-              className="rounded p-0.5 text-fg-subtle hover:text-fg"
-            >
-              <X className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          </div>
-        ))}
-      </div>
-    </ToastContext.Provider>
-  );
-}
+/**
+ * The panel uses the app-wide toast (components/ui/Feedback), mounted in the
+ * root layout. Re-exported here so admin screens keep a single import site and
+ * their `toast(message, 'error')` calls work unchanged.
+ */
+export { useToast } from '@/components/ui/Feedback';
 
 // ---------------------------------------------------------------------------
 // Confirmation dialog

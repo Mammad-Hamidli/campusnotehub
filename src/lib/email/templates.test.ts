@@ -16,7 +16,7 @@ describe('email templates', () => {
   it('covers every template with sample data', () => {
     // SAMPLE_PARAMS is typed `satisfies SampleMap`, so a missing template is
     // already a compile error; this asserts the count is what we think it is.
-    expect(SAMPLE_NAMES).toHaveLength(24);
+    expect(SAMPLE_NAMES).toHaveLength(26);
   });
 
   describe.each(SAMPLE_NAMES)('%s', (name) => {
@@ -72,7 +72,14 @@ describe('email templates', () => {
 
     it('uses a bulletproof button wherever it has a call to action', () => {
       // Not every template has one (passwordChanged deliberately does not).
-      if (!rendered.text.match(/: https?:\/\//)) return;
+      // A button renders as "Label: https://..." in the text version; the
+      // footer's "Notification preferences: https://..." line is on EVERY
+      // email and is not a call to action, so it is left out of the check.
+      const body = rendered.text
+        .split('\n')
+        .filter((line) => !line.startsWith('Notification preferences:'))
+        .join('\n');
+      if (!body.match(/: https?:\/\//)) return;
       expect(rendered.html).toContain('v:roundrect');
       expect(rendered.html).not.toMatch(/<button/);
     });

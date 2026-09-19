@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarCheck, Loader2, X } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
 import { SlotPicker } from './SlotPicker';
 
 /**
@@ -38,6 +39,7 @@ export function BookingPanel({
   onClose: () => void;
 }) {
   const t = useT();
+  const toast = useToast();
   const router = useRouter();
 
   const [startsAt, setStartsAt] = useState<string | null>(null);
@@ -85,6 +87,7 @@ export function BookingPanel({
       }
 
       setConfirmed(true);
+      toast.success(t('mentors.booking.confirmed.body'), { title: t('mentors.booking.confirmed.title') });
       // Refreshes any server-rendered state that depends on the new booking.
       router.refresh();
     } catch {

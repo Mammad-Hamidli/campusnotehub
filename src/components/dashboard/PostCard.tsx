@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { Flag, Heart, Link2, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
-import { FEED_IMAGE_HEIGHT, FEED_IMAGE_WIDTH } from '@/lib/media/constants';
+import { clampFeedAspect } from '@/lib/media/constants';
 import { Menu, MenuItem } from '@/components/ui/Menu';
+import { useConfirm, useToast } from '@/components/ui/Feedback';
 import { VerifiedBadge } from './VerificationBanner';
 import { CommentThread } from './CommentThread';
 
@@ -50,11 +51,14 @@ export function PostCard({
   onDeleted?: (postId: string) => void;
 }) {
   const t = useT();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [liked, setLiked] = useState(post.likedByViewer);
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [commentCount, setCommentCount] = useState(post.commentCount);
   const [showComments, setShowComments] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  /** Set only when the clipboard refused the link, so it can be copied by hand. */
+  const [manualLink, setManualLink] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const isOwn = Boolean(viewerId) && post.authorId === viewerId;
@@ -84,6 +88,7 @@ export function PostCard({
       if (!response.ok) {
         setLiked(!next);
         setLikeCount((c) => c + (next ? -1 : 1));
+        toast.error(t('feed.menu.likeFailed'));
         return;
       }
       // Trust the server's total over the local guess: two tabs, or a like
@@ -96,39 +101,48 @@ export function PostCard({
     } catch {
       setLiked(!next);
       setLikeCount((c) => c + (next ? -1 : 1));
+      toast.error(t('feed.menu.likeFailed'));
     }
   }
 
   /** DELETE /api/feed/:postId - own posts only; the server re-checks. */
   async function deletePost() {
-    if (!window.confirm(t('feed.menu.deleteConfirm'))) return;
+    const confirmed = await confirm({
+      title: t('feed.menu.deleteTitle'),
+      body: t('feed.menu.deleteBody'),
+      confirmLabel: t('feed.menu.delete'),
+    });
+    if (!confirmed) return;
+
     setDeleting(true);
-    setNotice(null);
     try {
       const response = await fetch(`/api/feed/${post.id}`, { method: 'DELETE' });
       if (!response.ok) {
-        setNotice(t('feed.menu.deleteFailed'));
+        toast.error(t('feed.menu.deleteFailed'));
         return;
       }
+      // A toast, not an inline notice: the card is about to unmount, so
+      // anything rendered inside it would disappear with it.
+      toast.success(t('feed.menu.deleted'));
       onDeleted?.(post.id);
     } catch {
-      setNotice(t('feed.menu.deleteFailed'));
+      toast.error(t('feed.menu.deleteFailed'));
     } finally {
       setDeleting(false);
     }
   }
 
   async function reportPost() {
-    setNotice(null);
     try {
       const response = await fetch(`/api/feed/${post.id}/report`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: '{}',
       });
-      setNotice(t(response.ok ? 'feed.menu.reported' : 'feed.menu.reportFailed'));
+      if (response.ok) toast.success(t('feed.menu.reported'));
+      else toast.error(t('feed.menu.reportFailed'));
     } catch {
-      setNotice(t('feed.menu.reportFailed'));
+      toast.error(t('feed.menu.reportFailed'));
     }
   }
 
@@ -136,11 +150,12 @@ export function PostCard({
     const url = `${window.location.origin}/dashboard#post-${post.id}`;
     try {
       await navigator.clipboard.writeText(url);
-      setNotice(t('feed.menu.linkCopied'));
+      setManualLink(null);
+      toast.success(t('feed.menu.linkCopied'));
     } catch {
       // Clipboard access refused (insecure context, permissions): show the
       // link so it can still be copied by hand.
-      setNotice(url);
+      setManualLink(url);
     }
   }
 
@@ -161,7 +176,7 @@ export function PostCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-            <span className="truncate text-sm font-medium text-fg">@{post.author.nickname}</span>
+            <span className="min-w-0 max-w-full truncate text-sm font-medium text-fg">@{post.author.nickname}</span>
             <VerifiedBadge verified={post.author.verified} />
             <span
               className="rounded-md bg-surface-inset px-1.5 py-0.5 text-2xs font-semibold text-fg-muted"
@@ -236,16 +251,24 @@ export function PostCard({
         </Menu>
       </header>
 
-      <p className="mt-3 whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-fg">
+      {/* break-words: a pasted URL has no spaces and would otherwise widen the card. */}
+      <p className="mt-3 whitespace-pre-wrap break-words text-[0.9375rem] leading-relaxed text-fg">
         {post.body}
       </p>
 
       {/*
-        Images: one fixed 4:3 frame for every upload, whatever its native
-        ratio (object-cover crops, never letterboxes). The box is sized before
-        the bytes arrive, so no layout shift. Server re-encodes new uploads to
-        FEED_IMAGE_WIDTH x FEED_IMAGE_HEIGHT; this frame also normalises
-        images stored before that change.
+        Images, Instagram-style: shown WHOLE, centred, never cropped by the
+        frame.
+
+        The frame takes the first image's real aspect ratio (clamped to the
+        feed range, 3:4 .. 1.91:1 - see src/lib/media/constants.ts), which is
+        the ratio the server stored it at, so a single photo fills its frame
+        exactly. In a multi-image post every cell uses that same ratio, as an
+        Instagram carousel does, and `object-contain` fits any image with a
+        different shape inside it with neutral bars rather than cutting it.
+        The box is sized from stored dimensions before the bytes arrive, so
+        there is no layout shift. max-h keeps a tall portrait from outgrowing
+        a short laptop screen; contain then scales it down instead of cropping.
       */}
       {post.media.length > 0 && (
         <div
@@ -257,18 +280,19 @@ export function PostCard({
               href={image.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="relative block aspect-[4/3] w-full overflow-hidden rounded-xl border border-edge bg-surface-inset"
+              style={{ aspectRatio: clampFeedAspect(post.media[0].width, post.media[0].height) }}
+              className="relative block max-h-[75vh] w-full overflow-hidden rounded-xl border border-edge bg-surface-inset"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- already
                   re-encoded, bounded WebP; next/image would add a loader hop. */}
               <img
                 src={image.url}
                 alt={image.alt ?? ''}
-                width={FEED_IMAGE_WIDTH}
-                height={FEED_IMAGE_HEIGHT}
+                width={image.width ?? undefined}
+                height={image.height ?? undefined}
                 loading="lazy"
                 decoding="async"
-                className="absolute inset-0 h-full w-full object-cover"
+                className="absolute inset-0 h-full w-full object-contain object-center"
               />
             </a>
           ))}
@@ -290,9 +314,9 @@ export function PostCard({
         </div>
       )}
 
-      {notice && (
+      {manualLink && (
         <p role="status" className="mt-2 break-all text-xs text-fg-muted">
-          {notice}
+          {manualLink}
         </p>
       )}
 

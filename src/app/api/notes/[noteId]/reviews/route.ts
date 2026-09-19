@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { NoteReviewError, upsertNoteReview } from '@/lib/firebase/repositories/notes';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
-import { can } from '@/lib/permissions';
+import { can, denialKey } from '@/lib/permissions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,9 +33,9 @@ export async function PUT(
     }
     throw error;
   }
-  // Same gate as buying: a frozen account cannot write reviews either.
+  // Same gate as buying: only a verified, non-frozen buyer reviews.
   if (!can(viewer, 'notes:buy')) {
-    return NextResponse.json({ error: 'errors.forbidden' }, { status: 403 });
+    return NextResponse.json({ error: denialKey(viewer, 'notes:buy') }, { status: 403 });
   }
 
   const limit = await rateLimit('notes:review', { userId, ip: clientIp(request.headers) });

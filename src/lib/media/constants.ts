@@ -31,11 +31,33 @@ export const MAX_IMAGE_BYTES = 12 * 1024 * 1024; // 12 MB
 export const MAX_IMAGE_MB = MAX_IMAGE_BYTES / (1024 * 1024);
 
 /**
- * The ONE stored size for feed images (4:3). Every upload is cover-cropped to
- * exactly this, so the feed never renders mixed aspect ratios.
+ * Feed images keep their OWN aspect ratio, Instagram-style.
+ *
+ * Every upload used to be cover-cropped to a fixed 1200x900 (4:3), which cut
+ * the top and bottom off every portrait photo and the sides off every
+ * panorama - and the crop was baked into the stored file, so the lost part
+ * was gone for good. Now:
+ *
+ *   - a ratio between FEED_MIN_ASPECT (3:4, the standard phone-camera portrait) and FEED_MAX_ASPECT
+ *     (1.91:1 landscape) is stored and shown uncropped;
+ *   - only a ratio OUTSIDE that range is centre-cropped to the nearest bound,
+ *     because a 1:3 phone screenshot at full width would be a wall three
+ *     screens tall;
+ *   - the stored width is capped at FEED_IMAGE_MAX_WIDTH and never upscaled.
+ *
+ * The same bounds drive the frame in PostCard, so display and storage agree.
  */
-export const FEED_IMAGE_WIDTH = 1200;
-export const FEED_IMAGE_HEIGHT = 900;
+export const FEED_IMAGE_MAX_WIDTH = 1080;
+export const FEED_MIN_ASPECT = 3 / 4;
+export const FEED_MAX_ASPECT = 1.91;
+/** Frame for records without stored dimensions (none are expected). */
+export const FEED_FALLBACK_ASPECT = 4 / 3;
+
+/** width / height, clamped to the feed's range. */
+export function clampFeedAspect(width: number | null | undefined, height: number | null | undefined): number {
+  if (!width || !height) return FEED_FALLBACK_ASPECT;
+  return Math.min(FEED_MAX_ASPECT, Math.max(FEED_MIN_ASPECT, width / height));
+}
 
 export const ACCEPTED_IMAGE_MIME =['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 

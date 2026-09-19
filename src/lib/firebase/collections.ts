@@ -86,6 +86,8 @@ export const COLLECTIONS = {
   emailOutbox: 'emailOutbox',
   /** PocketMentor applications, keyed by applicant user id. */
   mentorApplications: 'mentorApplications',
+  /** User-filed account deletion requests, keyed by user id; reviewed by an admin. */
+  accountDeletionRequests: 'accountDeletionRequests',
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

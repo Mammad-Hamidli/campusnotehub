@@ -127,7 +127,7 @@ export function AdminProfile() {
     <>
       <PageHeader title={t('admin.profile.title')} description={t('admin.profile.subtitle')} />
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <form onSubmit={save} className="card p-4">
           <h2 className="text-sm font-semibold text-fg">{t('admin.profile.account')}</h2>
 

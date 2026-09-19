@@ -158,7 +158,7 @@ export function AuditLogTable() {
       />
 
       <div className="card mb-3 flex flex-wrap items-end gap-2 p-3">
-        <label className="min-w-[14rem] flex-1">
+        <label className="w-full min-w-0 flex-1 basis-56">
           <span className="sr-only">{t('admin.auditLogs.searchLabel')}</span>
           <input
             type="search"

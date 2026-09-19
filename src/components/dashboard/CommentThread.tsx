@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Send } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
 import { VerifiedBadge } from './VerificationBanner';
 
 /**
@@ -61,6 +62,7 @@ export function CommentThread({
   onCountChange?: (count: number) => void;
 }) {
   const t = useT();
+  const toast = useToast();
   const [comments, setComments] = useState<ApiComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +140,7 @@ export function CommentThread({
       }
       setBody('');
       if (inputRef.current) inputRef.current.style.height = 'auto';
+      toast.success(t('feed.commentPosted'));
     } catch {
       setError(t('feed.commentFailed'));
     } finally {

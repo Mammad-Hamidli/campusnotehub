@@ -140,19 +140,86 @@ Three decisions worth keeping:
 
 ### Funnel
 
-```
-Step 1  POST /api/auth/register        (JSON)
-        -> account created, session issued, status = UNVERIFIED
-        -> device fingerprint recorded (NOT an IP address)
+The two steps are **decoupled in time**. Signing up does not touch a document;
+verification happens whenever the user chooses, in **Settings -> Verification**
+(`/settings?tab=verification`; `/verify` is a redirect kept for old links).
 
-Step 2  POST /api/verification/submit  (multipart, 4 files)
-        -> validate bytes -> analyse in memory -> decide -> WIPE
-        -> returns 200 with a real verdict in 3-8 seconds
+```
+Sign-up   POST /api/auth/register        (JSON only, no files)
+          -> account created, session issued, status = UNVERIFIED
+          -> device fingerprint recorded (NOT an IP address)
+          -> user lands in the product immediately
+
+          ... minutes, or days ...
+
+Verify    POST /api/verification/submit  (multipart, 2 or 4 files)
+          -> consent checked FIRST, before any byte is read
+          -> validate bytes -> analyse in memory -> decide -> WIPE
+          -> returns 200 with a real verdict in 3-8 seconds
 ```
 
-There is no step 3, no presigned upload, and no background queue. The
-documents go straight from the browser into the request handler's memory and
-are overwritten before the response is written.
+**Why they are decoupled.** Verification used to be the last step of the
+registration wizard, which meant a stranger who had not yet seen the product
+was asked to find a national ID and photograph four card faces before owning an
+account. That is where the funnel died. Nothing about the verification *rules*
+changed - the capability table in `permissions.ts` refuses every money-moving
+or 1-on-1 capability to an unverified account (see section 5). Only the queue
+in front of the product was removed.
+
+An account that is not VERIFIED sees a banner at the top of every page
+([`IdentityPrompt.tsx`](../src/components/account/IdentityPrompt.tsx)), mounted
+before `{children}` in the root layout. It has no close button: the state it
+reports is real and blocking, and a dismissal that hides a blocking state is
+how "why can't I buy notes" becomes a support ticket. UNVERIFIED and REJECTED
+get a "Verify now" link; PROCESSING and NEEDS_REVIEW get an "in review" status
+with no action. It disappears only at VERIFIED. It sits in the page flow rather
+than being pinned, so it does not stack with each page's own sticky header.
+
+### Account types and what each proves
+
+| Registers as | Role written | Identity (national ID) | Enrolment (student card) |
+|---|---|---|---|
+| Student, currently studying | `STUDENT` | required | required |
+| Student, graduated | `ALUMNI` | required | — |
+| Mentor | `MENTOR` | required | — |
+
+The rule lives once, in
+[`requirements.ts`](../src/lib/verification/requirements.ts)
+(`requiredKindsFor(role)`), which both the settings screen and
+`POST /api/verification/submit` use, always from the **stored** role.
+
+A mentor also picks their weekly availability at signup (a fourth wizard step,
+mentors only). It is stored as a draft on the user and prefills
+`/mentors/apply`; bookings read only the approved mentor profile's rules.
+
+Registration offers exactly **two** choices, Student and Mentor. `TEACHER`
+remains a `UserRole` an administrator can assign, but it is no longer a signup
+option: it was validated by the same refinements, asked for the same fields and
+required the same documents as `MENTOR`, so the choice changed nothing.
+
+`ALUMNI` is **concluded, not claimed**. A student registration carries an
+`academicStatus` of `STUDYING` or `GRADUATED`, asked in the same block as the
+university because it is the same question - which institution, and are you
+still there. `GRADUATED` is written as `ALUMNI` by the register route, with
+`alumniTransitionedAt` stamped so the 1 May sweep does not prompt a transition
+that already happened. The status and the graduation date must agree, enforced
+by a refinement in `registerSchema`: "graduated, finishing in 2029" would
+otherwise produce an alumni account that could never be verified, because it
+would be asked for a student card it does not hold.
+
+### Where consent is taken
+
+Consent to process identity documents is collected in the settings
+verification section, at the moment
+the documents are handed over - not at signup. Consent given before the
+processing is specified is not valid consent for special-category data under
+GDPR Art. 9 or the AZ personal data law, and signup no longer mentions a
+document at all. `POST /api/verification/submit` refuses a body without
+`consentDocumentProcessing`, before reading a single file.
+
+There is no presigned upload and no background queue. The documents go straight
+from the browser into the request handler's memory and are overwritten before
+the response is written.
 
 ### Zero retention
 
@@ -230,19 +297,23 @@ The "Account Unverified" banner is backed by one table
 | Capability | Unverified | Verified |
 |---|---|---|
 | read feed, post, comment | ✅ | ✅ |
-| browse notes, **buy** notes | ✅ | ✅ |
+| browse notes | ✅ | ✅ |
 | browse mentors | ✅ | ✅ |
-| wallet top-up | ✅ | ✅ |
+| **buy notes** (and review them) | ❌ | ✅ |
+| **wallet top-up** | ❌ | ✅ |
 | **sell notes** | ❌ | ✅ |
 | **book a mentor** | ❌ | ✅ |
 | **offer mentorship** | ❌ | ✅ |
 | **withdraw funds** | ❌ | ✅ |
 
-The line: unverified users get the full social product and can *spend*, but
-cannot *earn*, *withdraw*, or get into a 1-on-1 call with a student. Anything
-that moves value off-platform or puts a stranger in a private call needs a
-verified identity; everything else stays open so the product is useful on day
-one and people finish the funnel.
+The line: unverified users get the full social product; verification unlocks
+everything that moves money or puts two strangers in a private call. Spending
+(buying notes, and with it wallet top-up, since money loaded but unspendable
+would just sit in the wallet) moved behind verification so that every
+transaction has a verified person on both sides. A refusal caused only by
+verification returns `verification.restricted.action` (`denialKey()`), and the
+UI answers it with a link to the settings section; every other refusal stays
+the generic `errors.forbidden`.
 
 ---
 

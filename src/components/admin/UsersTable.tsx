@@ -232,7 +232,7 @@ export function UsersTable() {
 
       <div className="card mb-3 p-3">
         <div className="flex flex-wrap items-end gap-2">
-          <label className="relative min-w-[14rem] flex-1">
+          <label className="relative w-full min-w-0 flex-1 basis-56">
             <span className="sr-only">{t('admin.users.searchLabel')}</span>
             <Search
               className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"

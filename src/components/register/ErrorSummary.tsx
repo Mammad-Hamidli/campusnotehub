@@ -45,20 +45,34 @@ export function ErrorSummary({ errors }: { errors: FieldErrors }) {
 
   if (entries.length === 0) return null;
 
-  function focusField(field: keyof AccountForm) {
-    // The select and checkbox ids differ from the form key names; map them.
-    const id =
-      field === 'universityId'
-        ? 'university'
-        : field === 'graduationYear' || field === 'graduationMonth'
-          ? 'gradYear'
-          : field === 'acceptTerms'
-            ? 'terms'
-            : field === 'consentDocuments'
-              ? 'consent'
-              : field;
+  /**
+   * Some controls carry an id that is not their form key.
+   *
+   * Kept as an explicit map rather than a chain of ternaries so a field whose
+   * id changes is one line here, and so the pairs are readable as a list -
+   * which is the only way to notice that one is missing. A key with no entry
+   * focuses the element whose id IS the key, which is the common case.
+   *
+   * `academicStatus` is deliberately absent: it is a radio group with no
+   * wrapping id, and the browser focuses the first radio from the name
+   * attribute anyway. See the fallback below.
+   */
+  const CONTROL_IDS: Partial<Record<keyof AccountForm, string>> = {
+    universityId: 'university',
+    graduationYear: 'gradYear',
+    graduationMonth: 'gradYear',
+    acceptTerms: 'terms',
+  };
 
-    const element = document.getElementById(id);
+  function focusField(field: keyof AccountForm) {
+    const id = CONTROL_IDS[field] ?? field;
+
+    const element =
+      document.getElementById(id) ??
+      // Radio groups (accountType, academicStatus) have no element carrying
+      // the field id - their name attribute is the group. Focusing the first
+      // member puts the user inside the group with arrow keys live.
+      document.querySelector<HTMLElement>(`[name="${id}"]`);
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     element?.focus({ preventScroll: true });
   }

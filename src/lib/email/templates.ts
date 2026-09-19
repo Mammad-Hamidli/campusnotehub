@@ -48,6 +48,8 @@ export type TemplateName =
   | 'accountSuspended'
   | 'accountReactivated'
   | 'accountDeleted'
+  | 'accountDeletionRequested'
+  | 'accountDeletionRejected'
   | 'newNotification'
   | 'mentorApplicationSubmitted'
   | 'mentorApplicationApproved'
@@ -441,6 +443,47 @@ export const TEMPLATES = {
         title: 'Did not expect this?',
         body: 'Contact support and include your handle.',
       },
+    ],
+  }),
+
+  accountDeletionRequested: (p: { nickname: string }): EmailContent => ({
+    subject: 'We received your account deletion request',
+    heading: 'Deletion request received',
+    preheader: 'An administrator will review your request.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: 'We received your request to delete your UniPath account. An administrator will review it, and we will email you when it has been processed. Your account keeps working until then.',
+      },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Did not request this?',
+        body: 'Cancel the request in Settings and change your password - someone else may have access to your account.',
+      },
+      { kind: 'button', label: 'Open settings', href: appUrl('/settings?tab=account') },
+    ],
+  }),
+
+  accountDeletionRejected: (p: { nickname: string; reason: string }): EmailContent => ({
+    subject: 'Your account deletion request was not processed',
+    heading: 'Deletion request declined',
+    preheader: 'Your account was not deleted.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: 'An administrator reviewed your request to delete your UniPath account and could not process it yet. Your account is still active.',
+      },
+      { kind: 'facts', rows: [{ label: 'Reason', value: p.reason }] },
+      {
+        kind: 'callout',
+        tone: 'neutral',
+        title: 'What next?',
+        body: 'Once the issue above is resolved you can file a new request in Settings, or reply to this email.',
+      },
+      { kind: 'button', label: 'Open settings', href: appUrl('/settings?tab=account') },
     ],
   }),
 

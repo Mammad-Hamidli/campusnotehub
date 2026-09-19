@@ -24,7 +24,6 @@ import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Menu, MenuItem, MenuSeparator } from '@/components/ui/Menu';
 import { useT } from '@/lib/i18n/LocaleProvider';
-import { ToastProvider } from './primitives';
 
 const NAV: { href: string; icon: LucideIcon; labelKey: string }[] = [
   { href: '/admin', icon: LayoutDashboard, labelKey: 'admin.nav.dashboard' },
@@ -95,8 +94,12 @@ export function AdminShell({
   );
 
   return (
-    <ToastProvider>
-      <div className="min-h-dvh bg-surface-muted">
+    <>
+      {/* max-w-full + overflow-x-clip: the panel is built out of tables that
+          are deliberately wider than a phone, each inside its own
+          overflow-x-auto. `clip` bounds the PAGE without creating a second
+          scroll container, which would break the sticky rail. */}
+      <div className="min-h-dvh w-full max-w-full overflow-x-clip bg-surface-muted">
         {/* Skip link: the panel is table-heavy and tabbing past a nav on every
             page is exactly the case skip links exist for. */}
         <a
@@ -108,12 +111,14 @@ export function AdminShell({
 
         <div className="lg:flex">
           {/* Mobile bar */}
-          <header className="flex items-center justify-between border-b border-edge bg-surface px-4 py-3 lg:hidden">
-            <Logo />
+          <header className="flex w-full max-w-full items-center justify-between gap-2 border-b border-edge bg-surface px-3 py-3 sm:px-4 lg:hidden">
+            <div className="min-w-0 shrink">
+              <Logo />
+            </div>
             <button
               type="button"
               onClick={() => setMobileOpen((open) => !open)}
-              className="btn-ghost px-2 py-1.5"
+              className="btn-ghost shrink-0 px-2 py-1.5"
               aria-expanded={mobileOpen}
               aria-label={t('admin.nav.label')}
             >
@@ -214,12 +219,12 @@ export function AdminShell({
             </div>
           </aside>
 
-          <main id="admin-main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <main id="admin-main" className="w-full min-w-0 max-w-full flex-1 px-4 py-6 sm:px-6 lg:px-8">
             {children}
           </main>
         </div>
       </div>
-    </ToastProvider>
+    </>
   );
 }
 
