@@ -1,161 +1,66 @@
 import type { DocKind, DocState } from './DocumentDropzone';
 import { requiredKindsFor } from '@/lib/verification/requirements';
+import { normalizeAzPhone } from '@/lib/auth/phone';
 
 /**
- * The account types a person may CHOOSE at signup.
+ * The registration form: ONE step, six fields (+ terms).
  *
- * Mirrors ACCOUNT_TYPES in src/server/validators/auth.ts, which is now two
- * values rather than three. TEACHER still exists as a UserRole - accounts
- * already hold it and an administrator can still assign it - but it is no
- * longer offered at registration: a teacher and a mentor were asked for
- * exactly the same two fields and the same documents, so the third card
- * bought a decision and nothing else.
+ * Also the shape /onboarding finishes for a quick-login account, which has no
+ * password, no phone and usually already has its provider's email - see
+ * `options` on validateProfile().
  */
-export type AccountType = 'STUDENT' | 'MENTOR';
-
-/**
- * The types that answer "where do you work" rather than "where do you study".
- * Mirrors PROFESSIONAL_TYPES in src/server/validators/auth.ts.
- */
-export const PROFESSIONAL_TYPES: readonly AccountType[] = ['MENTOR'];
-export const isProfessional = (t: AccountType | '') => t === 'MENTOR';
-
-/**
- * Where a student is in their studies.
- *
- * This is the "Graduated / Currently studying" choice, and it is asked in the
- * same block as the university because it is the same question: which
- * institution, and are you still there. It decides three things downstream:
- *
- *   - the role written at registration (ALUMNI vs STUDENT);
- *   - whether the graduation date is read as a past fact or a future plan;
- *   - which documents verification asks for later - an alumnus has no current
- *     student card, so demanding one would make their verification impossible.
- */
-export type AcademicStatus = 'STUDYING' | 'GRADUATED';
-
-export type AccountForm = {
-  /**
-   * The legal name, in two halves.
-   *
-   * Collected separately because a document check compares given name and
-   * surname independently. `fullName` below is derived from these on the
-   * server and remains what every existing surface renders.
-   */
-  firstName: string;
-  lastName: string;
-  /** YYYY-MM-DD. Checked against the identity document during verification. */
-  dateOfBirth: string;
-  /** Chosen in step 2; decides which fields follow. */
-  accountType: AccountType | '';
-  /** STUDENT only: 'STUDYING' or 'GRADUATED'. See AcademicStatus. */
-  academicStatus: AcademicStatus | '';
-  /** MENTOR only. */
-  department: string;
-  academicTitle: string;
+export type ProfileForm = {
   fullName: string;
   nickname: string;
+  /** University CODE ('ADA'), as the server's registerSchema expects. */
+  universityId: string;
+  /** A PERSONAL address - a university one is welcome but not required. */
   email: string;
+  /**
+   * As TYPED. Any of '+994 50 123 45 67', '050 123 45 67' or '994501234567'
+   * is accepted here; normalisePhone() below collapses them to one E.164
+   * string before the value ever reaches the payload, so the server is never
+   * asked to guess which of three spellings a number was entered in.
+   */
   phone: string;
   password: string;
-  universityId: string;
-  /** Catalogue slug from src/lib/faculties.ts. '' until chosen. */
-  facultySlug: string;
-  /** Typed value, meaningful only when facultySlug === 'other'. */
-  facultyOther: string;
-  graduationYear: string;
-  graduationMonth: string;
-  /**
-   * MENTOR only: the weekly availability picked in the schedule step, as the
-   * AvailabilityGrid's "weekday:minute" cell keys. Sent as merged rules
-   * (cellsToRules) and carried into the mentor application later.
-   */
-  availability: Set<string>;
-  /** MENTOR only: IANA zone the availability is expressed in. */
-  timezone: string;
   acceptTerms: boolean;
 };
 
 /** Values are locale KEYS, not sentences, so errors render in the active language. */
-export type FieldErrors = Partial<Record<keyof AccountForm, string>>;
+export type ProfileErrors = Partial<Record<keyof ProfileForm, string>>;
 
 export type DocumentMap = Record<DocKind, DocState>;
 
-/**
- * Field order for the error summary and for focus management.
- *
- * Declared once, here, so "jump to the first invalid field" and "list the
- * problems in the order they appear on screen" cannot drift apart from the
- * actual DOM order — which is what makes an error summary useless.
- */
-export const FIELD_ORDER: (keyof AccountForm)[] = [
-  'firstName',
-  'lastName',
-  'dateOfBirth',
+/** Screen order - the error summary lists and focuses problems in this order. */
+export const FIELD_ORDER: (keyof ProfileForm)[] = [
+  'fullName',
   'nickname',
+  'universityId',
   'email',
   'phone',
   'password',
-  'accountType',
-  'universityId',
-  'academicStatus',
-  'department',
-  'academicTitle',
-  'facultySlug',
-  'facultyOther',
-  'graduationYear',
-  'graduationMonth',
-  'timezone',
-  'availability',
   'acceptTerms',
 ];
 
 /** Label keys for the error summary, so it reads "Nickname: required". */
-export const FIELD_LABEL_KEYS: Record<keyof AccountForm, string> = {
-  firstName: 'auth.register.firstName',
-  lastName: 'auth.register.lastName',
-  dateOfBirth: 'auth.register.dateOfBirth',
-  accountType: 'auth.register.accountType',
-  academicStatus: 'auth.register.academicStatus',
-  department: 'auth.register.department',
-  academicTitle: 'auth.register.academicTitle',
+export const FIELD_LABEL_KEYS: Record<keyof ProfileForm, string> = {
   fullName: 'auth.register.fullName',
   nickname: 'auth.register.nickname',
-  email: 'auth.register.email',
+  universityId: 'auth.register.university',
+  email: 'auth.register.personalEmail',
   phone: 'auth.register.phone',
   password: 'auth.register.password',
-  universityId: 'auth.register.university',
-  facultySlug: 'auth.register.faculty',
-  facultyOther: 'auth.register.facultyOther',
-  graduationYear: 'auth.register.graduationYear',
-  graduationMonth: 'auth.register.graduationMonth',
-  availability: 'mentors.schedule.weekly',
-  timezone: 'mentors.schedule.timezone',
   acceptTerms: 'auth.register.termsShort',
 };
 
-export const EMPTY_ACCOUNT: AccountForm = {
-  firstName: '',
-  lastName: '',
-  dateOfBirth: '',
-  accountType: '',
-  academicStatus: '',
-  department: '',
-  academicTitle: '',
+export const EMPTY_PROFILE: ProfileForm = {
   fullName: '',
   nickname: '',
+  universityId: '',
   email: '',
   phone: '',
   password: '',
-  universityId: '',
-  facultySlug: '',
-  facultyOther: '',
-  graduationYear: '',
-  graduationMonth: '',
-  // Never mutated in place - the grid always produces a new Set - so sharing
-  // this one instance between wizard mounts is safe.
-  availability: new Set<string>(),
-  timezone: 'Asia/Baku',
   acceptTerms: false,
 };
 
@@ -189,174 +94,59 @@ const RESERVED_NICKNAMES = new Set([
   'admin', 'administrator', 'moderator', 'mod', 'campushub', 'support', 'help',
   'staff', 'official', 'system', 'root', 'security', 'team', 'api', 'null',
   'undefined', 'me', 'you', 'settings', 'login', 'register', 'dashboard',
+  'onboarding', 'mentors', 'profile',
 ]);
 
 /**
- * Which fields a given step is responsible for.
- *
- * ---------------------------------------------------------------------------
- * WHY VALIDATION IS STEP-SCOPED
- * ---------------------------------------------------------------------------
- * Running the whole validator on step 1 demands `accountType`, which is not
- * chosen until step 2 - so step 1 could never be satisfied and the wizard was
- * impossible to advance past. The same trap applies in reverse: the
- * type-specific fields cannot be judged before the type exists.
- *
- * `scope` therefore says what is being checked right now:
- *   basics  - step 1, the common fields;
- *   details - everything except the mentor's schedule (step 4 for mentors);
- *   all     - the submit path, and what the server mirrors.
+ * Client-side mirror of registerSchema / completeProfileSchema in
+ * src/server/validators/auth.ts. This one gives instant inline feedback; the
+ * server is the enforcement. Both return the same locale keys.
  */
-export type ValidationScope = 'basics' | 'details' | 'all';
+export function validateProfile(
+  form: ProfileForm,
+  options: { requirePassword: boolean; requireEmail: boolean; requirePhone?: boolean },
+): ProfileErrors {
+  const errors: ProfileErrors = {};
 
-/**
- * Client-side mirror of registerSchema in src/server/validators/auth.ts.
- *
- * Duplicated deliberately: this one gives instant inline feedback, the server
- * one is the enforcement. They stay in sync by returning the same locale keys,
- * so changing a message is a single edit in the message bundles.
- *
- * NOTE what is no longer here: the document-processing consent. Registration
- * does not touch a document any more, so consenting to document processing at
- * signup would be consent to something that is not happening yet - which is
- * not valid consent. It is asked on /verify, at the moment the documents are
- * actually handed over.
- */
-export function validateAccount(
-  form: AccountForm,
-  scope: ValidationScope = 'all',
-): FieldErrors {
-  const errors: FieldErrors = {};
-
-  /**
-   * Name halves.
-   *
-   * Digits and punctuation never appear on an ID; rejecting them here avoids a
-   * mismatch the document cross-check would otherwise flag much later.
-   */
-  const NAME_RE = /^[\p{L}\s'-]+$/u;
-
-  const firstName = form.firstName.trim();
-  if (!firstName) errors.firstName = 'errors.fieldRequired';
-  else if (firstName.length < 2) errors.firstName = 'auth.errors.nameTooShort';
-  else if (!NAME_RE.test(firstName)) errors.firstName = 'auth.errors.nameInvalid';
-
-  const lastName = form.lastName.trim();
-  if (!lastName) errors.lastName = 'errors.fieldRequired';
-  else if (lastName.length < 2) errors.lastName = 'auth.errors.nameTooShort';
-  else if (!NAME_RE.test(lastName)) errors.lastName = 'auth.errors.nameInvalid';
-
-  /**
-   * Date of birth. Mirrors the server's plausibility window rather than
-   * inventing a second rule - a client that disagrees with the server just
-   * produces a confusing round trip.
-   */
-  if (!form.dateOfBirth) {
-    errors.dateOfBirth = 'errors.fieldRequired';
-  } else {
-    const dob = new Date(`${form.dateOfBirth}T00:00:00.000Z`);
-    if (Number.isNaN(dob.getTime())) {
-      errors.dateOfBirth = 'auth.errors.dobInvalid';
-    } else {
-      const years = (Date.now() - dob.getTime()) / (365.2425 * 86_400_000);
-      if (years < 16 || years > 100) errors.dateOfBirth = 'auth.errors.dobImplausible';
-    }
-  }
+  const fullName = form.fullName.trim().replace(/\s+/g, ' ');
+  if (!fullName) errors.fullName = 'errors.fieldRequired';
+  else if (fullName.length < 2) errors.fullName = 'auth.errors.nameTooShort';
+  else if (!/^[\p{L}\s'-]+$/u.test(fullName)) errors.fullName = 'auth.errors.nameInvalid';
 
   const nickname = form.nickname.trim();
   if (!nickname) errors.nickname = 'errors.fieldRequired';
   else if (!/^[a-zA-Z0-9_]{3,24}$/.test(nickname)) errors.nickname = 'auth.errors.nicknameInvalid';
-  else if (RESERVED_NICKNAMES.has(nickname.toLowerCase()))
+  else if (RESERVED_NICKNAMES.has(nickname.toLowerCase()) || /^user\d{5}$/i.test(nickname))
     errors.nickname = 'auth.errors.nicknameReserved';
 
-  const email = form.email.trim();
-  if (!email) errors.email = 'errors.fieldRequired';
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = 'auth.errors.emailInvalid';
+  if (!form.universityId) errors.universityId = 'errors.fieldRequired';
 
-  const phone = form.phone.replace(/[\s-]/g, '');
-  if (!phone) errors.phone = 'errors.fieldRequired';
-  else if (!/^(\+994|0)(50|51|55|70|77|10|60|99)\d{7}$/.test(phone))
-    errors.phone = 'auth.errors.phoneInvalid';
-
-  if (!form.password) errors.password = 'errors.fieldRequired';
-  else if (form.password.length < 12 || new Set(form.password).size < 5)
-    errors.password = 'auth.errors.weakPassword';
-
-  /**
-   * Step 1 stops here.
-   *
-   * The university, the account type and everything that depends on it belong
-   * to steps 2 and 3; reporting them as missing while the user is still on
-   * step 1 is how the wizard became unadvanceable.
-   */
-  if (scope === 'basics') return errors;
-
-  // A student is enrolled somewhere by definition. A mentor is often an
-  // industry professional with no university, so for them it is optional -
-  // mirrored by the STUDENT-only refinement in src/server/validators/auth.ts.
-  if (form.accountType !== 'MENTOR' && !form.universityId) errors.universityId = 'errors.fieldRequired';
-
-  if (!form.accountType) errors.accountType = 'errors.fieldRequired';
-
-  /**
-   * Type-specific requirements, mirroring the refinements in
-   * src/server/validators/auth.ts.
-   *
-   * This copy exists to show the error next to the field before a round trip -
-   * NOT instead of the server check.
-   */
-  if (form.accountType === 'STUDENT') {
-    // Asked in the same block as the university: which institution, and are
-    // you still there. Everything below reads differently depending on it.
-    if (!form.academicStatus) errors.academicStatus = 'errors.fieldRequired';
-
-    // Faculty: a catalogue choice is required, and the free text is required
-    // only when that choice is 'other'.
-    if (!form.facultySlug) errors.facultySlug = 'errors.fieldRequired';
-    else if (form.facultySlug === 'other' && !form.facultyOther.trim())
-      errors.facultyOther = 'auth.errors.facultyOtherRequired';
-
-    if (!form.graduationYear) errors.graduationYear = 'errors.fieldRequired';
-    if (!form.graduationMonth) errors.graduationMonth = 'errors.fieldRequired';
-
-    /**
-     * The date has to agree with the status.
-     *
-     * Someone who says they have graduated but names a date two years out has
-     * answered one of the two questions wrongly - and the wrong one silently
-     * decides their role and which documents they will be asked for. Catching
-     * it here is the difference between correcting a dropdown now and an
-     * alumni account that cannot complete verification later.
-     */
-    if (form.academicStatus && form.graduationYear && form.graduationMonth) {
-      const now = new Date();
-      const chosen = Number(form.graduationYear) * 12 + Number(form.graduationMonth);
-      const current = now.getFullYear() * 12 + (now.getMonth() + 1);
-
-      if (form.academicStatus === 'GRADUATED' && chosen > current)
-        errors.graduationYear = 'auth.errors.graduationNotPast';
-      if (form.academicStatus === 'STUDYING' && chosen < current)
-        errors.graduationYear = 'auth.errors.graduationNotFuture';
-    }
+  if (options.requireEmail) {
+    const email = form.email.trim();
+    if (!email) errors.email = 'errors.fieldRequired';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = 'auth.errors.emailInvalid';
   }
 
-  if (isProfessional(form.accountType)) {
-    if (!form.department.trim()) errors.department = 'auth.errors.departmentRequired';
-    if (!form.academicTitle.trim()) errors.academicTitle = 'auth.errors.academicTitleRequired';
+  /**
+   * The phone is only asked for at registration, never at /onboarding - a
+   * quick-login account is finishing a profile, and the recovery number can be
+   * added from Settings. Validating it here means a mistyped number is caught
+   * before the request, rather than coming back as the deliberately vague
+   * 'credentialsUnavailable' that a server-side clash produces.
+   */
+  if (options.requirePhone) {
+    const phone = form.phone.trim();
+    if (!phone) errors.phone = 'errors.fieldRequired';
+    else if (!normalizeAzPhone(phone)) errors.phone = 'auth.errors.phoneInvalid';
   }
+
+  if (options.requirePassword) {
+    if (!form.password) errors.password = 'errors.fieldRequired';
+    else if (form.password.length < 12 || new Set(form.password).size < 5)
+      errors.password = 'auth.errors.weakPassword';
+  }
+
   if (!form.acceptTerms) errors.acceptTerms = 'auth.errors.termsRequired';
-
-  /**
-   * The mentor's schedule is its own step, after details, so it is judged
-   * only on the submit path. Mirrors the MENTOR refinement in
-   * src/server/validators/auth.ts: at least one bookable slot, because a
-   * mentor with no availability can never be booked.
-   */
-  if (scope === 'all' && form.accountType === 'MENTOR') {
-    if (!form.timezone) errors.timezone = 'errors.fieldRequired';
-    if (form.availability.size === 0) errors.availability = 'mentors.schedule.errors.empty';
-  }
-
   return errors;
 }
 

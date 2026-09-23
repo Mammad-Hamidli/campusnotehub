@@ -47,6 +47,12 @@
 /** Top-level collections. */
 export const COLLECTIONS = {
   users: 'users',
+  /**
+   * `usernames/{lowercase handle}` -> { userId }. The uniqueness claim for the
+   * public handle, which is also a login identifier. Server-only; see
+   * createUser() in repositories/users.ts.
+   */
+  usernames: 'usernames',
   universities: 'universities',
   faculties: 'faculties',
 
@@ -77,6 +83,34 @@ export const COLLECTIONS = {
   pushSubscriptions: 'pushSubscriptions',
 
   sessions: 'sessions',
+  /** `mfa/{userId}`: sealed TOTP secret, recovery code hashes, lockout. Server-only. */
+  mfa: 'mfa',
+  /**
+   * `loginTickets/{hash}`: "password accepted, second factor pending". Five
+   * minutes, single use, not a session. Server-only; TTL policy on expiresAt.
+   */
+  loginTickets: 'loginTickets',
+  /**
+   * `authIdentities/{provider}:{hmac(subject)}` -> { userId, ... }. A Google /
+   * Google account linked to a user. Keyed by the provider's
+   * SUBJECT, never by email. Server-only; see repositories/identities.ts.
+   */
+  authIdentities: 'authIdentities',
+  /** `oauthStates/{hash(state)}`: one in-flight authorization. 10 minutes, single use. */
+  oauthStates: 'oauthStates',
+  /** `oauthSignups/{hash(token)}`: a verified provider identity awaiting registration. 30 minutes. */
+  oauthSignups: 'oauthSignups',
+  /**
+   * `emailVerifications/{hash(token)}`: an address confirmation in flight.
+   * 24 hours, single use, redeemable only by the owner's session.
+   */
+  emailVerifications: 'emailVerifications',
+  /**
+   * `passwordResets/{hash(token)}`: a forgotten-password link in flight.
+   * 30 minutes, single use, bound to the password hash it was issued against.
+   * Server-only; TTL policy on expiresAt. See repositories/passwordResets.ts.
+   */
+  passwordResets: 'passwordResets',
   userDevices: 'userDevices',
   scheduledTasks: 'scheduledTasks',
   mediaAssets: 'mediaAssets',
@@ -84,6 +118,8 @@ export const COLLECTIONS = {
   emailDispatches: 'emailDispatches',
   /** Emails whose delivery failed, waiting for a retry. */
   emailOutbox: 'emailOutbox',
+  /** Inbound mail read from the support@ mailbox - see src/lib/email/inbox.ts. */
+  supportInbox: 'supportInbox',
   /** PocketMentor applications, keyed by applicant user id. */
   mentorApplications: 'mentorApplications',
   /** User-filed account deletion requests, keyed by user id; reviewed by an admin. */

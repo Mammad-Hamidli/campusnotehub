@@ -45,6 +45,14 @@ export type TemplateName =
   | 'profileUpdated'
   | 'passwordChanged'
   | 'passwordReset'
+  | 'passwordResetLink'
+  | 'mfaEnabled'
+  | 'mfaDisabled'
+  | 'mfaRecoveryCodeUsed'
+  | 'mfaRecoveryCodesRegenerated'
+  | 'oauthLinked'
+  | 'oauthUnlinked'
+  | 'emailVerification'
   | 'accountSuspended'
   | 'accountReactivated'
   | 'accountDeleted'
@@ -346,17 +354,187 @@ export const TEMPLATES = {
     };
   },
 
-  passwordChanged: (p: { nickname: string }): EmailContent => ({
+  passwordChanged: (p: { nickname: string; viaReset?: boolean }): EmailContent => ({
     subject: 'Your UniPath password was changed',
     heading: 'Password changed',
     preheader: 'The password on your account was just changed.',
     blocks: [
       { kind: 'paragraph', text: hi(p.nickname) },
-      { kind: 'paragraph', text: 'The password on your UniPath account was just changed. Every other session was signed out.' },
+      {
+        kind: 'paragraph',
+        text: p.viaReset
+          ? 'The password on your UniPath account was just reset with a link sent to this address. Every session was signed out.'
+          : 'The password on your UniPath account was just changed. Every other session was signed out.',
+      },
       {
         kind: 'callout',
         tone: 'warning',
         title: 'Did not change it?',
+        body: 'Contact support immediately - someone else may have access to your account.',
+      },
+    ],
+  }),
+
+  oauthLinked: (p: { nickname: string; provider: string; automatic: boolean }): EmailContent => ({
+    subject: `${p.provider} can now sign in to your UniPath account`,
+    heading: `${p.provider} connected`,
+    preheader: `Your account can now be opened with ${p.provider}.`,
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: p.automatic
+          ? `You signed in with ${p.provider} using the same verified email address as your account, so it was connected automatically. From now on you can sign in with ${p.provider}.`
+          : `A ${p.provider} account was just connected to your UniPath account. From now on it can be used to sign in.`,
+      },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Was this not you?',
+        body: `Remove ${p.provider} in your security settings and contact support immediately.`,
+      },
+      { kind: 'button', label: 'Review security settings', href: appUrl('/settings/security') },
+    ],
+  }),
+
+  emailVerification: (p: { nickname: string; url: string }): EmailContent => ({
+    subject: 'Confirm your email address for UniPath',
+    heading: 'Confirm your email',
+    preheader: 'One click, while signed in, confirms this address belongs to you.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: 'Please confirm that this address belongs to you. Open the link in the browser where you are signed in to your account - it only works there. The link expires in 24 hours.',
+      },
+      { kind: 'button', label: 'Confirm my email', href: p.url },
+      {
+        kind: 'callout',
+        tone: 'neutral',
+        title: 'Did not create an account?',
+        body: 'Ignore this email. Nothing happens unless someone signed in to that account opens the link, and nobody else can use it.',
+      },
+    ],
+  }),
+
+  passwordResetLink: (p: { nickname: string; url: string; minutes: number }): EmailContent => ({
+    subject: 'Reset your UniPath password',
+    heading: 'Reset your password',
+    preheader: `Someone asked to reset the password on your account. The link works for ${p.minutes} minutes.`,
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: `We received a request to reset the password on your UniPath account. The link below works once, for ${p.minutes} minutes. Opening it signs out every device that is signed in to your account once the new password is saved.`,
+      },
+      { kind: 'button', label: 'Choose a new password', href: p.url },
+      {
+        kind: 'callout',
+        tone: 'neutral',
+        title: 'Did not ask for this?',
+        body: 'Ignore this email - your password stays as it is and the link expires on its own. Never forward it: anyone holding it can set a new password.',
+      },
+    ],
+  }),
+
+  oauthUnlinked: (p: { nickname: string; provider: string }): EmailContent => ({
+    subject: `${p.provider} was disconnected from your UniPath account`,
+    heading: `${p.provider} disconnected`,
+    preheader: `Your account can no longer be opened with ${p.provider}.`,
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: `${p.provider} can no longer be used to sign in to your account.` },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Was this not you?',
+        body: 'Contact support immediately - someone else may have access to your account.',
+      },
+      { kind: 'button', label: 'Review security settings', href: appUrl('/settings/security') },
+    ],
+  }),
+
+  mfaEnabled: (p: { nickname: string; replaced: boolean }): EmailContent => ({
+    subject: p.replaced
+      ? 'Your UniPath authenticator was replaced'
+      : 'Two-factor authentication is on for your UniPath account',
+    heading: p.replaced ? 'Authenticator replaced' : 'Two-factor authentication enabled',
+    preheader: 'A new authenticator app now protects your account.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: p.replaced
+          ? 'A new authenticator app was just set up for your account. The previous one no longer works, your old recovery codes were replaced, and every other session was signed out.'
+          : 'Two-factor authentication was just turned on. Signing in now needs your password and a code from your authenticator app. Every other session was signed out.',
+      },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Was this not you?',
+        body: 'Someone may know your password. Contact support immediately so we can lock the account.',
+      },
+      { kind: 'button', label: 'Review security settings', href: appUrl('/settings/security') },
+    ],
+  }),
+
+  mfaDisabled: (p: { nickname: string; byAdmin: boolean }): EmailContent => ({
+    subject: 'Two-factor authentication was turned off for your UniPath account',
+    heading: 'Two-factor authentication disabled',
+    preheader: 'Your account is now protected by your password alone.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: p.byAdmin
+          ? 'An administrator removed two-factor authentication from your account at your request, and every session was signed out. Set it up again after you sign in.'
+          : 'Two-factor authentication was just turned off. Your account is now protected by your password alone, and every other session was signed out.',
+      },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Was this not you?',
+        body: 'Contact support immediately - someone else may have access to your account.',
+      },
+      { kind: 'button', label: 'Review security settings', href: appUrl('/settings/security') },
+    ],
+  }),
+
+  mfaRecoveryCodeUsed: (p: { nickname: string; remaining: number }): EmailContent => ({
+    subject: 'A recovery code was used to sign in to UniPath',
+    heading: 'Recovery code used',
+    preheader: 'One of your recovery codes was just used instead of your authenticator.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: 'Someone signed in to your account with one of your recovery codes instead of an authenticator code. That code cannot be used again.',
+      },
+      { kind: 'facts', rows: [{ label: 'Codes left', value: String(p.remaining) }] },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Was this not you?',
+        body: 'Your recovery codes may have been exposed. Contact support immediately.',
+      },
+      { kind: 'button', label: 'Review security settings', href: appUrl('/settings/security') },
+    ],
+  }),
+
+  mfaRecoveryCodesRegenerated: (p: { nickname: string }): EmailContent => ({
+    subject: 'New UniPath recovery codes were generated',
+    heading: 'Recovery codes replaced',
+    preheader: 'Your previous recovery codes no longer work.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: 'A new set of recovery codes was just generated for your account. Every earlier code has stopped working.',
+      },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Was this not you?',
         body: 'Contact support immediately - someone else may have access to your account.',
       },
     ],

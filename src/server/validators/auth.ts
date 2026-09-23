@@ -1,10 +1,7 @@
 import { z } from 'zod';
-import { UserRole } from '@/lib/enums';
+import { USERNAME_PATTERN, parseLoginIdentifier } from '@/lib/auth/username';
+import { normalizeAzPhone } from '@/lib/auth/phone';
 import { UNIVERSITIES } from '@/lib/universities';
-import { FACULTY_OTHER, FACULTY_SLUGS } from '@/lib/faculties';
-import { timezoneSchema, weeklyRulesSchema } from '@/lib/mentors/schedule';
-
-const CURRENT_YEAR = new Date().getFullYear();
 
 /**
  * Accepted university values, taken from the same list that builds the
@@ -24,6 +21,7 @@ const RESERVED_NICKNAMES = new Set([
   'admin', 'administrator', 'moderator', 'mod', 'campushub', 'support', 'help',
   'staff', 'official', 'system', 'root', 'security', 'team', 'api', 'null',
   'undefined', 'me', 'you', 'settings', 'login', 'register', 'dashboard',
+  'onboarding', 'mentors', 'profile',
 ]);
 
 /**
@@ -32,370 +30,192 @@ const RESERVED_NICKNAMES = new Set([
  * "8 chars, one uppercase, one symbol", which reliably produces "Parol123!".
  * The only additional check is a breach-list lookup, done server-side.
  */
-const password = z
+export const passwordSchema = z
   .string()
   .min(12, 'auth.errors.weakPassword')
   .max(200)
   .refine((v) => new Set(v).size >= 5, 'auth.errors.weakPassword');
+const password = passwordSchema;
 
 /**
- * The two account types a person can register as.
- *
- * Deliberately a SUBSET of UserRole rather than a new enum. UserRole already
- * has STUDENT and MENTOR, already drives permissions, and is already what the
- * admin panel reads - so registration writes into the existing concept instead
- * of adding a parallel `accountType` that could disagree with it.
- *
- * MENTOR is self-service because a mentor has to be able to create an account
- * from zero - requiring them to register as a student first and then apply was
- * the bug that sent every signed-out mentor applicant to /login. Claiming the
- * role at signup grants NOTHING on its own: a MENTOR account still has to pass
- * identity verification, and it only becomes listable in the directory once a
- * moderator approves its application (POST /api/mentors/apply).
- *
- * ---------------------------------------------------------------------------
- * WHY TEACHER IS NO LONGER ONE OF THEM
- * ---------------------------------------------------------------------------
- * TEACHER and MENTOR were validated by the same refinements, asked for the
- * same two fields, and required the same documents - the choice between them
- * changed nothing downstream. It remains a perfectly good UserRole, assigned
- * by an administrator in the panel; it is simply not something a stranger
- * claims about themselves at signup. Removing it narrows what this endpoint
- * accepts, which is the safe direction: an existing TEACHER account is
- * untouched, and no other route reads ACCOUNT_TYPES.
- *
- * ALUMNI is likewise absent, but for a different reason: it is REACHED through
- * this endpoint rather than claimed at it. Someone registering as a student
- * who says they have already graduated is written as ALUMNI by the route - see
- * academicStatus below - and the graduation cron does the same for those who
- * finish later. MODERATOR and ADMIN are granted by an administrator only.
+ * Forgotten password: the address only. Never a username - staff sign in by
+ * email alone (see the login route), and a handle is public, so accepting one
+ * would let anyone aim reset mail at an account knowing only its @name.
  */
-export const ACCOUNT_TYPES = [UserRole.STUDENT, UserRole.MENTOR] as const;
-export type AccountType = (typeof ACCOUNT_TYPES)[number];
+export const forgotPasswordSchema = z
+  .object({ email: z.string().trim().toLowerCase().email('auth.errors.emailInvalid').max(254) })
+  .strict();
+
+/** The link's token plus the new password. Same strength rule as registration. */
+export const resetPasswordSchema = z
+  .object({ token: z.string().max(64), password: passwordSchema })
+  .strict();
+
+/** Signed-in change. The current password is required: a live session alone is not enough. */
+export const changePasswordSchema = z
+  .object({ currentPassword: z.string().min(1).max(200), newPassword: passwordSchema })
+  .strict()
+  .refine((d) => d.currentPassword !== d.newPassword, {
+    message: 'auth.password.errors.sameAsCurrent',
+    path: ['newPassword'],
+  });
 
 /**
- * The account types that describe a professional rather than an enrolled
- * student: they state where they work and what they do there, and have neither
- * a student card nor a graduation date - so they take one branch of the
- * refinements below and the identity-only document set in requiredKindsFor().
+ * The temporary handles quick-login accounts start with ("user34232" - see
+ * temporaryHandle()). Refused as a CHOSEN nickname so a real person can never
+ * look like an unfinished account, and so the random space stays free.
  */
-const PROFESSIONAL_TYPES: ReadonlySet<AccountType> = new Set([UserRole.MENTOR]);
+const TEMPORARY_HANDLE = /^user\d{5}$/i;
 
 /**
- * Where a student is in their studies, asked alongside the university.
- *
- * GRADUATED is what turns a registration into an ALUMNI account (done in the
- * route, not here - this schema validates, it does not decide roles), and it
- * is what stops the platform demanding a current student card from someone who
- * finished three years ago.
+ * Public handle. Everything social renders this, never the real name.
+ * Shared with the login lookup and the usernames claim - see username.ts.
  */
-export const ACADEMIC_STATUSES = ['STUDYING', 'GRADUATED'] as const;
-export type AcademicStatus = (typeof ACADEMIC_STATUSES)[number];
-
-/** One half of a legal name, as printed on an identity document. */
-const nameHalf = z
+export const nicknameSchema = z
   .string()
   .trim()
-  .min(2, 'errors.validationFailed')
-  .max(60)
-  // Latin-ext covers Azerbaijani diacritics; Cyrillic covers Russian names.
-  // Digits and punctuation are rejected because they never appear on an ID.
-  .regex(/^[\p{L}\s'-]+$/u, 'errors.validationFailed');
-
-const MIN_AGE_YEARS = 16;
-const MAX_AGE_YEARS = 100;
+  .regex(USERNAME_PATTERN, 'auth.errors.nicknameInvalid')
+  .refine((v) => !RESERVED_NICKNAMES.has(v.toLowerCase()), 'auth.errors.nicknameReserved')
+  .refine((v) => !TEMPORARY_HANDLE.test(v), 'auth.errors.nicknameReserved');
 
 /**
- * Date of birth, as a calendar date.
+ * The person's name, as ONE field.
  *
- * Accepted as YYYY-MM-DD and converted to a Date here, so nothing downstream
- * parses a string. The bounds are a plausibility check rather than a policy:
- * a university applicant younger than 16 or older than 100 is a typo far more
- * often than a real person, and the value is about to be compared against an
- * identity document.
- *
- * Constructed at UTC midnight. Using `new Date('2001-05-04')` alone is already
- * UTC, but a local-time constructor would shift the day backwards for anyone
- * east of Greenwich - which is everyone using this product.
+ * Letters, spaces, apostrophes and hyphens (Latin-ext covers Azerbaijani
+ * diacritics, Cyrillic covers Russian names). The route splits it into
+ * first/last for the verification cross-check; nothing here demands two words,
+ * because plenty of people are known by one.
  */
-const dateOfBirth = z
+export const fullNameSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'auth.errors.dobInvalid')
-  .transform((value) => new Date(`${value}T00:00:00.000Z`))
-  .refine((d) => !Number.isNaN(d.getTime()), 'auth.errors.dobInvalid')
-  .refine((d) => {
-    const years = (Date.now() - d.getTime()) / (365.2425 * 86_400_000);
-    return years >= MIN_AGE_YEARS && years <= MAX_AGE_YEARS;
-  }, 'auth.errors.dobImplausible');
+  .trim()
+  .transform((v) => v.replace(/\s+/g, ' '))
+  .pipe(
+    z
+      .string()
+      .min(2, 'auth.errors.nameTooShort')
+      .max(120)
+      .regex(/^[\p{L}\s'-]+$/u, 'auth.errors.nameInvalid'),
+  );
 
+/**
+ * University CODE, e.g. 'ADA'. See UNIVERSITY_CODES above. The route still
+ * confirms the row exists and is active.
+ */
+export const universityCodeSchema = z
+  .string()
+  .trim()
+  .refine((v) => UNIVERSITY_CODES.has(v), 'errors.fieldRequired');
+
+/**
+ * Mobile number, normalised to E.164 by the schema itself.
+ *
+ * The transform runs BEFORE the refine, so `input.phone` downstream is always
+ * '+994501234567' no matter which of the three accepted spellings arrived.
+ * That matters beyond tidiness: hashPhone() is what makes the number unique
+ * across accounts, and an un-normalised value would let the same number be
+ * registered twice by typing it differently the second time.
+ */
+export const phoneSchema = z
+  .string()
+  .trim()
+  .max(20)
+  .transform((v) => normalizeAzPhone(v))
+  .refine((v): v is string => v !== null, 'auth.errors.phoneInvalid');
+
+/**
+ * Registration: ONE step, six fields.
+ *
+ *   name, nickname, university, personal email, phone, password (+ terms).
+ *
+ * The phone is back, and only the phone: date of birth, faculty, graduation
+ * date and academic status stay gone from signup. It earns its place because
+ * it is the account-recovery and payout-confirmation channel, and because it
+ * is the second identifier the blocklist checks - collecting it at signup is
+ * what lets a banned number be refused at signup rather than at first payout.
+ * Identity is still proven the same way, later, at /verify; the capability
+ * table in src/lib/permissions.ts is unchanged, so an unverified account still
+ * cannot buy, sell, book or withdraw.
+ *
+ * The email is a PERSONAL address. A university address is not required (it
+ * may be lost at graduation) - it only speeds up verification when given.
+ *
+ * Only students register here. Mentors apply on their own site (MENTORS_URL),
+ * and quick-login accounts are created by the OAuth callback and finished at
+ * /onboarding, so neither `accountType` nor `social` exists in this body any
+ * more - an unknown key is stripped, never trusted.
+ */
 export const registerSchema = z
   .object({
-    /**
-     * The account type, chosen in step 2 of the wizard.
-     *
-     * Everything type-specific below is validated CONDITIONALLY against this
-     * value in the refinements at the bottom, which is what stops a client
-     * claiming STUDENT while omitting the student fields.
-     */
-    accountType: z.enum(ACCOUNT_TYPES),
-
-    firstName: nameHalf,
-    lastName: nameHalf,
-    dateOfBirth,
-
-    /**
-     * Retained and still accepted so nothing that already posts a fullName
-     * breaks. When absent it is derived from firstName + lastName in the
-     * route, which is now the normal path.
-     */
-    fullName: z
-      .string()
-      .trim()
-      .min(3)
-      .max(120)
-      .regex(/^[\p{L}\s'-]+$/u, 'errors.validationFailed')
-      .optional(),
-    /**
-     * Public handle. Everything social renders this, never fullName - which is
-     * what lets a student take part without publishing the legal name that has
-     * to match their ID document.
-     */
-    nickname: z
-      .string()
-      .trim()
-      .regex(/^[a-zA-Z0-9_]{3,24}$/, 'auth.errors.nicknameInvalid')
-      .refine((v) => !RESERVED_NICKNAMES.has(v.toLowerCase()), 'auth.errors.nicknameReserved'),
-    email: z.string().trim().toLowerCase().email().max(254),
+    fullName: fullNameSchema,
+    nickname: nicknameSchema,
+    universityId: universityCodeSchema,
+    email: z.string().trim().toLowerCase().email('auth.errors.emailInvalid').max(254),
+    phone: phoneSchema,
     password,
-    passwordConfirm: z.string(),
-    /**
-     * University CODE, e.g. 'ADA'. See UNIVERSITY_CODES above.
-     *
-     * Optional at the field level because a MENTOR need not belong to a
-     * university; the refinement below requires it for a STUDENT. An unknown
-     * code is still refused - optional means "may be absent", not "may be
-     * anything".
-     */
-    universityId: z
-      .string()
-      .trim()
-      .refine((v) => UNIVERSITY_CODES.has(v), 'errors.validationFailed')
-      .optional(),
-    /**
-     * A Firestore document id, NOT a cuid.
-     *
-     * `.cuid()` was wrong here even before the migration - it is the same
-     * mistake documented on UNIVERSITY_CODES above, where a format check
-     * rejected every real submission. It is now doubly wrong: Firestore mints
-     * 20-character alphanumeric ids that no cuid matcher accepts, so this
-     * would refuse every faculty the app itself created. The route confirms
-     * the faculty exists; this only bounds the shape.
-     */
-    facultyId: z.string().trim().min(1).max(128).optional(),
-    /**
-     * Faculty, from the catalogue in src/lib/faculties.ts.
-     *
-     * Validated against the known slug set rather than as a free string. That
-     * is what stops the column becoming a junk drawer of "CS", "comp sci" and
-     * "Computer  Science", which would make it useless for the filtering and
-     * mentor-matching it exists to support.
-     *
-     * `facultyId` above is a different thing and is left alone: it is the FK
-     * to the per-university Faculty table, which has never been populated. See
-     * the note on the User model for why both columns exist.
-     */
-    facultySlug: z
-      .string()
-      .trim()
-      .refine((v) => FACULTY_SLUGS.has(v), 'errors.validationFailed')
-      .optional(),
-    /** The typed value when the catalogue choice is 'other'. */
-    facultyOther: z.string().trim().min(2).max(120).optional(),
-
-    // ---- STUDENT-specific --------------------------------------------------
-    /**
-     * "Currently studying" or "Graduated". Required for a STUDENT
-     * registration; meaningless for a MENTOR, and refused on that branch by
-     * the refinement below so a mentor account cannot carry one.
-     */
-    academicStatus: z.enum(ACADEMIC_STATUSES).optional(),
-
-    // ---- MENTOR-specific ---------------------------------------------------
-    /** Organisation the mentor works in (column shared with TEACHER accounts). */
-    department: z.string().trim().min(2).max(120).optional(),
-    /** Position, e.g. "Senior Product Manager", "Assistant Professor". */
-    academicTitle: z.string().trim().min(2).max(120).optional(),
-    /**
-     * Weekly availability, picked on the wizard's schedule step. The same
-     * rule shape and normalisation as POST /api/mentors/apply, so what is
-     * chosen here can prefill that form unchanged. Required for a MENTOR (see
-     * the refinement below); refused on the student branch.
-     */
-    availability: weeklyRulesSchema.optional(),
-    /** IANA zone the availability is expressed in. */
-    timezone: timezoneSchema.optional(),
-    /**
-     * Graduation date. Required for a STUDENT, meaningless for a TEACHER.
-     *
-     * Optional at the field level and required by the refinement below, which
-     * is what lets one schema serve both account types without a teacher being
-     * asked when they graduate.
-     */
-    graduationYear: z
-      .number()
-      .int()
-      .min(CURRENT_YEAR - 15)
-      .max(CURRENT_YEAR + 10)
-      .optional(),
-    graduationMonth: z.number().int().min(1).max(12).optional(),
-    /**
-     * Azerbaijani mobile number. REQUIRED - it is the strongest ban anchor the
-     * platform has, because SIM registration here is identity-linked, so a
-     * banned number is genuinely expensive to replace unlike an email address.
-     */
-    phone: z
-      .string()
-      .trim()
-      .regex(/^(\+994|0)(50|51|55|70|77|10|60|99)\d{7}$/, 'auth.errors.phoneInvalid'),
     locale: z.enum(['az', 'en', 'ru']).default('az'),
     acceptTerms: z.literal(true, { errorMap: () => ({ message: 'auth.errors.termsRequired' }) }),
-    /**
-     * Consent to identity-document processing is NO LONGER COLLECTED HERE.
-     *
-     * Registration does not touch a document any more, so a consent taken at
-     * signup would be consent to processing that is not happening - and under
-     * GDPR Art. 9 and the AZ personal data law, consent given before the
-     * processing is specified is not consent at all. It is asked instead at
-     * the moment the documents are handed over: POST /api/verification/submit
-     * requires `consentDocumentProcessing` in its multipart body and refuses
-     * the upload without it.
-     *
-     * The field stays accepted-but-ignored here so a client from the previous
-     * deploy that still sends `true` is not answered with a 400 mid-rollout.
-     * It is deliberately not passed to the user record.
-     */
-    consentDocumentProcessing: z.literal(true).optional(),
     /** Client-side signal only; never trusted on its own. */
     deviceFingerprint: z.string().max(128).optional(),
-  })
-  .refine((d) => d.password === d.passwordConfirm, {
-    path: ['passwordConfirm'],
-    message: 'auth.errors.passwordMismatch',
-  })
-  /**
-   * ---------------------------------------------------------------------
-   * THE TYPE-SPECIFIC REQUIREMENTS, ENFORCED SERVER-SIDE
-   * ---------------------------------------------------------------------
-   * These refinements are the reason a malicious client cannot post
-   * `accountType: 'STUDENT'` while omitting the student fields, or register as
-   * a TEACHER without the teacher fields. The wizard asks for the right things
-   * per branch, but the wizard is a convenience - this is the control.
-   *
-   * Each refinement names its own `path`, so the error lands on the offending
-   * field rather than at the form root where nobody can act on it.
-   */
-  .refine((d) => d.accountType !== UserRole.STUDENT || Boolean(d.universityId), {
-    path: ['universityId'],
-    message: 'errors.fieldRequired',
-  })
-  .refine((d) => d.accountType !== UserRole.STUDENT || Boolean(d.academicStatus), {
-    path: ['academicStatus'],
-    message: 'errors.fieldRequired',
-  })
-  /**
-   * A mentor has no academic status, and accepting one would write a claim the
-   * account type does not make. Refused rather than silently dropped, so a
-   * client sending it learns that it is wrong instead of believing it landed.
-   */
-  .refine((d) => d.accountType === UserRole.STUDENT || d.academicStatus === undefined, {
-    path: ['academicStatus'],
-    message: 'errors.validationFailed',
-  })
-  /**
-   * ---------------------------------------------------------------------
-   * THE DATE MUST AGREE WITH THE STATUS
-   * ---------------------------------------------------------------------
-   * These two fields answer the same question twice, and when they disagree
-   * the platform cannot tell which answer to believe - while the consequences
-   * differ sharply: the status decides the ROLE written to the account, which
-   * decides which documents verification will demand. "Graduated, finishing in
-   * 2029" would produce an alumni account that can never complete
-   * verification, because it would be asked for a student card it does not
-   * have. Refusing here is the only point at which that is cheap to fix.
-   *
-   * The comparison is in whole months, at UTC, to match how the graduation
-   * sweep reads the same pair. The CURRENT month is valid for BOTH: someone
-   * defending this month is plausibly either.
-   */
-  .refine(
-    (d) => {
-      if (d.accountType !== UserRole.STUDENT) return true;
-      if (d.graduationYear === undefined || d.graduationMonth === undefined) return true;
-
-      const now = new Date();
-      const chosen = d.graduationYear * 12 + d.graduationMonth;
-      const current = now.getUTCFullYear() * 12 + (now.getUTCMonth() + 1);
-
-      if (d.academicStatus === 'GRADUATED') return chosen <= current;
-      if (d.academicStatus === 'STUDYING') return chosen >= current;
-      return true;
-    },
-    { path: ['graduationYear'], message: 'auth.errors.graduationStatusMismatch' },
-  )
-  .refine((d) => d.accountType !== UserRole.STUDENT || d.graduationYear !== undefined, {
-    path: ['graduationYear'],
-    message: 'errors.fieldRequired',
-  })
-  .refine((d) => d.accountType !== UserRole.STUDENT || d.graduationMonth !== undefined, {
-    path: ['graduationMonth'],
-    message: 'errors.fieldRequired',
-  })
-  .refine((d) => d.accountType !== UserRole.STUDENT || Boolean(d.facultySlug), {
-    path: ['facultySlug'],
-    message: 'errors.fieldRequired',
-  })
-  .refine((d) => !PROFESSIONAL_TYPES.has(d.accountType) || Boolean(d.department), {
-    path: ['department'],
-    message: 'auth.errors.departmentRequired',
-  })
-  .refine((d) => !PROFESSIONAL_TYPES.has(d.accountType) || Boolean(d.academicTitle), {
-    path: ['academicTitle'],
-    message: 'auth.errors.academicTitleRequired',
-  })
-  /**
-   * A mentor states when they can be booked. At least one slot, because a
-   * mentor with no availability is a listing nobody can ever book.
-   */
-  .refine((d) => d.accountType !== UserRole.MENTOR || (d.availability?.length ?? 0) > 0, {
-    path: ['availability'],
-    message: 'mentors.schedule.errors.empty',
-  })
-  .refine((d) => d.accountType === UserRole.MENTOR || d.availability === undefined, {
-    path: ['availability'],
-    message: 'errors.validationFailed',
-  })
-  /**
-   * The two faculty columns are only coherent together, and the same pairing
-   * is enforced by a CHECK constraint in the migration. Validating it here as
-   * well means the user gets a field-level message instead of a 500 from a
-   * constraint violation - the constraint is the guarantee, this is the UX.
-   */
-  .refine((d) => d.facultySlug !== FACULTY_OTHER || Boolean(d.facultyOther?.trim()), {
-    path: ['facultyOther'],
-    message: 'auth.errors.facultyOtherRequired',
-  })
-  .refine((d) => !d.facultyOther || d.facultySlug === FACULTY_OTHER, {
-    path: ['facultyOther'],
-    message: 'errors.validationFailed',
   });
+
+/**
+ * Finishing a quick-login account at /onboarding. The same identity fields as
+ * registration, minus the password (the account signs in through its
+ * provider). `email` is only accepted - and then required - when the provider
+ * supplied none; the route decides which.
+ */
+export const completeProfileSchema = z.object({
+  fullName: fullNameSchema,
+  nickname: nicknameSchema,
+  universityId: universityCodeSchema,
+  email: z.string().trim().toLowerCase().email('auth.errors.emailInvalid').max(254).optional(),
+  acceptTerms: z.literal(true, { errorMap: () => ({ message: 'auth.errors.termsRequired' }) }),
+});
+
+/** Splits a one-field name into the halves the verification check compares. */
+export function splitFullName(fullName: string): { firstName: string; lastName: string | null } {
+  const [first, ...rest] = fullName.trim().split(' ');
+  return { firstName: first, lastName: rest.join(' ') || null };
+}
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 
-export const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(1).max(200),
-  deviceFingerprint: z.string().max(128).optional(),
-});
+/**
+ * Login body. `identifier` is whatever was typed into the "email or username"
+ * box; see parseLoginIdentifier() for how the two are told apart.
+ *
+ * `email` is still accepted as a legacy alias - tabs opened before this
+ * release, scripts/e2e.mjs and any API client post that field - but only when
+ * `identifier` is absent. Sending BOTH is refused rather than having one
+ * silently win: a body that names two accounts is not something to guess about.
+ */
+export const loginSchema = z
+  .object({
+    identifier: z.string().max(254).optional(),
+    email: z.string().max(254).optional(),
+    password: z.string().min(1).max(200),
+    deviceFingerprint: z.string().max(128).optional(),
+  })
+  .transform((body, ctx) => {
+    if (body.identifier !== undefined && body.email !== undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'errors.validationFailed' });
+      return z.NEVER;
+    }
+    const parsed = parseLoginIdentifier(body.identifier ?? body.email ?? '');
+    // The legacy field can only ever name an email.
+    const valid =
+      parsed &&
+      (body.email === undefined || parsed.kind === 'email') &&
+      (parsed.kind === 'username' || z.string().email().safeParse(parsed.value).success);
+    if (!valid) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'errors.validationFailed' });
+      return z.NEVER;
+    }
+    return { identifier: parsed, password: body.password, deviceFingerprint: body.deviceFingerprint };
+  });
+
+export type LoginInput = z.infer<typeof loginSchema>;
 
 export const documentKindSchema = z.enum([
   'ID_FRONT',
@@ -414,3 +234,38 @@ export const documentKindSchema = z.enum([
  * zero retention there are no keys to validate, and validating a client's
  * self-declared MIME string was never security in the first place.
  */
+
+/**
+ * A second factor: EITHER an authenticator code OR a recovery code, never
+ * both. Sending both is refused rather than trying one then the other - that
+ * would spend a failed attempt on one factor while the other one succeeds,
+ * and make the lockout arithmetic depend on field order.
+ *
+ * Lengths are generous for formatting ("123 456", "ABCD-EFGH-...") and tight
+ * enough that nothing large reaches a hash or a transaction.
+ */
+const secondFactorFields = {
+  code: z.string().trim().max(16).optional(),
+  recoveryCode: z.string().trim().max(32).optional(),
+};
+const exactlyOneFactor = (d: { code?: string; recoveryCode?: string }) =>
+  (d.code !== undefined && d.code !== '') !== (d.recoveryCode !== undefined && d.recoveryCode !== '');
+
+export const secondFactorSchema = z
+  .object(secondFactorFields)
+  .strict()
+  .refine(exactlyOneFactor, { message: 'errors.validationFailed' });
+
+/** Setup takes an OPTIONAL second factor: required only when replacing one. */
+export const mfaSetupSchema = z
+  .object(secondFactorFields)
+  .strict()
+  .refine((d) => (!d.code && !d.recoveryCode) || exactlyOneFactor(d), { message: 'errors.validationFailed' });
+
+export const mfaConfirmSchema = z.object({ code: z.string().trim().min(6).max(16) }).strict();
+
+export const mfaVerifySchema = z
+  // ticket is optional: a social sign-in delivers it in the CH_MT cookie instead.
+  .object({ ticket: z.string().min(1).max(64).optional(), ...secondFactorFields })
+  .strict()
+  .refine(exactlyOneFactor, { message: 'errors.validationFailed' });

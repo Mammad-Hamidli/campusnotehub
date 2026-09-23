@@ -459,12 +459,25 @@
     mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, #000 40%, transparent 100%);
   }
 
-  /* Warm decorative wash (orange / yellow / green / red), mounted once in the
-     root layout. Blurred radial blobs at low opacity so text contrast on the
-     canvas is unaffected; the dark theme halves them so they glow rather than
-     glare. The drift is decorative and stops under reduced motion (below). */
+  /*
+   * Decorative wash behind every page.
+   *
+   * This used to be FOUR fully-saturated blobs - orange, yellow, green, red,
+   * straight off the Tailwind ramp - at 0.32 opacity, on every screen in the
+   * product. Two problems, and the second is the one that mattered: green and
+   * red are load-bearing in this palette (verified, destructive), so painting
+   * the whole canvas in them meant a status colour no longer stood out from
+   * the wallpaper. And yellow sitting under a warning banner is how a warning
+   * stops reading as a warning.
+   *
+   * So: TWO blobs, both drawn from the brand tokens rather than raw hex, at
+   * roughly half the opacity. That still lifts the canvas off flat grey - the
+   * thing the wash is for - without spending a semantic hue on decoration.
+   * The dark theme takes them down further; the drift stops under reduced
+   * motion (below).
+   */
   .warm-backdrop {
-    --blob-opacity: 0.32;
+    --blob-opacity: 0.18;
     position: fixed;
     inset: 0;
     z-index: -1;
@@ -472,7 +485,7 @@
     pointer-events: none;
   }
   [data-theme='dark'] .warm-backdrop {
-    --blob-opacity: 0.16;
+    --blob-opacity: 0.1;
   }
   .warm-blob {
     position: absolute;
@@ -483,28 +496,16 @@
     opacity: var(--blob-opacity);
     animation: warm-drift 28s ease-in-out infinite alternate;
   }
-  .warm-blob-orange {
+  .warm-blob-brand {
     top: -14vmax;
     left: -10vmax;
-    background: radial-gradient(circle, #fb923c, transparent 70%);
+    background: radial-gradient(circle, rgb(var(--brand)), transparent 70%);
   }
-  .warm-blob-yellow {
-    top: -8vmax;
-    right: -12vmax;
-    background: radial-gradient(circle, #facc15, transparent 70%);
-    animation-delay: -7s;
-  }
-  .warm-blob-green {
-    bottom: -16vmax;
-    left: 18vw;
-    background: radial-gradient(circle, #4ade80, transparent 70%);
-    animation-delay: -14s;
-  }
-  .warm-blob-red {
+  .warm-blob-accent {
     bottom: -12vmax;
     right: -8vmax;
-    background: radial-gradient(circle, #f87171, transparent 70%);
-    animation-delay: -21s;
+    background: radial-gradient(circle, rgb(var(--accent)), transparent 70%);
+    animation-delay: -14s;
   }
   @keyframes warm-drift {
     to {
@@ -512,8 +513,128 @@
     }
   }
 
+  /* Watermark layer (WarmBackdrop). Kept to a few percent opacity: enough to
+     break up an empty canvas, never enough to compete with text on top. Each
+     shape sets its tone with a text-* utility and draws in currentColor. */
+  .watermarks {
+    --watermark-opacity: 0.045;
+    position: absolute;
+    inset: 0;
+  }
+  [data-theme='dark'] .watermarks {
+    --watermark-opacity: 0.04;
+  }
+  .watermark {
+    position: absolute;
+    display: block;
+    opacity: var(--watermark-opacity);
+  }
+  .watermark-ring {
+    border-radius: 9999px;
+    border: 18px solid currentColor;
+  }
+  .watermark-dots {
+    background-image: radial-gradient(currentColor 1.5px, transparent 1.5px);
+    background-size: 16px 16px;
+    mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+  }
+  @media (max-width: 639px) {
+    .watermarks .sm-only {
+      display: none;
+    }
+  }
+
   .marquee-mask {
     mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  }
+
+  /*
+   * Verified avatar ring (UserAvatar): brand orange sweeping through accent
+   * blue and back.
+   *
+   * Two hues, not the six it had. A ring that cycled orange -> pink -> blue ->
+   * green -> amber put five colours around every verified face in the feed,
+   * which is most of them - so the badge that is supposed to MEAN something
+   * was the loudest object on the page and there were forty of it. Two stops
+   * still read as a gradient ring rather than a plain border, and green stays
+   * reserved for the verified tick itself.
+   */
+  .avatar-ring {
+    background: conic-gradient(
+      from 0deg,
+      rgb(var(--brand)),
+      rgb(var(--accent)),
+      rgb(var(--brand))
+    );
+  }
+
+  /* ------------------------------------------------------------------------
+     Landing page only: the social palette.
+
+     It used to run on SIX ad-hoc hues - orange, pink, violet, blue, green,
+     yellow - none of them from the token system, each with a hand-written dark
+     override. That is what made the front end read as loud: not the
+     saturation of any one colour, but the number of unrelated ones competing
+     on a single screen, with nothing to tell the eye which mattered.
+
+     This is the same page on TWO hues plus green, all pulled from the tokens
+     the rest of the product already uses:
+
+       brand (orange)   warmth, energy, the CampusHub mark
+       accent (blue)    interaction
+       verified (green) people and community
+
+     Vibrancy now comes from gradient MOVEMENT, generous radii, float and tilt
+     - form rather than hue. Because everything below resolves through tokens,
+     the dark theme needs no overrides at all: twelve of them are gone.
+     ------------------------------------------------------------------------ */
+  .fun-mesh {
+    background:
+      radial-gradient(40rem 28rem at 8% 12%, rgb(var(--brand) / 0.16), transparent 62%),
+      radial-gradient(38rem 30rem at 88% 88%, rgb(var(--accent) / 0.14), transparent 62%);
+  }
+  [data-theme='dark'] .fun-mesh {
+    background:
+      radial-gradient(40rem 28rem at 8% 12%, rgb(var(--brand) / 0.12), transparent 62%),
+      radial-gradient(38rem 30rem at 88% 88%, rgb(var(--accent) / 0.12), transparent 62%);
+  }
+
+  /* One gradient, two stops. A four-stop rainbow across a headline is
+     unreadable at small sizes and dates a page instantly. */
+  .fun-gradient-text {
+    background: linear-gradient(95deg, rgb(var(--brand)) 0%, rgb(var(--accent)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .fun-bubble {
+    @apply animate-float rounded-2xl border px-3.5 py-2.5 text-sm font-semibold shadow-overlay backdrop-blur;
+  }
+  /*
+   * Three tones, each a token triplet, so light and dark are one swap. The
+   * `-soft` fill carries the `DEFAULT` hue as its text in BOTH themes - that
+   * pairing is contrast-checked in the token block at the top of this file,
+   * which is exactly what the hand-rolled hex versions were not.
+   */
+  .fun-bubble-brand {
+    background: rgb(var(--brand-soft) / 0.92);
+    border-color: rgb(var(--brand) / 0.35);
+    color: rgb(var(--brand));
+  }
+  .fun-bubble-accent {
+    background: rgb(var(--accent-soft) / 0.92);
+    border-color: rgb(var(--accent) / 0.35);
+    color: rgb(var(--accent));
+  }
+  .fun-bubble-verified {
+    background: rgb(var(--verified-soft) / 0.92);
+    border-color: rgb(var(--verified) / 0.35);
+    color: rgb(var(--verified));
+  }
+
+  .fun-cta {
+    background: linear-gradient(120deg, rgb(var(--brand)) 0%, rgb(var(--accent)) 100%);
   }
 }
 

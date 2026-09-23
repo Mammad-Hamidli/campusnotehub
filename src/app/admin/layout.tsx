@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { findUserById } from '@/lib/firebase/repositories/users';
 import { getAdminViewer } from '@/lib/auth/admin';
+import { getViewer } from '@/lib/auth/session';
 import { AdminShell } from '@/components/admin/AdminShell';
 
 export const metadata: Metadata = {
@@ -40,7 +41,13 @@ export const revalidate = 0;
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const viewer = await getAdminViewer();
-  if (!viewer) redirect('/dashboard');
+  if (!viewer) {
+    // A staff member without a verified second factor is sent to set one up
+    // (or enter it), not to the student feed - otherwise the panel just seems
+    // to have vanished. getViewer() shares the same memoised session read.
+    const member = await getViewer();
+    redirect(member?.mfaRequired ? '/settings/security?mfa=required' : '/dashboard');
+  }
 
   // The shell shows who is signed in and at what tier, so an operator can tell
   // why an action is unavailable to them. Nickname is public by design.

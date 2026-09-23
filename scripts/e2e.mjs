@@ -12,6 +12,7 @@
  * about whether a menu opens where it should or whether a post keeps its
  * image - the class of defect this codebase was reported to have.
  */
+import { createHmac } from 'node:crypto';
 import { chromium } from 'playwright';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:3000';
@@ -34,13 +35,23 @@ if (!process.env.FIRESTORE_EMULATOR_HOST && process.env.E2E_ALLOW_LIVE_DB !== '1
 const ACCOUNTS = {
   // The real admin is created by scripts/bootstrap-admin.mts with its own
   // password, so the suite takes the admin credentials from the environment.
+  //
+  // Staff need two-factor authentication. E2E_ADMIN_TOTP_SECRET is the setup
+  // key (base32) shown when that admin enrolled at /settings/security; without
+  // it the admin groups stop at the code prompt and fail with a clear message.
   admin: {
     email: process.env.E2E_ADMIN_EMAIL ?? 'aysel.dev01@ada.edu.az',
     password: process.env.E2E_ADMIN_PASSWORD ?? 'UniPathAdmin2026!',
+    totpSecret: process.env.E2E_ADMIN_TOTP_SECRET,
   },
   student: { email: 'e2e.student@ada.edu.az', password: PW },
   unverified: { email: 'e2e.unverified@ada.edu.az', password: PW },
-  moderator: { email: 'e2e.mod@ada.edu.az', password: PW },
+  // Enrolled by scripts/seed-e2e.mts with the same key.
+  moderator: {
+    email: 'e2e.mod@ada.edu.az',
+    password: PW,
+    totpSecret: process.env.E2E_TOTP_SECRET ?? 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+  },
   frozen: { email: 'e2e.frozen@ada.edu.az', password: PW },
 };
 
@@ -101,6 +112,42 @@ async function clearRateLimits() {
 }
 
 /**
+ * RFC 6238 code for a base32 setup key - the same maths as src/lib/auth/totp.ts,
+ * restated here because this runner is plain Node and cannot import TypeScript.
+ *
+ * The server refuses a code from a time-step it has already accepted (replay
+ * protection), so two logins of the same account inside one 30-second window
+ * would fail the second time. The last step used per account is remembered and
+ * the helper waits for the next one when needed.
+ */
+const lastTotpStep = new Map();
+async function freshTotp(who, base32) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0;
+  let value = 0;
+  const bytes = [];
+  for (const ch of base32.toUpperCase().replace(/[\s=-]/g, '')) {
+    value = (value << 5) | alphabet.indexOf(ch);
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  let step = Math.floor(Date.now() / 30000);
+  if (step <= (lastTotpStep.get(who) ?? -1)) {
+    await new Promise((resolve) => setTimeout(resolve, (step + 1) * 30000 - Date.now() + 250));
+    step = Math.floor(Date.now() / 30000);
+  }
+  lastTotpStep.set(who, step);
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(step));
+  const mac = createHmac('sha1', Buffer.from(bytes)).update(counter).digest();
+  const offset = mac[mac.length - 1] & 0x0f;
+  return String((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
+
+/**
  * Signs in through the real form and waits for the post-login navigation.
  *
  * Two details that are load-bearing and were both wrong on the first attempt:
@@ -120,12 +167,31 @@ async function login(page, who) {
   ]);
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
   await page.waitForSelector('button[type="submit"]', { timeout: 15000 });
-  await page.fill('input[type="email"]', account.email);
+  // "Email or username" is a text field now, so it is addressed by id.
+  await page.fill('#identifier', account.email);
   await page.fill('input[type="password"]', account.password);
-  await Promise.all([
-    page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 }),
-    page.click('button[type="submit"]'),
+  const leftLogin = (url) => !url.pathname.startsWith('/login');
+  await page.click('button[type="submit"]');
+
+  // An account with two-factor authentication stays on /login and shows the
+  // code step instead of navigating.
+  // Both waits swallow their own timeout: the one that loses the race still
+  // rejects 30 s later, and an unhandled rejection would kill the runner.
+  const outcome = await Promise.race([
+    page.waitForURL(leftLogin, { timeout: 30000 }).then(() => 'navigated', () => null),
+    page.waitForSelector('#mfa-code', { timeout: 30000 }).then(() => 'mfa', () => null),
   ]);
+  if (!outcome) throw new Error(`${who}: login neither navigated nor asked for a code`);
+  if (outcome === 'mfa') {
+    if (!account.totpSecret) {
+      throw new Error(`${who} has two-factor authentication; set its TOTP secret (see ACCOUNTS)`);
+    }
+    await page.fill('#mfa-code', await freshTotp(who, account.totpSecret));
+    await Promise.all([
+      page.waitForURL(leftLogin, { timeout: 30000 }),
+      page.click('button[type="submit"]'),
+    ]);
+  }
   // The destination renders client-side after the push; give it a beat so the
   // caller sees a settled page rather than a mid-transition one.
   await page.waitForLoadState('networkidle').catch(() => {});

@@ -5,6 +5,8 @@ export type Capability =
   | 'feed:read'
   | 'feed:post'
   | 'feed:comment'
+  | 'feed:react'
+  | 'users:follow'
   | 'notes:browse'
   | 'notes:buy'
   | 'notes:sell'
@@ -29,6 +31,19 @@ export type Viewer = {
    * It is never the authorisation input; accountStatus is. See can().
    */
   frozenUntil?: Date | null;
+  /**
+   * A staff account on a session that has not proven a second factor. Its
+   * `role` above is already withheld (see requireSession); this flag only lets
+   * the UI send the person to /settings/security instead of a bare 403.
+   */
+  mfaRequired?: boolean;
+  /**
+   * An account created through a quick login (Google)
+   * that has not yet filled in name, nickname and university. It still holds
+   * its temporary handle ("user34232"), so it is VIEW-ONLY until the profile
+   * is completed at /onboarding - see can() below.
+   */
+  profileIncomplete?: boolean;
 };
 
 /**
@@ -73,6 +88,16 @@ export function can(viewer: Viewer | null, capability: Capability): boolean {
     return ALWAYS_ALLOWED.has(capability);
   }
 
+  /**
+   * View-only until the profile is complete. A temporary "user34232" posting,
+   * commenting, liking or following would put an anonymous, unattributable
+   * handle in front of everyone else - so the same read-only set a freeze
+   * leaves open is all an incomplete profile gets.
+   */
+  if (viewer.profileIncomplete) {
+    return ALWAYS_ALLOWED.has(capability);
+  }
+
   if (capability === 'moderation:review') {
     return viewer.role === UserRole.MODERATOR || viewer.role === UserRole.ADMIN;
   }
@@ -100,6 +125,9 @@ export function can(viewer: Viewer | null, capability: Capability): boolean {
  * leaks nothing about bans or freezes to a caller who should not learn it.
  */
 export function denialKey(viewer: Viewer | null, capability: Capability): string {
+  if (viewer?.profileIncomplete && !ALWAYS_ALLOWED.has(capability)) {
+    return 'onboarding.restricted';
+  }
   if (
     viewer &&
     REQUIRES_VERIFICATION.has(capability) &&

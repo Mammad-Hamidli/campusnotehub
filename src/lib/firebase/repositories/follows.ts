@@ -65,3 +65,8 @@ export async function unfollow(followerId: string, followeeId: string): Promise<
   batch.delete(followers(followeeId).doc(followerId));
   await batch.commit();
 }
+
+/** Exact follower count via the count() aggregation - see profileCounts(). */
+export async function followerCount(userId: string): Promise<number> {
+  return (await followers(userId).count().get()).data().count;
+}

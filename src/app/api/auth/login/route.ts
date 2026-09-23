@@ -2,19 +2,18 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { UserRole } from '@/lib/enums';
 import {
   findUserByEmail,
+  findUserByUsername,
   getCredentials,
   incrementFailedLogins,
   updateCredentials,
   updateUser,
 } from '@/lib/firebase/repositories/users';
-import { writeAuditLog } from '@/lib/firebase/repositories/audit';
+import { createLoginTicket, getMfa, isEnrolled } from '@/lib/firebase/repositories/mfa';
 import { loginSchema } from '@/server/validators/auth';
 import { burnPasswordTime, hashPassword, verifyPassword } from '@/lib/crypto/hash';
 import { rateLimit, peekRateLimit, resetRateLimit, clientIp } from '@/lib/security/ratelimit';
-import { isUserBlocked, recordDeviceDetailed } from '@/lib/security/blocklist';
-import { sendEmailAsync } from '@/lib/email/send';
-import { deviceLabel } from '@/lib/security/fingerprint';
-import { issueSession } from '@/lib/auth/session';
+import { isUserBlocked } from '@/lib/security/blocklist';
+import { completeLogin } from '@/lib/auth/complete-login';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -78,15 +77,27 @@ export async function POST(request: NextRequest) {
     await burnPasswordTime();
     return NextResponse.json(GENERIC_FAILURE, { status: 401 });
   }
-  const { email, password, deviceFingerprint } = parsed.data;
+  const { identifier, password, deviceFingerprint } = parsed.data;
 
   /**
-   * The per-(address + email) budget. Checked, not consumed: a token is spent
-   * only when an attempt actually FAILS, further down. Charging on the way in
-   * meant a correct password cost the same as a wrong one, so five ordinary
-   * sign-ins locked the account out for fifteen minutes.
+   * The per-(address + identifier) budget. Checked, not consumed: a token is
+   * spent only when an attempt actually FAILS, further down. Charging on the
+   * way in meant a correct password cost the same as a wrong one, so five
+   * ordinary sign-ins locked the account out for fifteen minutes.
+   *
+   * The subject is the identifier AS TYPED (normalised), never the resolved
+   * user id. Keying on the account would be tighter, but it would also be an
+   * oracle: a real account reached by both its email and its @handle would
+   * share one bucket and hit 429 sooner than a made-up pair, which tells an
+   * attacker the two belong together. Per-ACCOUNT protection is the
+   * failedLoginCount lockout below, which counts every failure against the
+   * user whichever form reached it - so two identifiers do not buy an
+   * attacker two budgets there. An email subject stays the bare address, so
+   * existing buckets carry over; "@" can never start an email, so the two
+   * forms cannot collide.
    */
-  const identity = { ip, subject: email };
+  const subject = identifier.kind === 'email' ? identifier.value : `@${identifier.value}`;
+  const identity = { ip, subject };
   const attemptLimit = await peekRateLimit('auth:login', identity);
   if (!attemptLimit.ok) {
     await burnPasswordTime();
@@ -121,11 +132,39 @@ export async function POST(request: NextRequest) {
    * Firebase Auth cannot check argon2, and re-hashing everyone with something
    * it can would be a silent downgrade.
    */
-  const user = await findUserByEmail(email);
+  const found =
+    identifier.kind === 'email'
+      ? await findUserByEmail(identifier.value)
+      : await findUserByUsername(identifier.value);
+
+  /**
+   * STAFF SIGN IN BY EMAIL ONLY.
+   *
+   * A username is public: it is printed next to every post, note and review.
+   * An email is not. For an ordinary account that difference barely matters,
+   * but for ADMIN and MODERATOR it removes half of what an attacker has to
+   * know - and the bootstrap admin's handle is literally "admin". Two things
+   * follow from refusing the handle here:
+   *
+   *  - Guessing a staff password requires first learning a private address.
+   *  - Nobody can lock staff out of the panel by hammering a public name,
+   *    because this path never reaches the failedLoginCount increment below.
+   *
+   * The account is treated exactly as if it did not exist - same body, same
+   * Argon2 cost, same rate-limit charge - so this cannot be used to discover
+   * which handles belong to staff.
+   */
+  const staffViaUsername =
+    identifier.kind === 'username' &&
+    !!found &&
+    (found.role === UserRole.ADMIN || found.role === UserRole.MODERATOR);
+  const user = staffViaUsername ? null : found;
   const credential = user ? await getCredentials(user.id) : null;
 
-  // No such user. Burn comparable time, then answer identically.
-  if (!user || user.deletedAt || !credential) {
+  // No such user. Burn comparable time, then answer identically. An account
+  // with no password (a future social-only or phone-only sign-up) cannot be
+  // entered through this route and is indistinguishable from a missing one.
+  if (!user || user.deletedAt || !credential || typeof credential.passwordHash !== 'string') {
     await burnPasswordTime();
     await chargeFailure();
     return NextResponse.json(GENERIC_FAILURE, { status: 401 });
@@ -168,94 +207,55 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(GENERIC_FAILURE, { status: 401 });
   }
 
-  // --- success -------------------------------------------------------------
+  // --- password accepted --------------------------------------------------
 
   /**
-   * Proving you own the account clears the attempt budget, the same way the
-   * update below clears failedLoginCount and lockedUntil. Only the address-wide
-   * ceiling is left alone: a successful sign-in is not evidence that the other
-   * ninety attempts from that address were legitimate.
+   * Proving you own the account clears the attempt budget. Only the
+   * address-wide ceiling is left alone: a successful sign-in is not evidence
+   * that the other ninety attempts from that address were legitimate.
+   *
+   * The failed-login counter is reset here too, and NOT only once a session
+   * exists: the password was right, so the password lockout has done its job
+   * whether or not a second factor follows. The second factor has its own
+   * counter and lockout (repositories/mfa.ts).
    */
   await resetRateLimit('auth:login', identity);
+  await updateUser(user.id, { failedLoginCount: 0, lockedUntil: null });
 
   // Opportunistic rehash: bcrypt hashes upgrade to argon2id on the one
   // occasion we legitimately hold the plaintext. No migration, no forced reset.
-  const passwordHash = check.needsRehash ? await hashPassword(password) : undefined;
-
-  await updateUser(user.id, {
-    failedLoginCount: 0,
-    lockedUntil: null,
-    lastLoginAt: new Date(),
-  });
   // The rehash lands in the credential document, never on the profile.
-  if (passwordHash) await updateCredentials(user.id, { passwordHash });
+  if (check.needsRehash) await updateCredentials(user.id, { passwordHash: await hashPassword(password) });
 
-  const device = deviceFingerprint
-    ? await recordDeviceDetailed({
-        userId: user.id,
-        fingerprint: deviceFingerprint,
-        label: deviceLabel(request.headers.get('user-agent') ?? undefined),
-      })
-    : undefined;
-  const deviceId = device?.id;
+  const method = identifier.kind === 'email' ? 'email_password' : 'username_password';
 
-  // First sign-in from this device (registration records the device it was
-  // created on, so a normal login there is not "new").
-  if (device?.created) {
-    sendEmailAsync(user.email, 'newDeviceLogin', {
-      nickname: user.nickname,
-      device: deviceLabel(request.headers.get('user-agent') ?? undefined),
-      when: new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC',
+  /**
+   * SECOND FACTOR.
+   *
+   * An enrolled account gets a login ticket, not a session. This branch is
+   * reached only AFTER the password verified and every status check passed,
+   * so "this account has 2FA" is never disclosed to someone who does not
+   * already hold the password - the response for a wrong password is the
+   * generic 401 above, whatever the account's 2FA state.
+   *
+   * No device is recorded, no new-device email is sent and lastLoginAt is not
+   * touched: none of that has happened until the second factor succeeds.
+   */
+  const mfa = await getMfa(user.id);
+  if (isEnrolled(mfa)) {
+    const ticket = await createLoginTicket({
+      userId: user.id,
+      userAgent: request.headers.get('user-agent') ?? '',
+      deviceFingerprint,
+      amr: ['pwd'],
+    });
+    return NextResponse.json({
+      mfaRequired: true,
+      ticket: ticket.token,
+      expiresAt: ticket.expiresAt.toISOString(),
+      method,
     });
   }
 
-  const session = await issueSession({
-    user: {
-      id: user.id,
-      role: user.role,
-      accountStatus: user.accountStatus,
-      verificationStatus: user.verificationStatus,
-    },
-    userAgent: request.headers.get('user-agent') ?? '',
-    deviceId,
-  });
-
-  await writeAuditLog({
-    actorId: user.id,
-    action: 'USER_LOGIN',
-    entityType: 'user',
-    entityId: user.id,
-    deviceFingerprint,
-    userAgent: request.headers.get('user-agent')?.slice(0, 512),
-    result: 'SUCCESS',
-  });
-
-  /**
-   * Where this account belongs after signing in, decided HERE rather than on
-   * the client.
-   *
-   * The access token deliberately carries no role claim - see issueSession -
-   * so the browser has no way to know whether it just signed in a student or
-   * an administrator. The form previously had no information to act on and
-   * simply pushed everyone to /dashboard, which is why staff landed on the
-   * student feed and had to retype the URL.
-   *
-   * Returning a destination keeps the role server-side and read from live
-   * state, and it matches what /api/auth/register already does with
-   * `next: { step, href }`. The client treats this as a default, not as
-   * authorization: /admin is still guarded by its own layout and by every
-   * /api/admin handler, so a tampered response changes where a browser
-   * navigates and nothing about what it may read.
-   *
-   * MODERATOR lands here too - the panel is where their work is, and
-   * requireAdmin admits them at the MODERATOR tier.
-   */
-  const isStaff = user.role === UserRole.ADMIN || user.role === UserRole.MODERATOR;
-
-  const response = NextResponse.json({
-    user: { id: user.id, role: user.role, verificationStatus: user.verificationStatus },
-    next: { href: isStaff ? '/admin' : '/dashboard' },
-  });
-  session.applyCookies(response);
-  return response;
+  return completeLogin({ request, user, deviceFingerprint, amr: ['pwd'], mfaAt: null, method });
 }

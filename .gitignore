@@ -2,6 +2,7 @@ node_modules/
 .next/
 out/
 build/
+logos/
 # Environment files.
 #
 # `.env*` rather than a list of known names: the list only ever covers the

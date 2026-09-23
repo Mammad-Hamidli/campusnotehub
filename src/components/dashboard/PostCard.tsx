@@ -1,13 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Flag, Heart, Link2, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { clampFeedAspect } from '@/lib/media/constants';
 import { Menu, MenuItem } from '@/components/ui/Menu';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import { VerifiedBadge } from './VerificationBanner';
 import { CommentThread } from './CommentThread';
+import { PostTranslation } from './PostTranslation';
 
 export type Post = {
   id: string;
@@ -24,6 +27,8 @@ export type Post = {
      */
     nickname: string;
     initials: string;
+    /** Profile picture, or null for the initials fallback. */
+    avatarUrl: string | null;
     university: string;
     headline: string;
     verified: boolean;
@@ -43,11 +48,14 @@ export function PostCard({
   post,
   index = 0,
   viewerId = null,
+  readOnly = false,
   onDeleted,
 }: {
   post: Post;
   index?: number;
   viewerId?: string | null;
+  /** View-only viewer (unfinished quick-login profile): no like, no comment box. */
+  readOnly?: boolean;
   onDeleted?: (postId: string) => void;
 }) {
   const t = useT();
@@ -62,6 +70,7 @@ export function PostCard({
   const [deleting, setDeleting] = useState(false);
 
   const isOwn = Boolean(viewerId) && post.authorId === viewerId;
+  const profileHref = `/u/${encodeURIComponent(post.author.nickname)}`;
 
   /**
    * Likes.
@@ -166,17 +175,26 @@ export function PostCard({
       className={`card animate-rise p-4 transition-shadow hover:shadow-raised ${deleting ? 'opacity-60' : ''}`}
     >
       <header className="flex items-start gap-3">
-        <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full
- bg-surface-inset text-xs font-bold text-accent"
-          aria-hidden="true"
-        >
-          {post.author.initials}
-        </span>
+        {/* Picture and name both open the author's profile. The picture link
+            is hidden from assistive tech - the name link right next to it
+            already announces the same destination once. */}
+        <Link href={profileHref} tabIndex={-1} aria-hidden="true" className="shrink-0 rounded-full">
+          <UserAvatar
+            nickname={post.author.nickname}
+            src={post.author.avatarUrl}
+            verified={post.author.verified}
+            verifiedLabel={t('profile.verified')}
+          />
+        </Link>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-            <span className="min-w-0 max-w-full truncate text-sm font-medium text-fg">@{post.author.nickname}</span>
+            <Link
+              href={profileHref}
+              className="min-w-0 max-w-full truncate text-sm font-semibold text-fg underline-offset-2 hover:underline"
+            >
+              @{post.author.nickname}
+            </Link>
             <VerifiedBadge verified={post.author.verified} />
             <span
               className="rounded-md bg-surface-inset px-1.5 py-0.5 text-2xs font-semibold text-fg-muted"
@@ -299,6 +317,11 @@ export function PostCard({
         </div>
       )}
 
+      {/* Under the body and above the tags: it belongs to the text it
+          translates, not to the actions. A post with no words (an image-only
+          post) has nothing to translate, so the control is not rendered. */}
+      {post.body.trim().length > 0 && <PostTranslation postId={post.id} />}
+
       {post.tags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {post.tags.map((tag) => (
@@ -328,7 +351,8 @@ export function PostCard({
           active={liked}
           activeClass="text-danger"
           iconFill={liked}
-          onClick={toggleLike}
+          onClick={readOnly ? undefined : toggleLike}
+          disabled={readOnly}
         />
         <ActionButton
           icon={MessageCircle}
@@ -342,7 +366,7 @@ export function PostCard({
 
       {/* Mounted only when expanded, so the thread's fetch happens on demand
           rather than twenty times per feed page. */}
-      {showComments && <CommentThread postId={post.id} onCountChange={setCommentCount} />}
+      {showComments && <CommentThread postId={post.id} onCountChange={setCommentCount} readOnly={readOnly} />}
     </article>
   );
 }
@@ -355,6 +379,7 @@ function ActionButton({
   activeClass,
   iconFill = false,
   onClick,
+  disabled = false,
 }: {
   icon: typeof Heart;
   label: string;
@@ -363,17 +388,20 @@ function ActionButton({
   activeClass: string;
   iconFill?: boolean;
   onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-pressed={onClick ? active : undefined}
       // aria-label carries the count so a screen reader announces
       // "Like, 24" rather than an unlabelled icon next to a bare number.
       aria-label={`${label}, ${count}`}
       className={`group flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm transition
-                  hover:bg-surface-inset ${active ? activeClass : 'text-fg-muted'}`}
+                  hover:bg-surface-inset disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent
+                  ${active ? activeClass : 'text-fg-muted'}`}
     >
       <Icon
         className={`h-[1.05rem] w-[1.05rem] transition-transform group-active:scale-90 ${

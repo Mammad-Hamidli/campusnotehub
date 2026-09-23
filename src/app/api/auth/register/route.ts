@@ -5,20 +5,94 @@ import {
   newUserDefaults,
   newUserId,
   DuplicateUserError,
+  type ConflictField,
 } from '@/lib/firebase/repositories/users';
 import { findUniversityByCode } from '@/lib/firebase/repositories/reference';
 import { ensureWallet } from '@/lib/firebase/repositories/wallets';
 import { writeAuditLog } from '@/lib/firebase/repositories/audit';
-import { registerSchema } from '@/server/validators/auth';
+import { registerSchema, splitFullName } from '@/server/validators/auth';
 import { hashPassword, hashEmail, hashPhone } from '@/lib/crypto/hash';
 import { checkSignupBlocked, recordDevice } from '@/lib/security/blocklist';
 import { deviceLabel } from '@/lib/security/fingerprint';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { issueSession } from '@/lib/auth/session';
 import { sendEmailAsync } from '@/lib/email/send';
-import { FACULTY_OTHER, facultyLabel } from '@/lib/faculties';
+import { sendVerificationEmail } from '@/lib/auth/email-verification';
 
 export const runtime = 'nodejs';
+
+/**
+ * The message each clashing field gets.
+ *
+ * Every key already exists in messages/{az,en,ru}.json - they were written for
+ * this and then never reached, because the route collapsed email and phone
+ * into one shared string before the client could tell them apart.
+ */
+const CONFLICT_MESSAGES: Record<ConflictField, string> = {
+  email: 'auth.errors.emailTaken',
+  phone: 'auth.errors.phoneTaken',
+  nickname: 'auth.errors.nicknameTaken',
+  // A provider identity clash has no field on this form.
+  identity: 'auth.errors.credentialsUnavailable',
+};
+
+/**
+ * Whether email and phone clashes are reported SEPARATELY.
+ *
+ * Separate is the default, because the bundled message was unusable: told only
+ * "these details cannot be used", someone whose phone was the problem edits
+ * their email, resubmits, and gets the same sentence back. That is a dead end
+ * on the first screen of the product.
+ *
+ * The cost is stated plainly: a distinct "that number is already in use" makes
+ * signup an enumeration oracle for phone numbers as well as addresses, and SIM
+ * registration in Azerbaijan is identity-linked, so a number is the more
+ * sensitive of the two. What limits it is the rate limiter on this route
+ * (auth:register, keyed by IP) - a bound on volume, not a fix.
+ *
+ * Set AUTH_COLLAPSE_SIGNUP_CONFLICTS=true to restore the shared message
+ * without a code change. The real answer to the oracle is the deferred
+ * verification flow described in the catch block below.
+ */
+const COLLAPSE_CONFLICTS = process.env.AUTH_COLLAPSE_SIGNUP_CONFLICTS === 'true';
+
+/**
+ * Turns a clash into ONE message per offending field, in the `fields` shape
+ * the 400 validation response already uses - so the client has a single code
+ * path for "these named fields are wrong" and does not have to infer a field
+ * from a top-level error string.
+ */
+function conflictResponse(error: DuplicateUserError) {
+  const collapsible = new Set<string>(error.fields.filter((f) => f === 'email' || f === 'phone'));
+  const fields: Record<string, string[]> = {};
+
+  for (const field of error.fields) {
+    if (field === 'identity') continue;
+    fields[field] =
+      COLLAPSE_CONFLICTS && collapsible.has(field)
+        ? ['auth.errors.credentialsUnavailable']
+        : [CONFLICT_MESSAGES[field]];
+  }
+
+  /**
+   * When email or phone clash and we are collapsing, BOTH fields carry the
+   * shared message even if only one actually matched - which is the whole
+   * point of collapsing: the response must not say which.
+   */
+  if (COLLAPSE_CONFLICTS && collapsible.size > 0) {
+    fields.email = ['auth.errors.credentialsUnavailable'];
+    fields.phone = ['auth.errors.credentialsUnavailable'];
+  }
+
+  return {
+    // Kept for older clients that only read `error`. The first clash in form
+    // order, which is what a single-message client would have shown anyway.
+    error: COLLAPSE_CONFLICTS && collapsible.has(error.field)
+      ? 'auth.errors.credentialsUnavailable'
+      : CONFLICT_MESSAGES[error.field],
+    fields,
+  };
+}
 
 /**
  * Field names that must never appear in a query string. Both our canonical
@@ -50,12 +124,12 @@ export async function GET() {
 export const HEAD = GET;
 
 /**
- * POST /api/auth/register  -  Step 1 of the funnel.
+ * POST /api/auth/register  -  single-step student registration.
  *
+ * Six fields: name, nickname, university, personal email, phone, password.
  * Creates the account and signs the user in immediately with
- * verificationStatus = UNVERIFIED. Document upload is a separate step so a
- * dropped connection during a 12 MB upload does not lose the account, and so
- * the user is never staring at a spinner while a model runs.
+ * verificationStatus = UNVERIFIED; identity documents are a separate, later
+ * step at /verify.
  */
 export async function POST(request: NextRequest) {
   const ip = clientIp(request.headers);
@@ -114,12 +188,13 @@ export async function POST(request: NextRequest) {
     );
   }
   const input = parsed.data;
+  const email = input.email;
 
   // Blocklist check before any write. A banned identity gets the same generic
   // response as a duplicate email - telling someone *which* rule caught them
   // is free tuning information.
   const blocked = await checkSignupBlocked({
-    email: input.email,
+    email,
     phone: input.phone,
     deviceFingerprint: input.deviceFingerprint,
   });
@@ -128,132 +203,70 @@ export async function POST(request: NextRequest) {
   }
 
   // Looked up by `code`, which is what the form submits; `university.id` below
-  // is the document id the user record actually stores. Absent only for a
-  // MENTOR (the schema requires it of a student); a code that was SENT must
-  // still resolve to a real, seeded university.
-  const university = input.universityId ? await findUniversityByCode(input.universityId) : null;
-  if (input.universityId && !university) {
-    return NextResponse.json({ error: 'errors.validationFailed' }, { status: 400 });
+  // is the document id the user record actually stores.
+  const university = await findUniversityByCode(input.universityId);
+  if (!university) {
+    return NextResponse.json(
+      { error: 'errors.validationFailed', fields: { universityId: ['errors.fieldRequired'] } },
+      { status: 400 },
+    );
   }
 
   const passwordHash = await hashPassword(input.password);
-
-  /**
-   * ---------------------------------------------------------------------------
-   * "GRADUATED" IS A ROLE, NOT A FLAG
-   * ---------------------------------------------------------------------------
-   * The account type answers "student or mentor"; academicStatus answers "are
-   * you still there". Someone who registers as a student and says they have
-   * already graduated IS an alumnus, and writing them as STUDENT would leave
-   * the product lying about them in three places at once:
-   *
-   *   - verification would demand a current student card they do not hold
-   *     (requiredKindsFor() branches on the role, and ALUMNI is identity-only);
-   *   - the 1 May graduation sweep would prompt them to "switch to alumni"
-   *     for a transition that already happened;
-   *   - the profile would show "Verified student" over a date in the past.
-   *
-   * ALUMNI is absent from ACCOUNT_TYPES on purpose - it is not a thing a
-   * stranger claims at signup, it is a thing the server concludes. This is the
-   * one place it concludes it, from a validated pair the schema has already
-   * checked for internal agreement.
-   *
-   * alumniTransitionedAt is stamped for the same reason: the sweep skips
-   * anyone who already carries it, so without it the first 1 May after signup
-   * would prompt a fresh alumni account to become alumni.
-   */
-  const graduated = input.accountType === UserRole.STUDENT && input.academicStatus === 'GRADUATED';
-  const role = graduated ? UserRole.ALUMNI : input.accountType;
+  const { firstName, lastName } = splitFullName(input.fullName);
 
   try {
     /**
-     * The id is reserved BEFORE the write.
-     *
-     * Under Postgres the cuid was generated by the insert, so nothing could
-     * reference the user until the row existed. Firestore lets us allocate the
-     * document id up front, which is what makes the wallet and the audit entry
-     * below possible without a second round trip to discover the id.
+     * The id is reserved BEFORE the write, so the wallet and the audit entry
+     * below can reference it without a second round trip.
      */
     const userId = newUserId();
 
     /**
-     * Creation is one Firestore TRANSACTION covering the profile and the
-     * credentials, which is the part that has to be atomic: a profile without
-     * its credential document is an account nobody can ever log into, and a
-     * credential document without its profile is an orphaned password hash.
-     *
-     * The wallet and the audit entry are deliberately OUTSIDE it - see below.
+     * Profile + credentials in ONE transaction (createUser): a profile without
+     * its credential document is an account nobody can log into, and the
+     * reverse is an orphaned password hash.
      */
     const user = await createUser({
       profile: {
-        // Everything Postgres used to default. Stated first so the explicit
-        // fields below always win; see newUserDefaults() for why this matters.
         ...newUserDefaults(),
         id: userId,
-        // Lowercased on the way in: `findUserByEmail` queries the lowercase
-        // form, and Firestore's equality match is case-sensitive, so a
-        // capitalised address stored verbatim would be unfindable at login.
-        email: input.email.toLowerCase(),
-        /**
-         * fullName is DERIVED from the two halves rather than trusted from
-         * the client, so the denormalised value can never disagree with the
-         * structured one it is supposed to summarise. `input.fullName` is
-         * still accepted for older clients and used only as a fallback.
-         */
-        fullName: `${input.firstName} ${input.lastName}`.trim() || input.fullName || '',
-        firstName: input.firstName ?? null,
-        lastName: input.lastName ?? null,
-        dateOfBirth: input.dateOfBirth ?? null,
-        /**
-         * The account type IS the role. There is no separate accountType
-         * field - see the note in the schema for why a parallel field would
-         * be a duplicate concept. The one transformation is GRADUATED, which
-         * resolves to ALUMNI; see the block above.
-         */
-        role,
+        // Lowercased by the schema: Firestore equality is case-sensitive and
+        // findUserByEmail queries the lowercase form.
+        email,
+        emailVerifiedAt: null,
+        // E.164 by the time it gets here - registerSchema normalised it.
+        // Stored unverified: possession is proven separately, and until then
+        // `phoneVerifiedAt` (null, from newUserDefaults) is what says so.
+        phone: input.phone,
+        fullName: input.fullName,
+        firstName,
+        lastName,
+        // Only students register here - mentors apply on MENTORS_URL.
+        role: UserRole.STUDENT,
         nickname: input.nickname,
         locale: input.locale,
-        universityId: university?.id ?? null,
-        facultyId: input.facultyId ?? null,
-        // Type-specific. Each is null on the branch it does not belong to, and
-        // the schema has already refused a request that omitted one its
-        // account type requires.
-        department: input.department ?? null,
-        academicTitle: input.academicTitle ?? null,
-        facultySlug: input.facultySlug ?? null,
-        // Cleared unless the choice was 'other', matching the CHECK constraint
-        // Postgres enforced. Firestore cannot enforce it, so the pairing is
-        // maintained here, at the single point where it is written.
-        facultyOther: input.facultySlug === FACULTY_OTHER ? input.facultyOther ?? null : null,
-        graduationYear: input.graduationYear ?? null,
-        graduationMonth: input.graduationMonth ?? null,
-        // MENTOR only (the schema refuses it elsewhere): the schedule chosen
-        // in the wizard, kept as a draft that prefills /mentors/apply. The
-        // profile timezone follows it so the two cannot disagree.
-        mentorAvailability: input.availability ?? null,
-        ...(input.timezone ? { timezone: input.timezone } : {}),
-        // Already an alumnus at signup: stamped so the 1 May sweep does not
-        // prompt them to make a transition that is already recorded.
-        alumniTransitionedAt: graduated ? new Date() : null,
+        universityId: university.id,
         verificationStatus: VerificationStatus.UNVERIFIED,
-        phone: input.phone ?? null,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
       /**
-       * The password hash and the PII HMACs go to `credentials/{userId}`,
-       * NOT onto the user document. Firestore grants are per document, so this
-       * separate collection - denied to every client in firestore.rules - is
-       * the only way to keep "a user may read their own profile" from also
-       * meaning "may read their own argon2id hash".
-       *
-       * The hash is still argon2id, produced by the same hashPassword() as
-       * before. Nothing about password handling was weakened by the move.
+       * The password hash and the email HMAC go to `credentials/{userId}`,
+       * never onto the user document - that collection is denied to every
+       * client in firestore.rules.
+       */
+      /**
+       * The phone HMAC sits beside the email one, and it is what makes
+       * createUser's phone uniqueness check fire at all: that check is guarded
+       * by `if (creds.phoneHash)`, so passing null - as this route used to -
+       * silently skipped it and let one number back as many accounts as it
+       * liked.
        */
       credentials: {
         passwordHash,
-        emailHash: hashEmail(input.email),
-        phoneHash: input.phone ? hashPhone(input.phone) : null,
+        emailHash: hashEmail(email),
+        phoneHash: hashPhone(input.phone),
       },
     });
 
@@ -286,8 +299,8 @@ export async function POST(request: NextRequest) {
       entityId: user.id,
       deviceFingerprint: input.deviceFingerprint,
       userAgent: request.headers.get('user-agent')?.slice(0, 512),
+      after: { method: 'password' },
     });
-
     // Record the device before the session so the session can reference it.
     // This is the replacement for logging a signup IP: it is what a later ban
     // attaches to, and unlike an address it does not implicate a whole dorm.
@@ -303,6 +316,9 @@ export async function POST(request: NextRequest) {
       user,
       userAgent: request.headers.get('user-agent') ?? '',
       deviceId,
+      // A brand-new account has proven one factor: its password.
+      amr: ['pwd'],
+      mfaAt: null,
     });
 
     /**
@@ -322,11 +338,15 @@ export async function POST(request: NextRequest) {
       'welcome',
       {
         nickname: user.nickname,
-        university: university?.nameEn ?? null,
-        faculty: facultyLabel(input.facultySlug ?? null, input.facultyOther ?? null),
+        university: university.nameEn,
+        faculty: null,
       },
       { dedupeKey: `welcome:${user.id}` },
     );
+
+    // A confirmation link for the address. Failure to send must not fail the
+    // registration: the account can request another from Settings -> Security.
+    await sendVerificationEmail(user).catch(() => {});
 
     // 201 with the next step spelled out, so the client does not have to
     // hard-code the funnel order.
@@ -341,32 +361,29 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     /**
-     * Unique violation. Which field clashed determines what we may say.
+     * Unique violation, reported PER FIELD.
      *
-     * NICKNAME -> named explicitly. A nickname is public by design: it renders
-     * in the feed, on note listings and in mentor reviews, so "that handle is
-     * taken" leaks nothing you could not learn by scrolling. And the user
-     * cannot pick a different one unless we tell them.
+     * createUser() now runs every uniqueness check before throwing, so
+     * `error.fields` is the complete list rather than whichever check happened
+     * to fail first. Someone whose email and phone are both taken is told so
+     * once, instead of discovering the second one on a resubmit.
      *
-     * EMAIL or PHONE -> collapsed into ONE shared message. Distinguishing them
-     * turns signup into a two-field enumeration oracle: an attacker learns
-     * both which addresses AND which phone numbers already have accounts here.
-     * Phone is the more sensitive of the two, because SIM registration in
-     * Azerbaijan is identity-linked.
+     * NICKNAME is named explicitly and always has been: a handle is public by
+     * design - it renders in the feed, on note listings and in mentor reviews
+     * - so "that handle is taken" leaks nothing you could not learn by
+     * scrolling, and the user cannot pick another unless we say so.
      *
-     * HONEST LIMITATION: this halves the oracle's precision but does not
-     * remove it - the caller still learns that *one of* the two is in use.
-     * Fully closing it needs the deferred-verification flow: always answer
-     * 201, create nothing, and email the address either a verification link
-     * (new) or a "someone tried to sign up as you" notice (existing). That
-     * needs working mail delivery, so it is deliberately not done here.
+     * EMAIL and PHONE are named too, by default. See COLLAPSE_CONFLICTS above
+     * for the enumeration trade-off and the switch that reverses it.
+     *
+     * The oracle is not closed by either setting. Closing it needs the
+     * deferred-verification flow: always answer 201, create nothing, and email
+     * the address either a verification link (new) or a "someone tried to sign
+     * up as you" notice (existing). That needs working mail delivery, so it is
+     * deliberately not done here.
      */
     if (error instanceof DuplicateUserError) {
-      const key =
-        error.field === 'nickname'
-          ? 'auth.errors.nicknameTaken'
-          : 'auth.errors.credentialsUnavailable';
-      return NextResponse.json({ error: key }, { status: 409 });
+      return NextResponse.json(conflictResponse(error), { status: 409 });
     }
     throw error;
   }

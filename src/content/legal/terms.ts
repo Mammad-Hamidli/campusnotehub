@@ -39,7 +39,7 @@ export const TERMS: LocalizedLegalDocument = {
           heading: '3. Your account',
           body: [
             'You agree to provide accurate information when registering and to keep it up to date. You are responsible for keeping your password confidential and for all activity that takes place under your account.',
-            'Tell us immediately at support@campushub.az if you believe your account has been accessed without your permission.',
+            'Tell us immediately at supportcampushub@gmail.com if you believe your account has been accessed without your permission.',
           ],
         },
         {
@@ -132,7 +132,7 @@ export const TERMS: LocalizedLegalDocument = {
         {
           id: 'contact',
           heading: '14. Contact',
-          body: ['Questions about these terms can be sent to support@campushub.az.'],
+          body: ['Questions about these terms can be sent to supportcampushub@gmail.com.'],
         },
       ],
     },
@@ -163,7 +163,7 @@ export const TERMS: LocalizedLegalDocument = {
           heading: '3. Hesabınız',
           body: [
             'Qeydiyyat zamanı düzgün məlumat təqdim etməyi və onu aktual saxlamağı öhdənizə götürürsünüz. Şifrənizin məxfiliyinə və hesabınızda baş verən bütün fəaliyyətə görə siz məsuliyyət daşıyırsınız.',
-            'Hesabınıza icazəsiz daxil olunduğundan şübhələnirsinizsə, dərhal support@campushub.az ünvanına yazın.',
+            'Hesabınıza icazəsiz daxil olunduğundan şübhələnirsinizsə, dərhal supportcampushub@gmail.com ünvanına yazın.',
           ],
         },
         {
@@ -256,7 +256,7 @@ export const TERMS: LocalizedLegalDocument = {
         {
           id: 'contact',
           heading: '14. Əlaqə',
-          body: ['Bu şərtlərlə bağlı suallarınızı support@campushub.az ünvanına göndərə bilərsiniz.'],
+          body: ['Bu şərtlərlə bağlı suallarınızı supportcampushub@gmail.com ünvanına göndərə bilərsiniz.'],
         },
       ],
     },
@@ -287,7 +287,7 @@ export const TERMS: LocalizedLegalDocument = {
           heading: '3. Ваш аккаунт',
           body: [
             'Вы обязуетесь указывать достоверные данные при регистрации и поддерживать их в актуальном состоянии. Вы несёте ответственность за сохранность пароля и за все действия, совершённые в вашем аккаунте.',
-            'Если вы подозреваете несанкционированный доступ к аккаунту, немедленно напишите на support@campushub.az.',
+            'Если вы подозреваете несанкционированный доступ к аккаунту, немедленно напишите на supportcampushub@gmail.com.',
           ],
         },
         {
@@ -380,7 +380,7 @@ export const TERMS: LocalizedLegalDocument = {
         {
           id: 'contact',
           heading: '14. Контакты',
-          body: ['Вопросы об этих условиях можно направить на support@campushub.az.'],
+          body: ['Вопросы об этих условиях можно направить на supportcampushub@gmail.com.'],
         },
       ],
     },

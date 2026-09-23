@@ -26,7 +26,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://campushub.az'),
+  metadataBase: new URL('https://www.campusnotehub.com'),
   title: {
     default: 'CampusHub — Notes, mentors and campus life',
     template: '%s · CampusHub',

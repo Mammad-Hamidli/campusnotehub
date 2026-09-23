@@ -223,6 +223,20 @@ export const adminRevokeSessionsSchema = z.object({
   reason: z.string().trim().min(10).max(1000),
 });
 
+/**
+ * Removing another account's second factor. The acting ADMIN proves their OWN
+ * factor in the same request, so a hijacked admin session alone cannot strip
+ * 2FA from the accounts it wants to take over next.
+ */
+export const adminMfaResetSchema = z
+  .object({
+    reason: z.string().trim().min(10).max(1000),
+    code: z.string().trim().max(16).optional(),
+    recoveryCode: z.string().trim().max(32).optional(),
+  })
+  .strict()
+  .refine((d) => !!d.code !== !!d.recoveryCode, { message: 'errors.validationFailed' });
+
 export const adminNoteSchema = z.object({
   note: z.string().trim().min(1).max(2000),
 });

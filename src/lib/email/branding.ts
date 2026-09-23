@@ -17,6 +17,7 @@
  * safe to log.
  */
 
+import { supportAddress } from './identity';
 import { appUrl } from './urls';
 
 export type EmailAssetMode = 'cid' | 'url';
@@ -49,16 +50,15 @@ export function emailBranding(): EmailBranding {
   const companyName = trim(process.env.EMAIL_COMPANY_NAME) ?? 'CampusHub';
 
   /**
-   * Falls back to the authenticated mailbox, because that address is
-   * guaranteed to exist and to be monitored - several templates tell the
-   * reader to "reply to support", and a reply-to nobody reads is worse than
-   * no invitation to reply at all.
+   * Always the platform mailbox - resolved through ./identity.ts, which
+   * refuses any other address.
+   *
+   * It used to fall back to whatever mailbox happened to be authenticated.
+   * That fallback would print any address a deployment configured as the
+   * sender in the footer of every email the platform sends, which is exactly
+   * the substitution the allowlist exists to make impossible.
    */
-  const supportEmail =
-    trim(process.env.EMAIL_SUPPORT_ADDRESS) ??
-    trim(process.env.GMAIL_USER) ??
-    trim(process.env.SMTP_USER) ??
-    'support@campushub.az';
+  const supportEmail = supportAddress();
 
   const assetMode: EmailAssetMode = process.env.EMAIL_ASSET_MODE === 'url' ? 'url' : 'cid';
 

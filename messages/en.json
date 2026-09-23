@@ -47,9 +47,9 @@
   },
   "auth": {
     "register": {
-      "title": "Join CampusHub",
-      "subtitle": "The verified platform for your university community",
-      "fullName": "Full name",
+      "title": "Join CampusHub 🎉",
+      "subtitle": "One minute — and you are in the liveliest crowd on campus.",
+      "fullName": "Name",
       "fullNameHint": "Exactly as it appears on your national ID",
       "email": "Email",
       "emailHint": "A university address speeds up verification",
@@ -66,7 +66,7 @@
       "createAccount": "Create account",
       "haveAccount": "Already have an account?",
       "phone": "Phone number",
-      "phoneHint": "Optional, but needed for account recovery and payouts",
+      "phoneHint": "Used to recover your account and confirm payouts",
       "nickname": "Nickname",
       "nicknameHint": "This is what people see across the platform. Letters, numbers and underscore, 3-24 characters.",
       "graduationDate": "Graduation date",
@@ -142,7 +142,7 @@
       },
       "graduatedDate": "Graduation date",
       "expectedGraduationDate": "Expected graduation date",
-      "verifyLater": "No documents are needed to sign up. Your account is ready immediately — verify your identity in Settings whenever it suits you to unlock buying and selling notes, your wallet and mentor bookings.",
+      "verifyLater": "No documents are needed to sign up. Your account is ready immediately — verify your identity in Settings whenever it suits you to buy and sell class notes, top up your wallet and book mentors.",
       "schedule": {
         "title": "Your availability",
         "subtitle": "Choose the times students can book sessions with you each week.",
@@ -156,11 +156,18 @@
         "later": "You can change this at any time. Nobody can book you until your mentor application is approved."
       },
       "universityNone": "No university affiliation",
-      "universityMentorHint": "Mentors do not need a university. Pick one only if you teach or work at one."
+      "universityMentorHint": "Mentors do not need a university. Pick one only if you teach or work at one.",
+      "nameHint": "Shown on your profile. Compared with your ID during verification.",
+      "fullNamePlaceholder": "Aysel Mammadova",
+      "personalEmail": "Personal email",
+      "personalEmailHint": "No university email needed — any personal address works.",
+      "quickHint": "After a quick sign-up your account stays view-only until you complete your profile.",
+      "mentorHint": "Not a student but a mentor?",
+      "mentorCta": "Apply to become a mentor"
     },
     "login": {
       "title": "Welcome back",
-      "email": "Email",
+      "identifier": "Email or username",
       "password": "Password",
       "forgotPassword": "Forgot your password?",
       "submit": "Log in",
@@ -175,7 +182,7 @@
       "tooManyAttempts": "Too many attempts. Try again in {minutes} minutes",
       "accountLocked": "This account is temporarily locked",
       "termsRequired": "Accept the terms to continue",
-      "nameTooShort": "Your full name needs at least 3 characters",
+      "nameTooShort": "Your name needs at least 2 characters",
       "nameInvalid": "Use letters, spaces and hyphens only",
       "nicknameInvalid": "Letters, numbers and underscore only. 3-24 characters.",
       "nicknameReserved": "That nickname is not available",
@@ -192,7 +199,106 @@
       "academicTitleRequired": "Your academic position is required",
       "graduationNotPast": "You chose “Graduated”, so this date cannot be in the future.",
       "graduationNotFuture": "You chose “Currently studying”, so this date cannot be in the past.",
-      "graduationStatusMismatch": "The graduation date does not match the academic status you chose."
+      "graduationStatusMismatch": "The graduation date does not match the academic status you chose.",
+      "mfaInvalid": "That code is not valid. Check your authenticator app and try again.",
+      "mfaLocked": "Too many wrong codes. Two-factor sign-in is locked for 15 minutes.",
+      "mfaRequired": "Staff accounts need two-factor authentication. Set it up or verify this session to continue.",
+      "mfaTicketExpired": "This sign-in took too long. Enter your password again.",
+      "mfaNotEnrolled": "Two-factor authentication is not set up on this account.",
+      "mfaStepUpRequired": "Enter a code from your current authenticator app to replace it.",
+      "mfaSetupExpired": "This setup expired. Start again to get a new QR code.",
+      "mfaRequiredForStaff": "Staff accounts cannot turn off two-factor authentication.",
+      "mfaResetSelf": "You cannot reset your own two-factor authentication. Ask another administrator.",
+      "reauthCodeRequired": "Enter a code from your authenticator app to confirm.",
+      "reauthPasswordRequired": "Enter your password to confirm.",
+      "reauthFailed": "That password is not correct.",
+      "reauthRecentSignIn": "For your security, sign out and sign in again, then retry within 10 minutes."
+    },
+    "mfa": {
+      "title": "Two-step verification",
+      "prompt": "Enter the 6-digit code from your authenticator app.",
+      "recoveryPrompt": "Enter one of the recovery codes you saved when you set up two-factor authentication.",
+      "codeLabel": "Authentication code",
+      "recoveryLabel": "Recovery code",
+      "useRecovery": "Use a recovery code instead",
+      "useCode": "Use your authenticator app instead",
+      "verify": "Verify",
+      "back": "Back to sign in",
+      "recoveryLow": "You have {count} recovery codes left. Generate new ones in Settings → Security."
+    },
+    "reauth": {
+      "recentHint": "Your account has no password, so a recent sign-in is used to confirm it is you. If this fails, sign out and sign in again first.",
+      "passwordLabel": "Current password"
+    },
+    "oauth": {
+      "or": "or",
+      "continueWith": "Continue with {provider}",
+      "emailFromProvider": "Verified by {provider}. This is the address your account will use.",
+      "noPasswordNeeded": "You will sign in with {provider}, so this account does not need a password.",
+      "connectedTitle": "Connected accounts",
+      "connectedDescription": "Sign in with an account you already have. Connecting one asks you to confirm it is you first.",
+      "linkedSince": "{account} · connected {date}",
+      "notLinked": "Not connected",
+      "link": "Connect",
+      "unlink": "Disconnect",
+      "confirmLink": "Confirm it is you, then continue to {provider}.",
+      "confirmUnlink": "Confirm it is you to disconnect {provider}. Your other sessions will be signed out.",
+      "linkedToast": "{provider} connected",
+      "unlinkedToast": "{provider} disconnected",
+      "errors": {
+        "cancelled": "Sign-in was cancelled.",
+        "expired": "That sign-in attempt expired. Please try again.",
+        "failed": "We could not sign you in with that account. Please try again.",
+        "unavailable": "This sign-in method is not available right now.",
+        "link_required": "An account with this email already exists. Sign in with your password and confirm your email in Settings → Security - {provider} will then connect automatically - or connect {provider} there directly.",
+        "identity_in_use": "That account is already connected to a different CampusHub account.",
+        "provider_already_linked": "A different {provider} account is already connected. Disconnect it first.",
+        "rate_limited": "Too many attempts. Please wait a few minutes and try again.",
+        "signup_expired": "Your sign-up session expired. Start again from the sign-in page.",
+        "last_method": "This is your only way to sign in, so it cannot be disconnected."
+      }
+    },
+    "emailVerify": {
+      "pageTitle": "Confirm your email",
+      "working": "Confirming…",
+      "done": "Your email address is confirmed. Google sign-in with this address will now connect to your account automatically.",
+      "toSettings": "Go to security settings",
+      "requestNew": "Request a new link",
+      "panelTitle": "Email address",
+      "panelDescription": "Confirming your address lets a Google account with the same verified email connect automatically.",
+      "verified": "Confirmed",
+      "notVerified": "Not confirmed",
+      "send": "Send confirmation link",
+      "sent": "A link is on its way to {email}. Open it in this browser while signed in; it expires in 24 hours.",
+      "errors": {
+        "invalid": "This link is invalid or has expired. Request a new one from your security settings.",
+        "wrongAccount": "This link belongs to a different account. Sign out, sign in to that account, then open the link again.",
+        "alreadyVerified": "Your email address is already confirmed."
+      }
+    },
+    "password": {
+      "forgotTitle": "Reset your password",
+      "forgotSubtitle": "Enter the email address on your account and we will send you a link to choose a new password.",
+      "emailLabel": "Email address",
+      "sendLink": "Send reset link",
+      "sent": "If an account uses {email}, a reset link is on its way. It works once, for 30 minutes. Check your spam folder if it does not arrive.",
+      "backToLogin": "Back to log in",
+      "resetTitle": "Choose a new password",
+      "newPassword": "New password",
+      "save": "Save new password",
+      "resetDone": "Your password was changed and every device was signed out. Log in with your new password.",
+      "toLogin": "Log in",
+      "requestNew": "Request a new link",
+      "changeTitle": "Password",
+      "changeDescription": "Changing your password signs out every other device.",
+      "currentPassword": "Current password",
+      "changeSubmit": "Change password",
+      "changed": "Password changed. Every other device was signed out.",
+      "errors": {
+        "linkInvalid": "This reset link is invalid, already used or expired. Request a new one.",
+        "sameAsCurrent": "Choose a password different from your current one.",
+        "noPassword": "Your account signs in with Google and has no password to change."
+      }
     }
   },
   "verification": {
@@ -347,6 +453,18 @@
       "deleteBody": "It will be removed from the feed for everyone. This cannot be undone.",
       "deleted": "Your post was deleted successfully.",
       "likeFailed": "Your like could not be saved. Try again."
+    },
+    "translate": {
+      "action": "Translate",
+      "showOriginal": "Show original",
+      "chooseLanguage": "Choose a language",
+      "attribution": "Machine translation into {language}. It may not be exact.",
+      "errors": {
+        "failed": "This post could not be translated. Try again.",
+        "unavailable": "Translation is unavailable right now.",
+        "unsupported": "That language is not supported.",
+        "empty": "There is nothing to translate."
+      }
     },
     "posted": "Your post was published.",
     "commentPosted": "Your comment was added."
@@ -780,7 +898,11 @@
       "rejectedBody": "Your account was not deleted. See your email for the reason."
     },
     "allRead": "All notifications marked as read.",
-    "updateFailed": "Notifications could not be updated. Try again."
+    "updateFailed": "Notifications could not be updated. Try again.",
+    "newFollower": {
+      "title": "New follower",
+      "body": "@{nickname} started following you"
+    }
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",
@@ -816,60 +938,63 @@
       "about": "About"
     },
     "hero": {
-      "badge": "Verified students only",
-      "titleLead": "The complete ecosystem for students and",
-      "titleAccent": "future professionals",
-      "subtitle": "Buy and sell study notes, book working professionals for 1-on-1 career advice, and keep up with your campus — all in one place. Every account is verified with a student card and national ID.",
-      "ctaNotes": "Explore notes",
-      "ctaMentor": "Find a mentor",
-      "trust": "No fake profiles — every account is document-verified"
+      "badge": "The social space for students",
+      "titleLead": "Buy and sell class notes,",
+      "titleAccent": "and join the liveliest crowd on campus",
+      "subtitle": "Follow classmates, post to the feed, ask and answer, buy and sell class notes, meet mentors — all in one place, with verified students only.",
+      "ctaNotes": "Browse class notes",
+      "trust": "No fake profiles — every account is verified",
+      "ctaJoin": "Join for free"
     },
     "stats": {
       "students": "Active students",
-      "notes": "Notes shared",
+      "notes": "Class notes shared",
       "hours": "Mentorship hours",
       "universities": "Universities",
       "live": "Live"
     },
     "features": {
-      "eyebrow": "Three products, one account",
-      "title": "Everything your university years actually need",
-      "subtitle": "A verified student identity is the spine all three products run on. Get checked once, use it everywhere.",
+      "eyebrow": "One account, three worlds",
+      "title": "Classes, friends and careers — together",
+      "subtitle": "Chat in the feed, buy and sell class notes, find a mentor. Join once, use it everywhere.",
       "notes": {
         "title": "UniNotes",
-        "body": "A student-to-student marketplace for study material. Upload, earn, or find what you need.",
+        "body": "Buy and sell class notes. Upload and earn, or find what you need before the exam.",
         "p1": "First-page preview generated automatically",
         "p2": "Secure payment through your internal balance",
-        "p3": "Only verified buyers can leave reviews"
+        "p3": "Only verified buyers can leave reviews",
+        "cta": "Browse class notes"
       },
       "mentor": {
         "title": "PocketMentor",
         "body": "One-on-one career guidance from people actually doing the job.",
         "p1": "IT, marketing, law, engineering and more",
         "p2": "Pick an open slot, confirm instantly",
-        "p3": "Payment held until the session is done"
+        "p3": "Payment held until the session is done",
+        "cta": "Find a mentor"
       },
       "feed": {
         "title": "Campus feed",
-        "body": "Exam alerts, scholarship deadlines, questions and answers — filtered to your university.",
+        "body": "Exam news, scholarship calls, memes and Q&A — the pulse of your university.",
         "p1": "Filter by university",
         "p2": "Follow topics through tags",
-        "p3": "Share images and notes inline"
+        "p3": "Share images and notes inline",
+        "cta": "Open the feed"
       }
     },
     "ticker": {
       "title": "Happening on campus",
       "joined": "{name} joined",
       "verified": "{name} got verified",
-      "uploaded": "{name} uploaded a new note",
+      "uploaded": "{name} uploaded new class notes",
       "booked": "{name} booked a mentor session",
       "popular": "{title} bought {count} times today"
     },
     "cta": {
-      "title": "Start today",
-      "body": "Signing up takes two minutes. You can use the platform while your documents are being checked.",
+      "title": "Campus is waiting for you 🎉",
+      "body": "Signing up takes a minute. Join, follow, post, buy and sell class notes.",
       "button": "Create a free account",
-      "secondary": "Browse notes first"
+      "secondary": "Browse class notes first"
     },
     "footer": {
       "tagline": "The verified student platform for Azerbaijani universities.",
@@ -881,6 +1006,17 @@
       "security": "Security",
       "contact": "Contact",
       "rights": "All rights reserved."
+    },
+    "social": {
+      "title": "What happens here",
+      "items": {
+        "follow": "Follow your classmates",
+        "feed": "Post to the campus feed",
+        "comment": "Comment, like, discuss",
+        "notes": "Buy & sell class notes",
+        "mentor": "Meet mentors",
+        "campus": "Explore by university"
+      }
     }
   },
   "register": {
@@ -904,7 +1040,7 @@
       "title": "Sign up now, verify later",
       "b1": "No documents to find right now — the account is created from this form alone",
       "b2": "Verification, when you choose to do it, keeps fake profiles and stolen notes off the platform",
-      "b3": "It unlocks buying and selling notes, your wallet and mentor bookings",
+      "b3": "It unlocks buying and selling class notes, your wallet and mentor bookings",
       "privacy": "When you do verify, the images are processed at that moment and destroyed immediately. They are never kept on our servers."
     },
     "scanner": {
@@ -1390,7 +1526,9 @@
       "devicesHint": "Devices that have signed in to your account",
       "exportData": "Download my data",
       "exportHint": "A JSON copy of everything we hold",
-      "deleteAccount": "Delete account"
+      "deleteAccount": "Delete account",
+      "security": "Two-factor authentication",
+      "securityHint": "Authenticator app and recovery codes"
     },
     "verification": {
       "title": "Identity verification",
@@ -1444,6 +1582,45 @@
       },
       "submitted": "Your deletion request was sent for review.",
       "cancelled": "Your deletion request was cancelled."
+    },
+    "security": {
+      "title": "Security",
+      "back": "Settings",
+      "heading": "Two-factor authentication",
+      "description": "A code from an authenticator app is needed every time you sign in, in addition to your password.",
+      "statusOn": "On",
+      "statusOff": "Off",
+      "offBody": "Protect your account with an authenticator app such as Google Authenticator, Microsoft Authenticator or Authy. Even if someone learns your password, they cannot sign in without your phone.",
+      "requiredNotice": "Your role requires two-factor authentication. Set it up to use the admin panel.",
+      "verifyNotice": "This session has not been verified with your authenticator. Enter a code to unlock staff tools.",
+      "verifySession": "Verify this session",
+      "enable": "Set up authenticator",
+      "scanTitle": "Scan this QR code",
+      "scanHint": "Open your authenticator app, add an account and scan the code. Or type the setup key instead.",
+      "qrAlt": "QR code for your authenticator app",
+      "manualKey": "Setup key",
+      "confirmLabel": "Enter the 6-digit code the app now shows",
+      "confirm": "Verify and turn on",
+      "cancel": "Cancel",
+      "codesTitle": "Save your recovery codes",
+      "codesHint": "If you lose your phone, each code lets you sign in once. They will not be shown again - keep them in a password manager or print them.",
+      "copy": "Copy codes",
+      "copied": "Copied",
+      "download": "Download",
+      "done": "I have saved them",
+      "enabledSince": "Enabled on {date}",
+      "codesRemaining": "{count} recovery codes left",
+      "replace": "Replace authenticator",
+      "regenerate": "New recovery codes",
+      "disable": "Turn off",
+      "stepUpTitle": "Confirm it is you",
+      "stepUpPrompt": "Enter a code from your authenticator app, or a recovery code.",
+      "continue": "Continue",
+      "staffCannotDisable": "Staff accounts cannot turn off two-factor authentication.",
+      "enabledToast": "Two-factor authentication is on",
+      "disabledToast": "Two-factor authentication is off",
+      "verifiedToast": "Session verified",
+      "loadFailed": "Could not load your security settings."
     }
   },
   "stub": {
@@ -1480,7 +1657,15 @@
       "joined": "Joined"
     },
     "headline": "Headline",
-    "bio": "About you"
+    "bio": "About you",
+    "viewPublic": "View profile",
+    "avatar": {
+      "upload": "Upload photo",
+      "change": "Change photo",
+      "remove": "Remove",
+      "updated": "Profile picture updated",
+      "removed": "Profile picture removed"
+    }
   },
   "legal": {
     "onThisPage": "On this page",
@@ -1489,5 +1674,32 @@
     "related": "Related document",
     "backToTop": "Back to top",
     "opensInNewTab": "(opens in a new tab)"
+  },
+  "onboarding": {
+    "badge": "Last step",
+    "title": "Complete your profile",
+    "subtitle": "Pick your name, nickname and university — then you can post, comment, like and follow.",
+    "viewOnly": "You are browsing as the temporary @{handle} in view-only mode: posting, commenting, liking and following unlock once your profile is complete.",
+    "submit": "Complete profile",
+    "done": "Your profile is ready. Welcome!",
+    "restricted": "Complete your profile first.",
+    "finishToJoin": "Complete your profile to join in",
+    "banner": {
+      "title": "Complete your profile",
+      "body": "Your account is still view-only under the temporary @{handle}. Complete your profile to post, comment and follow.",
+      "cta": "Complete profile"
+    },
+    "errors": {
+      "alreadyComplete": "Your profile is already complete."
+    }
+  },
+  "publicProfile": {
+    "backToFeed": "Back to feed",
+    "backHome": "Home",
+    "joined": "Joined {date}",
+    "posts": "Posts",
+    "noPosts": "No posts yet.",
+    "follow": "Follow",
+    "following": "Following"
   }
 }

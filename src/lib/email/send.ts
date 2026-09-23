@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { after } from 'next/server';
-import { Resend } from 'resend';
 import { adminDb } from '@/lib/firebase/admin.core';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { buildEmail, type TemplateName, type TEMPLATES } from './templates';
+import { MAIL_ACCOUNT, fromHeader, replyToHeader, roleMailbox } from './identity';
 import type { EmailAttachment } from './assets';
 import { emailBranding } from './branding';
 
@@ -27,27 +27,32 @@ import { emailBranding } from './branding';
  * sent, and the mail silently never leaves.
  *
  * ---------------------------------------------------------------------------
- * TRANSPORTS, FIRST COMPLETE ONE WINS
+ * TRANSPORT: GMAIL SMTP, AUTHENTICATED AS supportcampushub@gmail.com
  * ---------------------------------------------------------------------------
- *   1. GMAIL_USER + GMAIL_APP_PASSWORD   - the platform mailbox
- *      (campushubsupport@gmail.com) over smtp.gmail.com:465, implicit TLS.
- *   2. SMTP_USER + SMTP_PASSWORD (+ SMTP_HOST / SMTP_PORT) - any other SMTP
- *      server. Kept for deployments that already use it.
- *   3. RESEND_API_KEY - once the platform sends from its own verified domain.
+ * SMTP_USER + SMTP_PASSWORD over SMTP_HOST (default smtp.gmail.com:465,
+ * implicit TLS). SMTP_USER must be the platform mailbox - see ./identity.ts,
+ * which is what keeps any other address out of the From header whatever a
+ * deployment's variables happen to say. This is the ONLY transport: there is
+ * no API fallback to fall out of sync with it.
  *
- * None configured is a no-op (logged once; loudly in production).
+ * Not configured is a no-op (logged once; loudly in production).
  *
  * ---------------------------------------------------------------------------
  * WHY GMAIL NEEDS AN APP PASSWORD, NOT THE ACCOUNT PASSWORD
  * ---------------------------------------------------------------------------
- * Google refuses plain account passwords over SMTP ("535 Username and Password
- * not accepted"). With 2-Step Verification enabled, the account can mint a
- * 16-character App Password (https://myaccount.google.com/apppasswords). It is
- * scoped to mail, revocable on its own, and is the only credential that works.
- * Google displays it in four groups of four; the spaces are stripped here.
+ * Google removed password-based SMTP for ordinary accounts ("Less secure app
+ * access"). The account password is refused outright with "535-5.7.8 Username
+ * and Password not accepted". With two-factor authentication on - which this
+ * mailbox must have, since it is what mints the credential - the account
+ * generates a 16-character App Password instead
+ * (myaccount.google.com > Security > 2-Step Verification > App passwords).
+ * It is scoped to one client, revocable on its own without touching the login,
+ * and is the only credential that works here.
  *
- * Gmail caps a free account at roughly 500 messages/day - fine for a project
- * deployment, not for a large user base (that is when Resend + a domain wins).
+ * From and Reply-To are both that same mailbox. Gmail rewrites a From it has
+ * not verified as a send-as alias on the authenticated account, so keeping the
+ * two identical is what makes the header the user sees match the header that
+ * was actually authenticated.
  *
  * ---------------------------------------------------------------------------
  * SECRETS
@@ -70,19 +75,14 @@ export type SendOptions = {
   noQueue?: boolean;
 };
 
-const DEFAULT_SENDER_NAME = 'UniPath';
 const MAX_ATTEMPTS = 3;
 const DEDUPE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 type SmtpSettings = { user: string; pass: string; host: string; port: number };
 
-type Transport =
-  | { kind: 'smtp'; client: Transporter; user: string }
-  | { kind: 'resend'; client: Resend }
-  | null;
+type Transport = { kind: 'smtp'; client: Transporter; user: string } | null;
 
 let smtp: Transporter | null = null;
-let resend: Resend | null = null;
 const warned = new Set<string>();
 
 /**
@@ -107,33 +107,31 @@ function warnOnce(key: string, message: string) {
 }
 
 function smtpSettings(): SmtpSettings | null {
-  const gmailUser = process.env.GMAIL_USER?.trim();
-  const gmailPass = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '');
-  if (gmailUser && gmailPass) {
-    return { user: gmailUser, pass: gmailPass, host: 'smtp.gmail.com', port: 465 };
-  }
-
-  const user = process.env.SMTP_USER?.trim();
   /**
-   * Whitespace is stripped here for the SAME reason it is stripped from
-   * GMAIL_APP_PASSWORD above: Google displays an App Password as four groups of
-   * four, and it is almost always pasted with those spaces intact. When the
-   * SMTP_* pair points at smtp.gmail.com - which is this file's own default
-   * host - a value carrying spaces is rejected with 535 BadCredentials, which
-   * is indistinguishable from a genuinely wrong password. Stripping is safe for
-   * other providers too: no SMTP password may contain leading, trailing or
+   * Throws (EIDENTITY) when SMTP_USER names anything but a role mailbox.
+   * Deliberate: authenticating as a person's mailbox is the exact failure this
+   * module is arranged to prevent, and a silent fallback would hide it.
+   */
+  const user = roleMailbox(process.env.SMTP_USER, 'SMTP_USER', MAIL_ACCOUNT);
+  /**
+   * Whitespace is stripped because an application-specific password is
+   * routinely pasted out of a dashboard with a trailing space or a line break,
+   * and the server answers that with the same 535 as a genuinely wrong
+   * password - an hour spent debugging a credential that was correct.
+   * Stripping is safe: no SMTP password may contain leading, trailing or
    * embedded whitespace and still survive the protocol's own tokenisation.
    */
   const pass = process.env.SMTP_PASSWORD?.replace(/\s+/g, '');
-  if (user && pass) {
-    return {
-      user,
-      pass,
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT || 465),
-    };
-  }
-  return null;
+  if (!pass) return null;
+
+  return {
+    user,
+    pass,
+    // Overridable so a deployment blocked from 465 can move to
+    // smtp.gmail.com:587 (STARTTLS) without a code change.
+    host: process.env.SMTP_HOST?.trim() || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT || 465),
+  };
 }
 
 /**
@@ -159,38 +157,34 @@ function getTransport(): Transport {
     return { kind: 'smtp', client: smtp, user: settings.user };
   }
 
-  const key = process.env.RESEND_API_KEY;
-  if (key) {
-    resend ??= new Resend(key);
-    return { kind: 'resend', client: resend };
-  }
-
   warnOnce(
     'unconfigured',
-    '[email] No transport configured - set GMAIL_USER + GMAIL_APP_PASSWORD (Gmail App Password), ' +
-      'SMTP_USER + SMTP_PASSWORD, or RESEND_API_KEY. Transactional email is disabled.',
+    '[email] No transport configured - set SMTP_PASSWORD to the Gmail App Password for ' +
+      `${MAIL_ACCOUNT}. Transactional email is disabled.`,
   );
   return null;
 }
 
 /**
- * The From header.
+ * The From header: always a platform role mailbox, never a person.
  *
- * Gmail rewrites any From that is not the authenticated mailbox (or a verified
- * alias of it), so EMAIL_FROM contributes its display name and the address is
- * always the mailbox that actually authenticated.
+ * The address comes from ./identity.ts rather than straight out of the
+ * environment, so an EMAIL_FROM pointing anywhere else throws here instead of
+ * going out on a message. Gmail would silently rewrite a From it has not
+ * verified on the authenticated account anyway, and silent rewriting by a
+ * provider is not a control this project should be relying on.
  */
 function fromAddress(transport: NonNullable<Transport>): string {
-  const configured = process.env.EMAIL_FROM?.trim() ?? '';
-  if (transport.kind === 'resend') return configured;
-
-  const match = /^(.*?)\s*<([^>]+)>$/.exec(configured);
-  const name = (match?.[1] ?? '').replace(/^"|"$/g, '').trim() || DEFAULT_SENDER_NAME;
-  const address = (match?.[2] ?? configured).trim();
-  if (address && address.toLowerCase() !== transport.user.toLowerCase()) {
-    warnOnce('from', `[email] EMAIL_FROM does not match the authenticated mailbox; sending as ${transport.user}`);
+  const from = fromHeader();
+  const address = (/<([^>]+)>/.exec(from)?.[1] ?? from).toLowerCase();
+  if (address !== transport.user.toLowerCase()) {
+    warnOnce(
+      'from',
+      `[email] EMAIL_FROM <${address}> is not the authenticated mailbox <${transport.user}>; ` +
+        'Gmail rewrites that to the authenticated address unless it is a verified send-as alias.',
+    );
   }
-  return `${name} <${transport.user}>`;
+  return from;
 }
 
 /** SMTP 4xx and network-level failures are worth another attempt; auth failures are not. */
@@ -209,6 +203,7 @@ async function deliver(
   transport: NonNullable<Transport>,
   message: {
     from: string;
+    replyTo: string;
     to: string;
     subject: string;
     html: string;
@@ -231,52 +226,27 @@ async function deliver(
     'List-Unsubscribe': `<${emailBranding().unsubscribeUrl}>`,
   };
 
-  if (transport.kind === 'smtp') {
-    /**
-     * Inline images. `cid` plus contentDisposition 'inline' is what makes the
-     * attachment render in place of src="cid:logo" rather than appearing as a
-     * downloadable file at the bottom of the message.
-     *
-     * nodemailer defaults the whole message to UTF-8, which is what carries
-     * the Azerbaijani characters in the templates through intact; no explicit
-     * charset is set anywhere, deliberately, so nothing can narrow it.
-     */
-    const info = await transport.client.sendMail({
-      ...body,
-      headers,
-      attachments: attachments.map((asset) => ({
-        filename: asset.filename,
-        content: asset.content,
-        cid: asset.cid,
-        contentType: asset.contentType,
-        contentDisposition: 'inline' as const,
-      })),
-    });
-    return info.messageId ?? null;
-  }
-
   /**
-   * Resend receives the HTML without inline attachments. Its API has no
-   * Content-ID support, so a cid: src would arrive broken; url mode is the
-   * supported configuration for this transport and the images resolve to
-   * absolute URLs before they ever reach here.
+   * Inline images. `cid` plus contentDisposition 'inline' is what makes the
+   * attachment render in place of src="cid:logo" rather than appearing as a
+   * downloadable file at the bottom of the message.
+   *
+   * nodemailer defaults the whole message to UTF-8, which is what carries
+   * the Azerbaijani characters in the templates through intact; no explicit
+   * charset is set anywhere, deliberately, so nothing can narrow it.
    */
-  if (attachments.length > 0) {
-    warnOnce(
-      'resend-cid',
-      '[email] EMAIL_ASSET_MODE=cid is not supported by the Resend transport; ' +
-        'images will be missing. Set EMAIL_ASSET_MODE=url and EMAIL_ASSET_BASE_URL.',
-    );
-  }
-
-  const { data, error } = await transport.client.emails.send({ ...body, headers });
-  if (error) {
-    const transient = ['rate_limit_exceeded', 'application_error', 'internal_server_error'].includes(
-      error.name,
-    );
-    throw Object.assign(new Error(error.message), transient ? { code: 'ECONNECTION' } : { code: 'EREJECTED' });
-  }
-  return data?.id ?? null;
+  const info = await transport.client.sendMail({
+    ...body,
+    headers,
+    attachments: attachments.map((asset) => ({
+      filename: asset.filename,
+      content: asset.content,
+      cid: asset.cid,
+      contentType: asset.contentType,
+      contentDisposition: 'inline' as const,
+    })),
+  });
+  return info.messageId ?? null;
 }
 
 function dedupeRef(dedupeKey: string) {
@@ -325,17 +295,16 @@ export async function sendEmail<K extends TemplateName>(
     if (!transport) return { ok: true, id: null, skipped: 'not-configured' };
 
     const from = fromAddress(transport);
-    if (!from) {
-      console.error('[email] EMAIL_FROM is required for the Resend transport');
-      return { ok: false, error: 'EMAIL_FROM not configured' };
-    }
+    // Every message invites a reply to the monitored mailbox - never to the
+    // sending one, and never to a person.
+    const replyTo = replyToHeader();
 
     if (options.dedupeKey) {
       if (!(await claim(options.dedupeKey, name))) return { ok: true, id: null, skipped: 'duplicate' };
       claimed = true;
     }
 
-    if (transport.kind === 'smtp' && Date.now() < authRejectedUntil) {
+    if (Date.now() < authRejectedUntil) {
       throw Object.assign(new Error('SMTP credentials rejected recently; skipping login attempt'), {
         code: 'EAUTH',
       });
@@ -345,7 +314,7 @@ export async function sendEmail<K extends TemplateName>(
 
     for (let attempt = 1; ; attempt++) {
       try {
-        const id = await deliver(transport, { from, to, subject, html, text, attachments });
+        const id = await deliver(transport, { from, replyTo, to, subject, html, text, attachments });
         console.info('[email] sent "' + name + '" to ' + maskAddress(to) + (id ? ' (' + id + ')' : ''));
         return { ok: true, id };
       } catch (error) {
@@ -354,9 +323,10 @@ export async function sendEmail<K extends TemplateName>(
           warnOnce(
             'eauth',
             '[email] The mail server REJECTED the login (SMTP 535). Every email is being queued in ' +
-              'emailOutbox until this is fixed. For Gmail: create a new App Password at ' +
-              'https://myaccount.google.com/apppasswords for the SMTP_USER mailbox, put it in ' +
-              'SMTP_PASSWORD (or GMAIL_APP_PASSWORD), restart, and check with "npm run email:verify".',
+              'emailOutbox until this is fixed. For Gmail: generate a new App Password ' +
+              '(myaccount.google.com > Security > 2-Step Verification > App passwords) for the ' +
+              'SMTP_USER mailbox, put it in SMTP_PASSWORD, restart, and check with ' +
+              '"npm run email:verify".',
           );
         }
         if (attempt >= MAX_ATTEMPTS || !isTransient(error)) throw error;
@@ -416,22 +386,17 @@ export function sendEmailAsync<K extends TemplateName>(
  * Wired to `npm run email:verify`.
  */
 export async function verifyTransport(): Promise<
-  { ok: true; kind: 'smtp' | 'resend'; from: string } | { ok: false; error: string }
+  { ok: true; kind: 'smtp'; from: string } | { ok: false; error: string }
 > {
   const transport = getTransport();
   if (!transport) return { ok: false, error: 'No transport configured.' };
 
-  if (transport.kind === 'smtp') {
-    try {
-      await transport.client.verify();
-      return { ok: true, kind: 'smtp', from: fromAddress(transport) };
-    } catch (cause) {
-      return { ok: false, error: cause instanceof Error ? cause.message : 'unknown error' };
-    }
+  try {
+    await transport.client.verify();
+    return { ok: true, kind: 'smtp', from: fromAddress(transport) };
+  } catch (cause) {
+    return { ok: false, error: cause instanceof Error ? cause.message : 'unknown error' };
   }
-
-  // Resend has no credential probe that does not send a message.
-  return { ok: true, kind: 'resend', from: fromAddress(transport) };
 }
 
 // ---------------------------------------------------------------------------
@@ -461,6 +426,9 @@ function isPermanent(error: unknown): boolean {
   // Bad credentials (SMTP 535 / EAUTH) are a configuration problem that gets
   // fixed, so the message must be retried afterwards, not dropped.
   if (e.code === 'EAUTH') return false;
+  // A non-platform sender address (see ./identity.ts) would be re-sent from the
+  // same forbidden identity on every retry, so it is never queued.
+  if (e.code === 'EIDENTITY') return true;
   if (e.code === 'EREJECTED') return true;
   return typeof e.responseCode === 'number' && e.responseCode >= 500 && e.responseCode !== 521;
 }

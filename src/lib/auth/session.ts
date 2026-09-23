@@ -137,6 +137,16 @@ export async function issueSession(params: {
   userAgent: string;
   /** FK to UserDevice. Sessions are tied to a device, never to an address. */
   deviceId?: string;
+  /**
+   * Factors proven to get here (see SessionRecord.amr). Required, not
+   * defaulted: a caller that forgot to say how the user authenticated must
+   * not silently mint a session that claims less - or more - than happened.
+   */
+  amr: string[];
+  /** When a second factor was proven; carried over unchanged on refresh. */
+  mfaAt: Date | null;
+  /** Original sign-in time. Omitted for a new sign-in; passed on rotation. */
+  authAt?: Date;
 }) {
   const refreshToken = newOpaqueToken();
   const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 86_400_000);
@@ -162,6 +172,9 @@ export async function issueSession(params: {
     userAgent: params.userAgent,
     deviceId: params.deviceId ?? null,
     expiresAt,
+    amr: params.amr,
+    mfaAt: params.mfaAt,
+    authAt: params.authAt ?? new Date(),
   });
 
   const ttl = accessTtlFor(params.user.role);
@@ -293,7 +306,25 @@ export function clearSessionCookies(response: NextResponse): NextResponse {
  * The cost is one indexed lookup per request, and it is fetched in the SAME
  * query as the user via a relation include, so it is not an extra round trip.
  */
-export type SessionResult = { userId: string; sessionId: string; viewer: Viewer };
+export type SessionResult = {
+  userId: string;
+  sessionId: string;
+  viewer: Viewer;
+  /** Factors proven on this session. See SessionRecord.amr. */
+  amr: string[];
+  mfaAt: Date | null;
+  /** When the person signed in (survives refresh rotation; see SessionRecord.authAt). */
+  authenticatedAt: Date;
+  /** The account's REAL role, even when `viewer.role` is withheld (below). */
+  accountRole: UserRole;
+};
+
+const STAFF_REQUIRING_MFA: ReadonlySet<UserRole> = new Set([UserRole.ADMIN, UserRole.MODERATOR]);
+
+/** True when this session proved a second factor. */
+export function sessionHasMfa(amr: readonly string[]): boolean {
+  return amr.includes('otp') || amr.includes('recovery');
+}
 
 /**
  * ---------------------------------------------------------------------------
@@ -414,15 +445,45 @@ async function loadSession(request?: NextRequest): Promise<SessionResult> {
   // it must never add latency to an authenticated request.
   void touchSession(session.id, now).catch(() => {});
 
+  /**
+   * ---------------------------------------------------------------------------
+   * STAFF POWERS REQUIRE A SECOND FACTOR - ENFORCED HERE, ONCE
+   * ---------------------------------------------------------------------------
+   * An ADMIN or MODERATOR whose session has not proven a second factor gets a
+   * viewer carrying an ordinary member's role, plus `mfaRequired`.
+   *
+   * Why here and not in requireAdmin(): staff privileges are not confined to
+   * /api/admin. permissions.can('moderation:review'), deleting another
+   * person's post, and reading any note's file all branch on `viewer.role`
+   * directly. Gating only the admin API would leave those open to a stolen
+   * password. Withholding the role at the one place every viewer is built
+   * makes every existing check - and every future one - fail closed without
+   * having to remember MFA.
+   *
+   * STUDENT is the least-privileged member role. The account keeps its real
+   * role in the database; `accountRole` exposes it to the few callers that
+   * must know it (the MFA endpoints: staff may not switch 2FA off).
+   *
+   * The same applies to sessions minted before this change: they carry no
+   * `amr`, so a staff member must verify once to get the panel back.
+   */
+  const mfaRequired = STAFF_REQUIRING_MFA.has(user.role) && !sessionHasMfa(session.amr);
+
   return {
     userId: user.id,
     sessionId: session.id,
+    amr: session.amr,
+    mfaAt: session.mfaAt,
+    authenticatedAt: session.authAt,
+    accountRole: user.role,
     viewer: {
       id: user.id,
-      role: user.role,
+      role: mfaRequired ? UserRole.STUDENT : user.role,
       accountStatus: effectiveStatus,
       verificationStatus: user.verificationStatus,
       frozenUntil: user.frozenUntil,
+      mfaRequired,
+      profileIncomplete: user.profileIncomplete === true,
     },
   };
 }
@@ -517,6 +578,12 @@ export async function rotateSession(refreshToken: string, userAgent: string) {
     },
     userAgent,
     deviceId: existing.deviceId ?? undefined,
+    // Rotation continues the SAME sign-in: it proves possession of the refresh
+    // token and nothing else, so it inherits the factors and their timestamp
+    // exactly - it can never add one, and must never drop one.
+    amr: existing.amr,
+    mfaAt: existing.mfaAt,
+    authAt: existing.authAt,
   });
 }
 

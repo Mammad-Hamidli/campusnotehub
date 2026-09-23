@@ -25,7 +25,7 @@ export async function createMeetingRoom(params: {
   const room = `ch-${params.bookingId}`;
   return {
     provider: 'jitsi' as const,
-    url: `https://meet.campushub.az/${room}`,
+    url: `https://meet.campushub.com/${room}`,
     room,
   };
 }
@@ -81,7 +81,7 @@ export async function issueJoinToken(params: { bookingId: string; userId: string
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(process.env.JITSI_APP_ID!)
     .setAudience('jitsi')
-    .setSubject('meet.campushub.az')
+    .setSubject('meet.campushub.com')
     // Epoch SECONDS, not a Date and not milliseconds: jose's setExpirationTime
     // writes a number straight into `exp`, which RFC 7519 defines as NumericDate.
     .setExpirationTime(Math.floor(closesAt / 1000))

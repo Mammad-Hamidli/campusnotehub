@@ -170,6 +170,44 @@ export async function processImage(input: Buffer): Promise<ImageResult> {
   }
 }
 
+/** Profile pictures are stored as one square, large enough for a 2x retina 128px ring. */
+export const AVATAR_SIZE = 320;
+
+/**
+ * Validates and re-encodes a PROFILE PICTURE.
+ *
+ * The same guarantees as processImage() - type decided from the bytes, EXIF
+ * (including GPS) destroyed by the re-encode, decompression bombs refused -
+ * but the output is a fixed AVATAR_SIZE square, centre-cropped, and always a
+ * still image: an animated avatar in every feed row is a performance cost the
+ * product does not need. Never throws for bad input.
+ */
+export async function processAvatar(input: Buffer): Promise<ImageResult> {
+  if (input.length === 0) return { ok: false, reason: 'FILE_EMPTY' };
+  if (input.length > MAX_IMAGE_BYTES) return { ok: false, reason: 'FILE_TOO_LARGE' };
+  if (!sniff(input)) return { ok: false, reason: 'MIME_NOT_ALLOWED' };
+
+  try {
+    const pipeline = sharp(input, { limitInputPixels: MAX_INPUT_PIXELS, animated: false });
+    const metadata = await pipeline.metadata();
+    if (!metadata.width || !metadata.height) return { ok: false, reason: 'DECODE_FAILED' };
+    if (metadata.width < MIN_DIMENSION || metadata.height < MIN_DIMENSION) {
+      return { ok: false, reason: 'DIMENSIONS_TOO_SMALL' };
+    }
+
+    const side = Math.min(AVATAR_SIZE, metadata.width, metadata.height);
+    const bytes = await pipeline
+      .rotate()
+      .resize({ width: side, height: side, fit: 'cover', position: 'attention' })
+      .webp({ quality: 82 })
+      .toBuffer();
+
+    return { ok: true, image: { bytes, mime: 'image/webp', width: side, height: side } };
+  } catch {
+    return { ok: false, reason: 'DECODE_FAILED' };
+  }
+}
+
 /**
  * Output size for one upload: the clamped aspect ratio, at most
  * FEED_IMAGE_MAX_WIDTH wide, and never larger than the (post-crop) source.

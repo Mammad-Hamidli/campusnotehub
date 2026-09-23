@@ -1,8 +1,8 @@
 /**
  * Resets CampusHub to a clean state and creates exactly one administrator.
  *
- *   npx tsx scripts/bootstrap-admin.mts --email admin@campushub.az            # admin only
- *   npx tsx scripts/bootstrap-admin.mts --email admin@campushub.az --wipe --yes
+ *   npx tsx scripts/bootstrap-admin.mts --email admin@campushub.com            # admin only
+ *   npx tsx scripts/bootstrap-admin.mts --email admin@campushub.com --wipe --yes
  *
  * --wipe deletes APPLICATION data only:
  *   - every Firestore collection the app owns (and their subcollections),
@@ -146,6 +146,14 @@ if (!(await users.where('email', '==', email).limit(1).get()).empty) {
   process.exit(1);
 }
 
+// The admin's handle is claimed like any other (see createUser). Without
+// --wipe an old, demoted admin may still hold it; refuse rather than steal it.
+const usernameClaim = db.collection(COLLECTIONS.usernames).doc('admin');
+if ((await usernameClaim.get()).exists) {
+  console.error('\n  The username "admin" is already claimed by another account.\n');
+  process.exit(1);
+}
+
 /**
  * 24 unbiased characters from an alphanumeric alphabet (~140 bits), always
  * with upper, lower and digit.
@@ -218,6 +226,7 @@ batch.set(
     showPhone: 'PRIVATE',
     showUniversity: 'PRIVATE',
     showFaculty: 'PRIVATE',
+    showGraduationYear: 'PRIVATE',
     failedLoginCount: 0,
     lockedUntil: null,
     emailVerifiedAt: now,
@@ -231,6 +240,8 @@ batch.set(
   db.collection('credentials').doc(ref.id),
   forFirestore({ passwordHash, emailHash: hashEmail(email), phoneHash: null, updatedAt: now }),
 );
+// create(): the commit fails as a whole if the claim appeared since the check.
+batch.create(usernameClaim, forFirestore({ userId: ref.id, createdAt: now }));
 batch.set(
   db.collection(COLLECTIONS.wallets).doc(ref.id),
   forFirestore({
@@ -266,5 +277,7 @@ console.log(`    id:     ${ref.id}`);
 console.log(`    email:  ${email}`);
 console.log('    password (the whole next line, nothing else):\n');
 console.log(password);
-console.log('\n  Shown once - store it in a password manager. Any earlier admin password is void.\n');
+console.log('\n  Shown once - store it in a password manager. Any earlier admin password is void.');
+console.log('  Next: sign in and set up an authenticator at /settings/security - the admin');
+console.log('  panel stays locked until this account has two-factor authentication.\n');
 process.exit(0);

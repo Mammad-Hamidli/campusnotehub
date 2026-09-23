@@ -45,3 +45,23 @@ describe('denialKey', () => {
     expect(denialKey(viewer(), 'moderation:review')).toBe('errors.forbidden');
   });
 });
+
+describe('an unfinished quick-login profile is view-only', () => {
+  const incomplete = viewer({ profileIncomplete: true, verificationStatus: VerificationStatus.VERIFIED });
+
+  it.each(['feed:read', 'notes:browse', 'mentors:browse'] as const)('can still %s', (capability) => {
+    expect(can(incomplete, capability)).toBe(true);
+  });
+
+  it.each(['feed:post', 'feed:comment', 'feed:react', 'users:follow', 'notes:buy', 'mentors:book'] as const)(
+    'cannot %s - even when verified',
+    (capability) => {
+      expect(can(incomplete, capability)).toBe(false);
+      expect(can(viewer({ verificationStatus: VerificationStatus.VERIFIED }), capability)).toBe(true);
+    },
+  );
+
+  it('explains the refusal as "finish your profile", not as verification', () => {
+    expect(denialKey(incomplete, 'users:follow')).toBe('onboarding.restricted');
+  });
+});

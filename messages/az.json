@@ -47,9 +47,9 @@
   },
   "auth": {
     "register": {
-      "title": "CampusHub-a qoşul",
-      "subtitle": "Universitet icması üçün doğrulanmış platforma",
-      "fullName": "Ad və soyad",
+      "title": "CampusHub-a qoşul 🎉",
+      "subtitle": "Bir dəqiqə — və kampusun ən canlı icmasındasan.",
+      "fullName": "Ad",
       "fullNameHint": "Şəxsiyyət vəsiqənizdəki kimi yazın",
       "email": "E-poçt",
       "emailHint": "Universitet e-poçtu varsa, doğrulama daha sürətli olur",
@@ -66,7 +66,7 @@
       "createAccount": "Hesab yarat",
       "haveAccount": "Artıq hesabınız var?",
       "phone": "Telefon nömrəsi",
-      "phoneHint": "Seçimlidir, lakin hesabın bərpası və ödənişlər üçün lazım olacaq",
+      "phoneHint": "Hesabı bərpa etmək və ödənişləri təsdiqləmək üçün istifadə olunur",
       "nickname": "İstifadəçi adı",
       "nicknameHint": "Platformada bu ad görünəcək. Hərf, rəqəm və alt xətt, 3-24 simvol.",
       "graduationDate": "Məzuniyyət tarixi",
@@ -142,7 +142,7 @@
       },
       "graduatedDate": "Məzuniyyət tarixi",
       "expectedGraduationDate": "Gözlənilən məzuniyyət tarixi",
-      "verifyLater": "Qeydiyyat üçün sənəd tələb olunmur. Hesabınız dərhal hazır olur — konspekt alıb-satmaq, balans və mentor sifarişləri üçün şəxsiyyətinizi istədiyiniz vaxt Tənzimləmələr bölməsində doğrulayın.",
+      "verifyLater": "Qeydiyyat üçün sənəd tələb olunmur. Hesabın dərhal hazırdır — dərs notları al və sat, balans və mentor sifarişləri üçün şəxsiyyətini istədiyin vaxt Tənzimləmələrdə doğrula.",
       "schedule": {
         "title": "İş qrafikiniz",
         "subtitle": "Tələbələrin hər həftə sizinlə görüş təyin edə biləcəyi vaxtları seçin.",
@@ -156,11 +156,18 @@
         "later": "Qrafiki istənilən vaxt dəyişə bilərsiniz. Mentor müraciətiniz təsdiqlənənə qədər heç kim sizinlə görüş təyin edə bilməz."
       },
       "universityNone": "Universitetlə əlaqəm yoxdur",
-      "universityMentorHint": "Mentorlar üçün universitet tələb olunmur. Yalnız universitetdə dərs deyirsinizsə və ya işləyirsinizsə seçin."
+      "universityMentorHint": "Mentorlar üçün universitet tələb olunmur. Yalnız universitetdə dərs deyirsinizsə və ya işləyirsinizsə seçin.",
+      "nameHint": "Profilində görünən adın. Doğrulama zamanı sənədlə müqayisə olunur.",
+      "fullNamePlaceholder": "Aysel Məmmədova",
+      "personalEmail": "Şəxsi e-poçt",
+      "personalEmailHint": "Universitet e-poçtu tələb olunmur — istənilən şəxsi ünvan olar.",
+      "quickHint": "Tez qeydiyyatdan sonra profilini tamamlayana qədər hesab yalnız baxış rejimində olur.",
+      "mentorHint": "Tələbə deyil, mentorsan?",
+      "mentorCta": "Mentor olmaq üçün müraciət et"
     },
     "login": {
       "title": "Xoş gəlmisiniz",
-      "email": "E-poçt",
+      "identifier": "E-poçt və ya istifadəçi adı",
       "password": "Şifrə",
       "forgotPassword": "Şifrəni unutmusunuz?",
       "submit": "Daxil ol",
@@ -175,7 +182,7 @@
       "tooManyAttempts": "Çox sayda cəhd. {minutes} dəqiqə sonra yenidən yoxlayın",
       "accountLocked": "Hesab müvəqqəti bloklanıb",
       "termsRequired": "Davam etmək üçün şərtləri qəbul edin",
-      "nameTooShort": "Ad və soyad ən azı 3 simvol olmalıdır",
+      "nameTooShort": "Ad ən azı 2 simvol olmalıdır",
       "nameInvalid": "Yalnız hərf, boşluq və defis istifadə edin",
       "nicknameInvalid": "Yalnız hərf, rəqəm və alt xətt. 3-24 simvol.",
       "nicknameReserved": "Bu istifadəçi adı istifadə edilə bilməz",
@@ -192,7 +199,106 @@
       "academicTitleRequired": "Akademik vəzifə tələb olunur",
       "graduationNotPast": "«Məzun olmuşam» seçdiniz, ona görə bu tarix gələcəkdə ola bilməz.",
       "graduationNotFuture": "«Hazırda oxuyuram» seçdiniz, ona görə bu tarix keçmişdə ola bilməz.",
-      "graduationStatusMismatch": "Məzuniyyət tarixi seçdiyiniz təhsil statusuna uyğun gəlmir."
+      "graduationStatusMismatch": "Məzuniyyət tarixi seçdiyiniz təhsil statusuna uyğun gəlmir.",
+      "mfaInvalid": "Kod yanlışdır. Autentifikator tətbiqini yoxlayıb yenidən cəhd edin.",
+      "mfaLocked": "Çox sayda yanlış kod. İki mərhələli giriş 15 dəqiqəlik bloklandı.",
+      "mfaRequired": "Heyət hesabları üçün iki mərhələli doğrulama tələb olunur. Davam etmək üçün onu quraşdırın və ya bu sessiyanı təsdiqləyin.",
+      "mfaTicketExpired": "Giriş çox uzun çəkdi. Şifrənizi yenidən daxil edin.",
+      "mfaNotEnrolled": "Bu hesabda iki mərhələli doğrulama quraşdırılmayıb.",
+      "mfaStepUpRequired": "Autentifikatoru dəyişmək üçün cari tətbiqdəki kodu daxil edin.",
+      "mfaSetupExpired": "Quraşdırmanın vaxtı bitdi. Yeni QR kod üçün yenidən başlayın.",
+      "mfaRequiredForStaff": "Heyət hesablarında iki mərhələli doğrulamanı söndürmək olmaz.",
+      "mfaResetSelf": "Öz iki mərhələli doğrulamanızı sıfırlaya bilməzsiniz. Başqa administratora müraciət edin.",
+      "reauthCodeRequired": "Təsdiq üçün autentifikator tətbiqindəki kodu daxil edin.",
+      "reauthPasswordRequired": "Təsdiq üçün şifrənizi daxil edin.",
+      "reauthFailed": "Şifrə yanlışdır.",
+      "reauthRecentSignIn": "Təhlükəsizlik üçün çıxış edib yenidən daxil olun, sonra 10 dəqiqə ərzində təkrar cəhd edin."
+    },
+    "mfa": {
+      "title": "İki mərhələli doğrulama",
+      "prompt": "Autentifikator tətbiqindəki 6 rəqəmli kodu daxil edin.",
+      "recoveryPrompt": "İki mərhələli doğrulamanı quraşdırarkən saxladığınız bərpa kodlarından birini daxil edin.",
+      "codeLabel": "Doğrulama kodu",
+      "recoveryLabel": "Bərpa kodu",
+      "useRecovery": "Bərpa kodundan istifadə edin",
+      "useCode": "Autentifikator tətbiqindən istifadə edin",
+      "verify": "Təsdiqlə",
+      "back": "Girişə qayıt",
+      "recoveryLow": "{count} bərpa kodunuz qalıb. Yenilərini Parametrlər → Təhlükəsizlik bölməsində yaradın."
+    },
+    "reauth": {
+      "recentHint": "Hesabınızın şifrəsi yoxdur, ona görə də sizin olduğunuzu təsdiqləmək üçün son giriş istifadə olunur. Alınmasa, əvvəlcə çıxış edib yenidən daxil olun.",
+      "passwordLabel": "Cari şifrə"
+    },
+    "oauth": {
+      "or": "və ya",
+      "continueWith": "{provider} ilə davam et",
+      "emailFromProvider": "{provider} tərəfindən təsdiqlənib. Hesabınız bu ünvandan istifadə edəcək.",
+      "noPasswordNeeded": "{provider} ilə daxil olacaqsınız, ona görə də bu hesaba şifrə lazım deyil.",
+      "connectedTitle": "Qoşulmuş hesablar",
+      "connectedDescription": "Artıq mövcud olan hesabla daxil olun. Qoşmazdan əvvəl sizin olduğunuz təsdiqlənir.",
+      "linkedSince": "{account} · {date} tarixində qoşulub",
+      "notLinked": "Qoşulmayıb",
+      "link": "Qoş",
+      "unlink": "Ayır",
+      "confirmLink": "Sizin olduğunuzu təsdiqləyin, sonra {provider} ilə davam edin.",
+      "confirmUnlink": "{provider} hesabını ayırmaq üçün sizin olduğunuzu təsdiqləyin. Digər sessiyalarınız bağlanacaq.",
+      "linkedToast": "{provider} qoşuldu",
+      "unlinkedToast": "{provider} ayrıldı",
+      "errors": {
+        "cancelled": "Giriş ləğv edildi.",
+        "expired": "Giriş cəhdinin vaxtı bitdi. Yenidən cəhd edin.",
+        "failed": "Bu hesabla daxil olmaq mümkün olmadı. Yenidən cəhd edin.",
+        "unavailable": "Bu giriş üsulu hazırda mövcud deyil.",
+        "link_required": "Bu e-poçtla hesab artıq mövcuddur. Şifrənizlə daxil olun və Parametrlər → Təhlükəsizlik bölməsində e-poçtunuzu təsdiqləyin - bundan sonra {provider} avtomatik qoşulacaq - və ya {provider} hesabını orada birbaşa qoşun.",
+        "identity_in_use": "Bu hesab artıq başqa CampusHub hesabına qoşulub.",
+        "provider_already_linked": "Başqa {provider} hesabı artıq qoşulub. Əvvəlcə onu ayırın.",
+        "rate_limited": "Çox sayda cəhd. Bir neçə dəqiqə gözləyib yenidən cəhd edin.",
+        "signup_expired": "Qeydiyyat sessiyasının vaxtı bitdi. Giriş səhifəsindən yenidən başlayın.",
+        "last_method": "Bu, yeganə giriş üsulunuzdur, ona görə də ayırmaq olmaz."
+      }
+    },
+    "emailVerify": {
+      "pageTitle": "E-poçtunuzu təsdiqləyin",
+      "working": "Təsdiqlənir…",
+      "done": "E-poçt ünvanınız təsdiqləndi. Bu ünvanla Google girişi artıq hesabınıza avtomatik qoşulacaq.",
+      "toSettings": "Təhlükəsizlik parametrlərinə keç",
+      "requestNew": "Yeni link istə",
+      "panelTitle": "E-poçt ünvanı",
+      "panelDescription": "Ünvanınızı təsdiqləsəniz, eyni təsdiqlənmiş e-poçtlu Google hesabı avtomatik qoşulur.",
+      "verified": "Təsdiqlənib",
+      "notVerified": "Təsdiqlənməyib",
+      "send": "Təsdiq linkini göndər",
+      "sent": "Link {email} ünvanına göndərildi. Onu daxil olduğunuz bu brauzerdə açın; 24 saata etibarsız olur.",
+      "errors": {
+        "invalid": "Bu link etibarsızdır və ya vaxtı bitib. Təhlükəsizlik parametrlərindən yenisini istəyin.",
+        "wrongAccount": "Bu link başqa hesaba aiddir. Çıxış edin, həmin hesaba daxil olun və linki yenidən açın.",
+        "alreadyVerified": "E-poçt ünvanınız artıq təsdiqlənib."
+      }
+    },
+    "password": {
+      "forgotTitle": "Şifrəni bərpa edin",
+      "forgotSubtitle": "Hesabınızın e-poçt ünvanını daxil edin, yeni şifrə seçmək üçün sizə link göndərək.",
+      "emailLabel": "E-poçt ünvanı",
+      "sendLink": "Bərpa linkini göndər",
+      "sent": "{email} ünvanı ilə hesab varsa, bərpa linki göndərildi. Link bir dəfə, 30 dəqiqə ərzində işləyir. Gəlməsə, spam qovluğunu yoxlayın.",
+      "backToLogin": "Girişə qayıt",
+      "resetTitle": "Yeni şifrə seçin",
+      "newPassword": "Yeni şifrə",
+      "save": "Yeni şifrəni yadda saxla",
+      "resetDone": "Şifrəniz dəyişdirildi və bütün cihazlardan çıxış edildi. Yeni şifrənizlə daxil olun.",
+      "toLogin": "Daxil ol",
+      "requestNew": "Yeni link istə",
+      "changeTitle": "Şifrə",
+      "changeDescription": "Şifrəni dəyişdikdə digər bütün cihazlardan çıxış edilir.",
+      "currentPassword": "Cari şifrə",
+      "changeSubmit": "Şifrəni dəyiş",
+      "changed": "Şifrə dəyişdirildi. Digər bütün cihazlardan çıxış edildi.",
+      "errors": {
+        "linkInvalid": "Bu bərpa linki etibarsızdır, artıq istifadə olunub və ya vaxtı bitib. Yenisini istəyin.",
+        "sameAsCurrent": "Cari şifrənizdən fərqli şifrə seçin.",
+        "noPassword": "Hesabınız Google ilə daxil olur və dəyişdiriləcək şifrəsi yoxdur."
+      }
     }
   },
   "verification": {
@@ -347,6 +453,18 @@
       "deleteBody": "Paylaşım hamı üçün lentdən silinəcək. Bu əməliyyat geri qaytarıla bilməz.",
       "deleted": "Paylaşımınız uğurla silindi.",
       "likeFailed": "Bəyənməniz yadda saxlanılmadı. Yenidən cəhd edin."
+    },
+    "translate": {
+      "action": "Tərcümə et",
+      "showOriginal": "Orijinalı göstər",
+      "chooseLanguage": "Dil seçin",
+      "attribution": "{language} dilinə maşın tərcüməsi. Dəqiq olmaya bilər.",
+      "errors": {
+        "failed": "Bu paylaşım tərcümə edilə bilmədi. Yenidən cəhd edin.",
+        "unavailable": "Tərcümə hazırda əlçatan deyil.",
+        "unsupported": "Bu dil dəstəklənmir.",
+        "empty": "Tərcümə ediləcək mətn yoxdur."
+      }
     },
     "posted": "Paylaşımınız uğurla dərc olundu.",
     "commentPosted": "Şərhiniz əlavə olundu."
@@ -780,7 +898,11 @@
       "rejectedBody": "Hesabınız silinmədi. Səbəbi e-poçtunuzda görə bilərsiniz."
     },
     "allRead": "Bütün bildirişlər oxunmuş kimi qeyd olundu.",
-    "updateFailed": "Bildirişlər yenilənmədi. Yenidən cəhd edin."
+    "updateFailed": "Bildirişlər yenilənmədi. Yenidən cəhd edin.",
+    "newFollower": {
+      "title": "Yeni izləyici",
+      "body": "@{nickname} səni izləməyə başladı"
+    }
   },
   "errors": {
     "generic": "Xəta baş verdi. Yenidən cəhd edin.",
@@ -816,60 +938,63 @@
       "about": "Haqqımızda"
     },
     "hero": {
-      "badge": "Yalnız doğrulanmış tələbələr",
-      "titleLead": "Tələbələr və gələcək peşəkarlar üçün",
-      "titleAccent": "tam ekosistem",
-      "subtitle": "Konspekt al və sat, sahəsində çalışan peşəkarlarla birbaşa görüş, kampus xəbərlərini bir yerdə izlə. Hər hesab tələbə bileti və şəxsiyyət vəsiqəsi ilə doğrulanır.",
-      "ctaNotes": "Konspektlərə bax",
-      "ctaMentor": "Mentor tap",
-      "trust": "Saxta profil yoxdur — hər hesab sənədlə yoxlanılır"
+      "badge": "Tələbələrin sosial məkanı",
+      "titleLead": "Dərs notları al və sat,",
+      "titleAccent": "kampusun ən canlı icmasına qoşul",
+      "subtitle": "Kurs yoldaşlarını izlə, lentdə paylaş, sual ver və cavabla, dərs notları al və sat, mentorlarla tanış ol — hamısı bir yerdə, doğrulanmış tələbələrlə.",
+      "ctaNotes": "Dərs notlarına bax",
+      "trust": "Saxta profil yoxdur — hər hesab doğrulanır",
+      "ctaJoin": "Pulsuz qoşul"
     },
     "stats": {
       "students": "Aktiv tələbə",
-      "notes": "Paylaşılan konspekt",
+      "notes": "Paylaşılan dərs notu",
       "hours": "Mentorluq saatı",
       "universities": "Universitet",
       "live": "Canlı"
     },
     "features": {
-      "eyebrow": "Üç məhsul, bir hesab",
-      "title": "Universitet həyatın üçün lazım olan hər şey",
-      "subtitle": "Doğrulanmış tələbə şəxsiyyəti üç məhsulun da təməlidir. Bir dəfə yoxlanırsan, hər yerdə istifadə edirsən.",
+      "eyebrow": "Bir hesab, üç dünya",
+      "title": "Dərs, dostluq və karyera — hamısı bir yerdə",
+      "subtitle": "Lentdə danış, dərs notları al və sat, mentor tap. Bir dəfə qoşul, hər yerdə istifadə et.",
       "notes": {
         "title": "UniNotes",
-        "body": "Tələbədən tələbəyə konspekt bazarı. Yüklə, qazanc əldə et və ya lazım olanı tap.",
+        "body": "Dərs notları al və sat. Yüklə, qazan və ya imtahandan əvvəl lazım olanı tap.",
         "p1": "İlk səhifə önizləməsi avtomatik yaradılır",
         "p2": "Daxili balans ilə təhlükəsiz ödəniş",
-        "p3": "Yalnız alanlar rəy yaza bilir"
+        "p3": "Yalnız alanlar rəy yaza bilir",
+        "cta": "Dərs notlarına bax"
       },
       "mentor": {
         "title": "PocketMentor",
         "body": "Sahəsində çalışan peşəkarlarla fərdi karyera məsləhəti.",
         "p1": "IT, marketinq, hüquq, mühəndislik və daha çox",
         "p2": "Boş vaxtlardan seç, dərhal təsdiqlə",
-        "p3": "Görüş bitənə qədər ödəniş saxlanılır"
+        "p3": "Görüş bitənə qədər ödəniş saxlanılır",
+        "cta": "Mentor tap"
       },
       "feed": {
         "title": "Kampus lenti",
-        "body": "İmtahan xəbərdarlıqları, təqaüd elanları, sual-cavab — universitetin üzrə filtrlə.",
+        "body": "İmtahan xəbərləri, təqaüd elanları, memlər və sual-cavab — universitetinin ritmi burada.",
         "p1": "Universitetə görə filtr",
         "p2": "Etiketlərlə mövzu axtarışı",
-        "p3": "Şəkil və qeyd paylaşımı"
+        "p3": "Şəkil və qeyd paylaşımı",
+        "cta": "Lentə keç"
       }
     },
     "ticker": {
       "title": "Kampusda indi",
       "joined": "{name} qoşuldu",
       "verified": "{name} doğrulandı",
-      "uploaded": "{name} yeni konspekt yüklədi",
+      "uploaded": "{name} yeni dərs notu yüklədi",
       "booked": "{name} mentor görüşü təyin etdi",
       "popular": "{title} bu gün {count} dəfə alındı"
     },
     "cta": {
-      "title": "Bu gün başla",
-      "body": "Qeydiyyat 2 dəqiqə çəkir. Sənədlər yoxlanarkən platformadan istifadə edə bilərsən.",
+      "title": "Kampus səni gözləyir 🎉",
+      "body": "Qeydiyyat bir dəqiqə çəkir. Qoşul, izlə, paylaş, dərs notları al və sat.",
       "button": "Pulsuz hesab yarat",
-      "secondary": "Əvvəlcə konspektlərə bax"
+      "secondary": "Əvvəlcə dərs notlarına bax"
     },
     "footer": {
       "tagline": "Azərbaycan universitetləri üçün doğrulanmış tələbə platforması.",
@@ -881,6 +1006,17 @@
       "security": "Təhlükəsizlik",
       "contact": "Əlaqə",
       "rights": "Bütün hüquqlar qorunur."
+    },
+    "social": {
+      "title": "Burada nələr baş verir",
+      "items": {
+        "follow": "Kurs yoldaşlarını izlə",
+        "feed": "Kampus lentində paylaş",
+        "comment": "Şərh yaz, bəyən, müzakirə et",
+        "notes": "Dərs notları al və sat",
+        "mentor": "Mentorlarla tanış ol",
+        "campus": "Universitetinə görə kəşf et"
+      }
     }
   },
   "register": {
@@ -904,7 +1040,7 @@
       "title": "İndi qeydiyyatdan keçin, sonra doğrulayın",
       "b1": "İndi sənəd axtarmağa ehtiyac yoxdur — hesab yalnız bu formadan yaradılır",
       "b2": "Doğrulama — nə vaxt istəsəniz — saxta profillərin və oğurlanmış konspektlərin qarşısını alır",
-      "b3": "O, konspekt alqı-satqısını, balansı və mentor sifarişini açır",
+      "b3": "Dərs notları al və sat, balans və mentor sifarişlərini açır",
       "privacy": "Doğrulama zamanı şəkillər həmin anda emal olunur və dərhal silinir. Serverlərimizdə heç vaxt saxlanılmır."
     },
     "scanner": {
@@ -1390,7 +1526,9 @@
       "devicesHint": "Hesabınıza daxil olmuş cihazlar",
       "exportData": "Məlumatlarımı yüklə",
       "exportHint": "Bütün məlumatlarınızın JSON kopyası",
-      "deleteAccount": "Hesabı sil"
+      "deleteAccount": "Hesabı sil",
+      "security": "İki mərhələli doğrulama",
+      "securityHint": "Autentifikator tətbiqi və bərpa kodları"
     },
     "verification": {
       "title": "Şəxsiyyətin doğrulanması",
@@ -1444,6 +1582,45 @@
       },
       "submitted": "Silinmə sorğunuz yoxlanılmaq üçün göndərildi.",
       "cancelled": "Silinmə sorğunuz ləğv edildi."
+    },
+    "security": {
+      "title": "Təhlükəsizlik",
+      "back": "Parametrlər",
+      "heading": "İki mərhələli doğrulama",
+      "description": "Hər girişdə şifrədən əlavə autentifikator tətbiqindəki kod tələb olunur.",
+      "statusOn": "Aktiv",
+      "statusOff": "Deaktiv",
+      "offBody": "Hesabınızı Google Authenticator, Microsoft Authenticator və ya Authy kimi autentifikator tətbiqi ilə qoruyun. Şifrənizi kimsə öyrənsə belə, telefonunuz olmadan daxil ola bilməz.",
+      "requiredNotice": "Rolunuz iki mərhələli doğrulama tələb edir. Admin panelindən istifadə üçün onu quraşdırın.",
+      "verifyNotice": "Bu sessiya autentifikatorla təsdiqlənməyib. Heyət alətlərini açmaq üçün kodu daxil edin.",
+      "verifySession": "Sessiyanı təsdiqlə",
+      "enable": "Autentifikatoru quraşdır",
+      "scanTitle": "Bu QR kodu skan edin",
+      "scanHint": "Autentifikator tətbiqini açın, hesab əlavə edin və kodu skan edin. Və ya quraşdırma açarını əl ilə yazın.",
+      "qrAlt": "Autentifikator tətbiqi üçün QR kod",
+      "manualKey": "Quraşdırma açarı",
+      "confirmLabel": "Tətbiqin göstərdiyi 6 rəqəmli kodu daxil edin",
+      "confirm": "Təsdiqlə və aktivləşdir",
+      "cancel": "Ləğv et",
+      "codesTitle": "Bərpa kodlarınızı saxlayın",
+      "codesHint": "Telefonunuzu itirsəniz, hər kod bir dəfə giriş imkanı verir. Onlar bir daha göstərilməyəcək - şifrə menecerində saxlayın və ya çap edin.",
+      "copy": "Kodları kopyala",
+      "copied": "Kopyalandı",
+      "download": "Yüklə",
+      "done": "Saxladım",
+      "enabledSince": "{date} tarixindən aktivdir",
+      "codesRemaining": "{count} bərpa kodu qalıb",
+      "replace": "Autentifikatoru dəyiş",
+      "regenerate": "Yeni bərpa kodları",
+      "disable": "Söndür",
+      "stepUpTitle": "Bunun siz olduğunuzu təsdiqləyin",
+      "stepUpPrompt": "Autentifikator tətbiqindəki kodu və ya bərpa kodunu daxil edin.",
+      "continue": "Davam et",
+      "staffCannotDisable": "Heyət hesablarında iki mərhələli doğrulamanı söndürmək olmaz.",
+      "enabledToast": "İki mərhələli doğrulama aktivdir",
+      "disabledToast": "İki mərhələli doğrulama söndürüldü",
+      "verifiedToast": "Sessiya təsdiqləndi",
+      "loadFailed": "Təhlükəsizlik parametrlərini yükləmək mümkün olmadı."
     }
   },
   "stub": {
@@ -1480,7 +1657,15 @@
       "joined": "Qoşulub"
     },
     "headline": "Başlıq",
-    "bio": "Haqqınızda"
+    "bio": "Haqqınızda",
+    "viewPublic": "Profilə bax",
+    "avatar": {
+      "upload": "Şəkil yüklə",
+      "change": "Şəkli dəyiş",
+      "remove": "Sil",
+      "updated": "Profil şəkli yeniləndi",
+      "removed": "Profil şəkli silindi"
+    }
   },
   "legal": {
     "onThisPage": "Bu səhifədə",
@@ -1489,5 +1674,32 @@
     "related": "Əlaqəli sənəd",
     "backToTop": "Yuxarı qayıt",
     "opensInNewTab": "(yeni vərəqdə açılır)"
+  },
+  "onboarding": {
+    "badge": "Son addım",
+    "title": "Profilini tamamla",
+    "subtitle": "Adını, istifadəçi adını və universitetini seç — sonra paylaşa, şərh yaza, bəyənə və izləyə biləcəksən.",
+    "viewOnly": "Hazırda müvəqqəti @{handle} adı ilə yalnız baxış rejimindəsən: paylaşım, şərh, bəyənmə və izləmə profil tamamlanana qədər bağlıdır.",
+    "submit": "Profili tamamla",
+    "done": "Profilin hazırdır. Xoş gəldin!",
+    "restricted": "Bunun üçün əvvəlcə profilini tamamla.",
+    "finishToJoin": "Qoşulmaq üçün profilini tamamla",
+    "banner": {
+      "title": "Profilini tamamla",
+      "body": "Hesabın hələ müvəqqəti @{handle} adı ilə yalnız baxış rejimindədir. Paylaşmaq, şərh yazmaq və izləmək üçün profilini tamamla.",
+      "cta": "Profili tamamla"
+    },
+    "errors": {
+      "alreadyComplete": "Profilin artıq tamamlanıb."
+    }
+  },
+  "publicProfile": {
+    "backToFeed": "Lentə qayıt",
+    "backHome": "Ana səhifə",
+    "joined": "Qoşulub: {date}",
+    "posts": "Paylaşımlar",
+    "noPosts": "Hələ paylaşım yoxdur.",
+    "follow": "İzlə",
+    "following": "İzləyirsən"
   }
 }

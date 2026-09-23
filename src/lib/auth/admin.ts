@@ -58,6 +58,16 @@ export class ForbiddenError extends Error {
   readonly messageKey = 'errors.forbidden';
 }
 
+/**
+ * A staff account whose session has not proven a second factor. Distinct from
+ * ForbiddenError so the client can send the operator to set up or enter their
+ * authenticator instead of showing "you may not do this".
+ */
+export class MfaRequiredError extends Error {
+  readonly status = 403;
+  readonly messageKey = 'auth.errors.mfaRequired';
+}
+
 export type AdminActor = {
   id: string;
   viewer: Viewer;
@@ -74,6 +84,11 @@ export async function requireAdmin(
   minTier: AdminTier = 'MODERATOR',
 ): Promise<AdminActor> {
   const { userId, viewer } = await requireSession(request);
+
+  // Before every other check: requireSession has already withheld the staff
+  // role from this viewer, so the rank test below would refuse it anyway -
+  // this only makes the refusal say WHY.
+  if (viewer.mfaRequired) throw new MfaRequiredError();
 
   /**
    * A frozen or restricted staff account may not administer.
@@ -117,6 +132,12 @@ export async function withAdmin<T>(
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
+    }
+    if (error instanceof MfaRequiredError) {
+      return NextResponse.json(
+        { error: error.messageKey, next: { href: '/settings/security?mfa=required' } },
+        { status: 403 },
+      );
     }
     if (error instanceof ForbiddenError) {
       return NextResponse.json({ error: 'errors.forbidden' }, { status: 403 });

@@ -52,13 +52,17 @@ function useCountUp(target: number, durationMs = 1400) {
 }
 
 /**
- * A bordered list, not a dark marketing slab.
+ * Four live numbers as tiles under the hero (real numbers - see
+ * stats/public.ts).
  *
- * The previous version was a full-width slate-950 panel with a radial indigo
- * wash and 4xl numerals — the visual equivalent of shouting. This says the
- * same thing at 20px inside the page's own grid, which is both calmer and
- * more credible.
+ * Each tile used to carry its own hue: orange, pink, violet, sky. Four
+ * numbers in four colours implies the colours encode something, and they did
+ * not - the tiles are one homogeneous set of counts. They now alternate brand
+ * and accent, which keeps the row from looking like a spreadsheet without
+ * pretending the tiles differ in kind.
  */
+const TONES = ['text-brand', 'text-accent', 'text-brand', 'text-accent'] as const;
+
 export function StatsRow({ stats }: { stats: PublicStats }) {
   const t = useT();
   const rows = [
@@ -69,24 +73,24 @@ export function StatsRow({ stats }: { stats: PublicStats }) {
   ];
 
   return (
-    <dl className="divide-y divide-edge rounded-xl border border-edge bg-surface">
-      {rows.map((stat) => (
-        <StatItem key={stat.key} target={stat.value} label={t(`landing.stats.${stat.key}`)} />
+    <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {rows.map((stat, i) => (
+        <StatItem key={stat.key} target={stat.value} label={t(`landing.stats.${stat.key}`)} tone={TONES[i]} />
       ))}
     </dl>
   );
 }
 
 /** `null` is an unreadable stat: shown as a dash rather than a false zero. */
-function StatItem({ target, label }: { target: number | null; label: string }) {
+function StatItem({ target, label, tone }: { target: number | null; label: string; tone: string }) {
   const { ref, value } = useCountUp(target ?? 0);
 
   return (
-    <div ref={ref} className="flex items-baseline justify-between gap-4 px-4 py-3">
-      {/* min-w-0 + leading-snug: AZ and RU labels here run up to twice the
-          length of the English ones and must wrap, not clip. */}
+    <div ref={ref} className="flex flex-col-reverse gap-1 rounded-2xl border border-edge bg-surface/80 px-4 py-3.5 backdrop-blur">
+      {/* min-w-0 + leading-snug: AZ and RU labels run up to twice the length
+          of the English ones and must wrap, not clip. */}
       <dt className="min-w-0 text-xs leading-snug text-fg-muted">{label}</dt>
-      <dd className="tabular shrink-0 text-xl font-medium text-fg">
+      <dd className={`tabular text-2xl font-extrabold ${tone}`}>
         {target === null ? '—' : value.toLocaleString()}
       </dd>
     </div>

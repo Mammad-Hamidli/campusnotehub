@@ -3,12 +3,12 @@ import { redirect } from 'next/navigation';
 import { getViewer } from '@/lib/auth/session';
 import { UserRole } from '@/lib/enums';
 import { RegisterAside } from '@/components/register/RegisterAside';
-import { RegisterWizard } from '@/components/register/RegisterWizard';
+import { RegisterForm } from '@/components/register/RegisterForm';
+import { enabledProviders } from '@/lib/auth/oauth/providers';
 
 export const metadata: Metadata = {
   title: 'Qeydiyyat',
-  // The registration flow handles national ID images. Keep it out of every
-  // index, including link previews.
+  // A credentials form. Keep it out of every index, including link previews.
   robots: { index: false, follow: false },
 };
 
@@ -16,15 +16,8 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 /**
- * Two-pane registration.
- *
- * The dark aside is not decoration: asking a 19-year-old to photograph their
- * national ID is a big ask, and the reasons have to be visible on the same
- * screen as the request. Burying "why we need this" behind a tooltip is how
- * you get a 40% drop-off at step two.
- *
- * The aside collapses on mobile to a compact strip above the form so the
- * reasoning survives the smaller viewport instead of being hidden entirely.
+ * Two-pane registration: the aside (logo, language, why we verify) and the
+ * single-step form. The aside collapses to a compact strip on mobile.
  */
 export default async function RegisterPage() {
   /**
@@ -49,7 +42,8 @@ export default async function RegisterPage() {
       <RegisterAside />
 
       <main id="main" className="flex flex-1 items-start justify-center px-4 py-10 sm:px-8 lg:py-16">
-        <RegisterWizard />
+        {/* Only providers whose credentials are configured get a button. */}
+        <RegisterForm providers={enabledProviders()} />
       </main>
     </div>
   );

@@ -30,7 +30,8 @@ User roles are student, teacher, moderator and admin.
 - Firebase Firestore, accessed through the Firebase Admin SDK
 - Cloudinary for file storage
 - Vercel for hosting and scheduled jobs
-- Email through SMTP (Nodemailer) or Resend
+- Email through Gmail on one mailbox (supportcampushub@gmail.com) - SMTP out
+  via Nodemailer, IMAP in - authenticated with a Google App Password
 - argon2 for password hashing, jose for session tokens, Zod for input validation
 - A separate Python (FastAPI) document-checking service in `services/doc-verifier`
 
@@ -59,5 +60,5 @@ Registration and verification, the feed, notes, mentors, the wallet and the admi
 - **Some background jobs do not run on Vercel.** Releasing held funds to note sellers and mentors, booking reminders, retrying failed emails and the yearly graduation check run in a separate scheduler process (`npm run worker:scheduler`) that the Vercel deployment does not start.
 - **Placeholder pages.** Explore, Bookmarks, Bookings, Help, About, Contact, the Terms, Privacy and Security pages, and the admin Reports page show an "under construction" screen. Reports on feed posts are saved, but there is no admin page to review them yet.
 - **The document checker is hosted separately.** It is not part of the Vercel deployment; whenever it is unreachable, every submission goes to manual review.
-- **The old name remains in places.** The app interface still says "CampusHub", and mentor video-call links point to `meet.campushub.az`.
+- **The old name remains in places.** The app interface still says "CampusHub", and mentor video-call links point to `meet.campushub.com`.
 - **`docs/` is out of date.** It describes an earlier PostgreSQL and Redis version of the project.

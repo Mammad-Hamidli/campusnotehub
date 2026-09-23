@@ -28,6 +28,26 @@ export type SessionRecord = {
   lastSeenAt: Date;
   expiresAt: Date;
   revokedAt: Date | null;
+  /**
+   * Authentication methods proven for this session (RFC 8176 values):
+   * 'pwd' password, 'otp' authenticator code, 'recovery' recovery code.
+   * Kept on the ROW, not in the JWT, like the role: every request reads the
+   * row anyway (see requireSession), so an upgrade or a revocation takes
+   * effect on the next request instead of when a token expires.
+   *
+   * Rows written before this field existed read back without it and are
+   * treated as [] - i.e. no second factor, which is the safe reading.
+   */
+  amr: string[];
+  /** When a second factor was last proven on this session. */
+  mfaAt: Date | null;
+  /**
+   * When the person actually signed in. NOT createdAt: every refresh rotates
+   * the row, so createdAt means "last refreshed". This is carried across
+   * rotation unchanged, which is what makes "signed in within the last ten
+   * minutes" a meaningful re-authentication test (see lib/auth/reauth.ts).
+   */
+  authAt: Date;
 };
 
 const sessions = () => adminDb().collection(COLLECTIONS.sessions);
@@ -40,6 +60,9 @@ export async function createSession(params: {
   userAgent: string;
   deviceId?: string | null;
   expiresAt: Date;
+  amr: string[];
+  mfaAt: Date | null;
+  authAt: Date;
 }): Promise<SessionRecord> {
   const now = new Date();
   const record = {
@@ -50,6 +73,9 @@ export async function createSession(params: {
     lastSeenAt: now,
     expiresAt: params.expiresAt,
     revokedAt: null,
+    amr: params.amr,
+    mfaAt: params.mfaAt,
+    authAt: params.authAt,
   };
 
   const batch = adminDb().batch();
@@ -61,7 +87,50 @@ export async function createSession(params: {
 }
 
 export async function findSessionById(id: string): Promise<SessionRecord | null> {
-  return docToObject<SessionRecord>(await sessions().doc(id).get()) as SessionRecord | null;
+  const row = docToObject<SessionRecord>(await sessions().doc(id).get()) as SessionRecord | null;
+  // Legacy rows predate amr/mfaAt; normalise here so no caller sees undefined.
+  return row
+    ? {
+        ...row,
+        amr: Array.isArray(row.amr) ? row.amr : [],
+        mfaAt: row.mfaAt ?? null,
+        // Legacy rows: createdAt is the best available (and an over-estimate
+        // of recency never happens - it can only be later than the sign-in).
+        authAt: row.authAt ?? row.createdAt,
+      }
+    : null;
+}
+
+/**
+ * Records a second factor proven on an EXISTING session - enrollment, or a
+ * step-up on a session that was issued before the account had one.
+ *
+ * Only a live session is upgraded: the update is conditional on the row still
+ * being unrevoked, inside a transaction, so a session revoked a moment ago
+ * cannot be resurrected into an MFA-verified one.
+ */
+export async function markSessionMfa(id: string, method: 'otp' | 'recovery', at: Date): Promise<boolean> {
+  const ref = sessions().doc(id);
+  return adminDb().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.get('revokedAt')) return false;
+    const amr = Array.isArray(snap.get('amr')) ? (snap.get('amr') as string[]) : [];
+    tx.update(ref, forFirestore({ amr: [...new Set([...amr, method])], mfaAt: at }));
+    return true;
+  });
+}
+
+/** Revokes every live session a user holds EXCEPT one - the one making the change. */
+export async function revokeOtherUserSessions(userId: string, keepSessionId: string): Promise<number> {
+  const snap = await sessions().where('userId', '==', userId).where('revokedAt', '==', null).get();
+  const doomed = snap.docs.filter((doc) => doc.id !== keepSessionId);
+  const now = new Date();
+  for (let i = 0; i < doomed.length; i += 400) {
+    const batch = adminDb().batch();
+    for (const doc of doomed.slice(i, i + 400)) batch.update(doc.ref, forFirestore({ revokedAt: now }));
+    await batch.commit();
+  }
+  return doomed.length;
 }
 
 /** Resolves a refresh token to its session, via the secrets collection. */

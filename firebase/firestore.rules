@@ -237,10 +237,33 @@ service cloud.firestore {
     // bypasses rules, ever touches it.
     match /credentials/{userId} { allow read, write: if false; }
 
+    // Username claims map a public handle to a user id. The handle is public,
+    // but the claim is a LOGIN IDENTIFIER index: listing it would hand out
+    // every valid username in one read, which is the target list for password
+    // spraying. Availability is answered by the API, one name at a time.
+    match /usernames/{key} { allow read, write: if false; }
+
     // Session records are credentials-adjacent: the refresh token hash is the
     // credential itself, and even the metadata is a login history.
     match /sessions/{id}      { allow read, write: if false; }
     match /userDevices/{id}   { allow read, write: if false; }
+
+    // Second factor. `mfa` holds the sealed TOTP secret and recovery code
+    // hashes; `loginTickets` are half-finished sign-ins. Both are credentials.
+    match /mfa/{userId}        { allow read, write: if false; }
+    match /loginTickets/{id}   { allow read, write: if false; }
+
+    // Social sign-in. Identities map a provider account to a user (listing
+    // them would reveal who signs in with what); states carry PKCE verifiers;
+    // signups carry a provider-verified email awaiting registration.
+    match /authIdentities/{id} { allow read, write: if false; }
+    match /oauthStates/{id}    { allow read, write: if false; }
+    match /oauthSignups/{id}   { allow read, write: if false; }
+
+    // hash. Server-only like every other credential.
+    match /emailVerifications/{id} { allow read, write: if false; }
+    // Forgotten-password links: whoever can write one owns the account.
+    match /passwordResets/{id}     { allow read, write: if false; }
 
     // Verification cases carry fraud signals and per-check scores. Naming the
     // check that fired is free tuning feedback for whoever is forging a
@@ -278,6 +301,21 @@ service cloud.firestore {
      * of src/lib/security/ratelimit.ts.
      */
     match /rateLimits/{id} { allow read, write: if false; }
+
+    /**
+     * Cached machine translations of post bodies.
+     *
+     * Denied, and not because a translation is secret in itself: the cache is
+     * keyed by post id, so a client that could read the collection could read
+     * the body of any UNIVERSITY_ONLY or FOLLOWERS post by asking for its
+     * translation - the audience check in src/lib/feed/visibility.ts lives in
+     * POST /api/feed/:postId/translate and cannot be expressed here.
+     *
+     * Written only by the Admin SDK. Documents expire by way of a Firestore
+     * TTL policy on `expiresAt`, exactly as rateLimits does - see the header
+     * of src/lib/firebase/repositories/translations.ts.
+     */
+    match /postTranslations/{id} { allow read, write: if false; }
     match /mediaAssets/{id}    { allow read, write: if false; }
     // Email dedupe keys (SHA-256 only) - see src/lib/email/send.ts.
     match /emailDispatches/{id} { allow read, write: if false; }

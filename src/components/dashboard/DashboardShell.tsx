@@ -5,10 +5,10 @@ import Link from 'next/link';
 import { BookOpen, UserRoundSearch, Wallet } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
-import { mediaUrlFromKey } from '@/lib/media/constants';
 import { Sidebar, type DashboardTab } from './Sidebar';
 import { Composer } from './Composer';
 import { PostCard, type Post } from './PostCard';
+import { toPost, type ApiPost } from './postMapping';
 import { GraduationCountdown, TrendingNotes, type TrendingNote } from './RightPanel';
 import { NotesList } from '@/components/notes/NotesList';
 import { MentorsList } from '@/components/mentors/MentorsList';
@@ -48,47 +48,8 @@ type Viewer = {
   graduationYear?: number;
   graduationMonth?: number;
   isMentor: boolean;
-};
-
-/**
- * The shape /api/feed returns for one post.
- *
- * This mirrors SerializedPost in src/lib/feed/serialize.ts, which is now the
- * single definition on the server side. Two fields changed shape and both were
- * bugs:
- *
- *   tags - was `{ tag: { slug, label } }[]`, matching the raw Prisma join row.
- *          The server now flattens it, so the client no longer reaches through
- *          a join table it should never have seen. It is ALWAYS an array.
- *   author.nickname - was typed `string | null` and defaulted to 'unknown',
- *          which hid the real problem: the feed query never selected the
- *          column, so every card in the product rendered as "@unknown". It is
- *          selected now and is non-null.
- */
-type ApiPost = {
-  id: string;
-  body: string;
-  createdAt: string;
-  likeCount: number;
-  commentCount: number;
-  shareCount: number;
-  likedByViewer: boolean;
-  author: {
-    id: string;
-    nickname: string;
-    fullName: string;
-    headline: string | null;
-    isVerified: boolean;
-    university: { code: string } | null;
-  };
-  tags: { slug: string; label: string }[];
-  media: {
-    id: string;
-    storageKey: string;
-    width: number | null;
-    height: number | null;
-    altText: string | null;
-  }[];
+  /** Quick-login account still on its temporary handle: view-only. */
+  profileIncomplete: boolean;
 };
 
 type ApiNote = {
@@ -100,72 +61,6 @@ type ApiNote = {
   purchaseCount: number;
   university: { code: string } | null;
 };
-
-/** Initials for the avatar fallback, from the public handle only. */
-function initialsOf(nickname: string): string {
-  return nickname.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '??';
-}
-
-/** Relative age, so a row does not need a date formatter to be readable. */
-function age(iso: string): string {
-  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (seconds < 60) return 'now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  return `${Math.floor(seconds / 86400)}d`;
-}
-
-/**
- * Maps one API row to the card's props.
- *
- * `row.tags.map(...)` used to throw
- *   TypeError: Cannot read properties of undefined (reading 'map')
- * every time a post was created. The cause was on the SERVER: POST /api/feed
- * returned the created row with only `author` included, while GET included
- * `tags` and `media` - two different contracts from one endpoint family, so a
- * freshly created post had no `tags` key at all.
- *
- * It is fixed there, in src/lib/feed/serialize.ts, which both routes now share.
- * This function is deliberately left WITHOUT optional chaining: `row.tags?.`
- * would silence the symptom while leaving new posts renderable but wrong (no
- * tags, no image, "@unknown" as the author) until a reload. If this ever
- * throws again, the contract has been broken again and that should be loud.
- */
-function toPost(row: ApiPost): Post {
-  const nickname = row.author.nickname;
-  return {
-    id: row.id,
-    authorId: row.author.id,
-    author: {
-      // The public handle, never fullName - the feed is a shared surface.
-      nickname,
-      initials: initialsOf(nickname),
-      university: row.author.university?.code ?? '—',
-      headline: row.author.headline ?? '',
-      verified: row.author.isVerified,
-    },
-    body: row.body,
-    tags: row.tags.map((t) => t.label || t.slug),
-    /**
-     * The storage key is translated to a URL here, once, rather than in the
-     * card. `db://media/<id>` is a LOGICAL locator - the same indirection
-     * Note.fileKey uses - so if these move to S3 this single mapping changes
-     * and the card keeps rendering a plain src.
-     */
-    media: row.media.map((m) => ({
-      id: m.id,
-      url: mediaUrlFromKey(m.storageKey),
-      width: m.width,
-      height: m.height,
-      alt: m.altText,
-    })),
-    createdAt: age(row.createdAt),
-    likeCount: row.likeCount,
-    commentCount: row.commentCount,
-    shareCount: row.shareCount,
-    likedByViewer: row.likedByViewer,
-  };
-}
 
 export function DashboardShell({ initialTab = 'feed' }: { initialTab?: DashboardTab }) {
   const t = useT();
@@ -245,6 +140,7 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
             graduationYear: user.graduationYear ?? undefined,
             graduationMonth: user.graduationMonth ?? undefined,
             isMentor: Boolean(user.isMentor),
+            profileIncomplete: Boolean(user.profileIncomplete),
           });
         }
 
@@ -425,6 +321,7 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
       role: viewer.role as PermissionViewer['role'],
       accountStatus: viewer.accountStatus as PermissionViewer['accountStatus'],
       verificationStatus: viewer.verificationStatus as PermissionViewer['verificationStatus'],
+      profileIncomplete: viewer.profileIncomplete,
     },
     'notes:sell',
   );
@@ -457,6 +354,18 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
               </div>
             )}
 
+            {viewer.profileIncomplete && (
+              <div className="card animate-rise mb-5 border-warn/40 bg-warn-soft p-4">
+                <h2 className="text-sm font-semibold text-fg">{t('onboarding.banner.title')}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-fg-muted">
+                  {t('onboarding.banner.body', { handle: viewer.nickname })}
+                </p>
+                <Link href="/onboarding" className="btn-primary mt-3.5 px-4 py-2 text-sm">
+                  {t('onboarding.banner.cta')}
+                </Link>
+              </div>
+            )}
+
             <header className="mb-5">
               <h1 className="text-xl font-bold tracking-tight text-fg">
                 {t('dashboard.greeting', { name: viewer.nickname })}
@@ -466,7 +375,9 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
 
             {tab === 'feed' ? (
               <div className="space-y-4">
-                <Composer author={viewer} onPost={handleNewPost} />
+                {/* View-only until the profile is finished - the server refuses
+                    the post anyway (permissions.can), so do not offer it. */}
+                {!viewer.profileIncomplete && <Composer author={viewer} onPost={handleNewPost} />}
 
                 {/* Filter pills. Horizontally scrollable rather than wrapping:
                     with 18 universities seeded this list grows, and a wrapping
@@ -516,6 +427,7 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
                       post={post}
                       index={i}
                       viewerId={viewer.id}
+                      readOnly={viewer.profileIncomplete}
                       onDeleted={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))}
                     />
                   ))

@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bookmark, Loader2, Plus, ShoppingBag, ShoppingCart, Star } from 'lucide-react';
+import { Bookmark, BookOpenText, FileText, Loader2, Plus, ShoppingBag, ShoppingCart, Star } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
+import { SectionHeading } from '@/components/ui/SectionHeading';
 import { VERIFICATION_REQUIRED_KEY, VerifyToUnlock } from '@/components/account/VerifyToUnlock';
 import { FileChip } from './FileChip';
 import { CreatorHandle, type CreatorStats } from './CreatorHandle';
@@ -150,14 +151,12 @@ export function NotesList({
   return (
     <div className={embedded ? 'w-full' : 'mx-auto w-full max-w-3xl px-4 py-8 sm:px-6'}>
       <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Heading className="text-xl font-bold tracking-tight text-fg">
-            {t(source === 'saved' ? 'notes.saved.title' : 'notes.title')}
-          </Heading>
-          <p className="mt-0.5 text-sm text-fg-muted">
-            {t(source === 'saved' ? 'notes.saved.subtitle' : 'notes.subtitle')}
-          </p>
-        </div>
+        <SectionHeading
+          as={Heading}
+          icon={source === 'saved' ? Bookmark : BookOpenText}
+          title={t(source === 'saved' ? 'notes.saved.title' : 'notes.title')}
+          subtitle={t(source === 'saved' ? 'notes.saved.subtitle' : 'notes.subtitle')}
+        />
         <div className="flex items-center gap-2">
           <Link href="/notes/purchases" className="btn-secondary">
             <ShoppingBag className="h-3.5 w-3.5" aria-hidden="true" />
@@ -179,15 +178,27 @@ export function NotesList({
       )}
 
       {notes?.length === 0 && (
-        <p className="card p-10 text-center text-sm text-fg-muted">
-          {t(source === 'saved' ? 'notes.saved.empty' : 'notes.empty')}
-        </p>
+        <div className="card flex flex-col items-center p-10 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent-soft">
+            {source === 'saved' ? (
+              <Bookmark className="h-6 w-6 text-accent" aria-hidden="true" />
+            ) : (
+              <BookOpenText className="h-6 w-6 text-accent" aria-hidden="true" />
+            )}
+          </span>
+          <p className="mt-3 text-sm text-fg-muted">
+            {t(source === 'saved' ? 'notes.saved.empty' : 'notes.empty')}
+          </p>
+        </div>
       )}
 
       <ul className="space-y-3">
         {notes?.map((note) => (
           <li key={note.id} className="card p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
+                <FileText className="h-4 w-4" aria-hidden="true" />
+              </span>
               <div className="min-w-0 flex-1">
                 <h2 className="truncate text-sm font-semibold text-fg">{note.title}</h2>
                 <p className="mt-0.5 break-words text-2xs text-fg-muted">
@@ -239,7 +250,10 @@ export function NotesList({
 
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <p className="flex items-center gap-3 text-2xs tabular-nums text-fg-subtle">
-                <span>{t('notes.stats.purchases', { n: note.purchaseCount })}</span>
+                <span className="inline-flex items-center gap-1">
+                  <ShoppingBag className="h-3 w-3" aria-hidden="true" />
+                  {t('notes.stats.purchases', { n: note.purchaseCount })}
+                </span>
                 {note.ratingCount > 0 && (
                   <span className="inline-flex items-center gap-1">
                     <Star className="h-3 w-3 fill-current text-warn" aria-hidden="true" />

@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Loader2, Send } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 import { VerifiedBadge } from './VerificationBanner';
 
 /**
@@ -41,10 +43,6 @@ type ApiComment = {
   };
 };
 
-function initialsOf(nickname: string): string {
-  return nickname.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '??';
-}
-
 function age(iso: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
   if (seconds < 60) return 'now';
@@ -56,10 +54,13 @@ function age(iso: string): string {
 export function CommentThread({
   postId,
   onCountChange,
+  readOnly = false,
 }: {
   postId: string;
   /** Lifts the new count so the card's counter stays in step. */
   onCountChange?: (count: number) => void;
+  /** View-only viewer (unfinished quick-login profile): no comment box. */
+  readOnly?: boolean;
 }) {
   const t = useT();
   const toast = useToast();
@@ -163,17 +164,28 @@ export function CommentThread({
         <ul className="space-y-3">
           {comments.map((comment) => (
             <li key={comment.id} className="flex gap-2.5">
-              <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-inset text-2xs font-bold text-accent"
+              <Link
+                href={`/u/${encodeURIComponent(comment.author.nickname)}`}
+                tabIndex={-1}
                 aria-hidden="true"
+                className="shrink-0 rounded-full"
               >
-                {initialsOf(comment.author.nickname)}
-              </span>
+                <UserAvatar
+                  nickname={comment.author.nickname}
+                  src={comment.author.avatarUrl}
+                  verified={comment.author.isVerified}
+                  size="sm"
+                  verifiedLabel={t('profile.verified')}
+                />
+              </Link>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-1.5">
-                  <span className="truncate text-xs font-medium text-fg">
+                  <Link
+                    href={`/u/${encodeURIComponent(comment.author.nickname)}`}
+                    className="truncate text-xs font-semibold text-fg underline-offset-2 hover:underline"
+                  >
                     @{comment.author.nickname}
-                  </span>
+                  </Link>
                   <VerifiedBadge verified={comment.author.isVerified} />
                   <time className="text-2xs text-fg-subtle">{age(comment.createdAt)}</time>
                 </div>
@@ -190,6 +202,13 @@ export function CommentThread({
         </ul>
       )}
 
+      {readOnly ? (
+        <p className="mt-3 text-xs text-fg-muted">
+          <Link href="/onboarding" className="font-semibold text-accent hover:underline">
+            {t('onboarding.finishToJoin')}
+          </Link>
+        </p>
+      ) : (
       <form onSubmit={submit} className="mt-3 flex items-end gap-2">
         <label htmlFor={`comment-${postId}`} className="sr-only">
           {t('feed.commentPlaceholder')}
@@ -229,6 +248,7 @@ export function CommentThread({
           )}
         </button>
       </form>
+      )}
 
       {error && (
         <p className="mt-1.5 text-xs text-danger" role="alert">

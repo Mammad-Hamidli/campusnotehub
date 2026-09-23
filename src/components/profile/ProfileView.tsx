@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BadgeCheck, Loader2, Pencil, ShieldAlert } from 'lucide-react';
+import { BadgeCheck, ExternalLink, Loader2, Pencil, ShieldAlert } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { CreatorHandle, type CreatorStats } from '@/components/notes/CreatorHandle';
+import { AvatarUploader } from './AvatarUploader';
 
 type Me = {
   id: string;
@@ -12,6 +13,7 @@ type Me = {
   nickname: string;
   email: string;
   phone: string | null;
+  avatarUrl: string | null;
   headline: string | null;
   bio: string | null;
   locale: string;
@@ -90,12 +92,12 @@ export function ProfileView() {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
       <header className="card flex flex-wrap items-start gap-4 p-5">
-        <span
-          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-surface-inset text-lg font-semibold text-fg-muted"
-          aria-hidden="true"
-        >
-          {me.initials}
-        </span>
+        <AvatarUploader
+          nickname={me.nickname}
+          avatarUrl={me.avatarUrl}
+          verified={me.isVerified}
+          onChange={(avatarUrl) => setMe((prev) => (prev ? { ...prev, avatarUrl } : prev))}
+        />
 
         <div className="min-w-0 flex-1">
           <h1 className="flex flex-wrap items-center gap-1.5 text-lg font-bold tracking-tight text-fg">
@@ -111,10 +113,16 @@ export function ProfileView() {
           </p>
         </div>
 
-        <Link href="/settings" className="btn-secondary shrink-0">
-          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('profile.edit')}
-        </Link>
+        <div className="flex shrink-0 flex-col gap-2">
+          <Link href="/settings" className="btn-secondary">
+            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('profile.edit')}
+          </Link>
+          <Link href={`/u/${encodeURIComponent(me.nickname)}`} className="btn-ghost text-xs">
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('profile.viewPublic')}
+          </Link>
+        </div>
       </header>
 
       {!me.isVerified && (

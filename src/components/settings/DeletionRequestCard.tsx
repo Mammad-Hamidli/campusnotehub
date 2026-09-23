@@ -35,6 +35,8 @@ export function DeletionRequestCard() {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [password, setPassword] = useState('');
+  // What the server will accept as proof - see lib/auth/reauth.ts.
+  const [reauth, setReauth] = useState<'code' | 'password' | 'recent_sign_in'>('password');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +44,10 @@ export function DeletionRequestCard() {
     const controller = new AbortController();
     fetch('/api/me/deletion-request', { signal: controller.signal, cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : { request: null }))
-      .then((body) => setRequest(body.request ?? null))
+      .then((body) => {
+        setRequest(body.request ?? null);
+        if (body.reauth === 'code' || body.reauth === 'recent_sign_in') setReauth(body.reauth);
+      })
       .catch((cause) => {
         if ((cause as Error)?.name !== 'AbortError') setRequest(null);
       });
@@ -129,7 +134,9 @@ export function DeletionRequestCard() {
               className="mt-4 space-y-3"
               onSubmit={(e) => {
                 e.preventDefault();
-                void call('POST', { password, reason: reason.trim() || null });
+                const proof =
+                  reauth === 'code' ? { code: password.replace(/\s/g, '') } : reauth === 'password' ? { password } : {};
+                void call('POST', { ...proof, reason: reason.trim() || null });
               }}
             >
               <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-fg-muted">
@@ -153,21 +160,28 @@ export function DeletionRequestCard() {
                 />
               </div>
 
-              <div>
-                <label htmlFor="deletion-password" className="mb-1 block text-xs font-medium text-fg">
-                  {t('settings.deletion.password')}
-                </label>
-                <input
-                  id="deletion-password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  aria-invalid={error === 'settings.deletion.errors.wrongPassword'}
-                  className="input text-sm"
-                />
-              </div>
+              {reauth === 'recent_sign_in' ? (
+                // No password and no authenticator: a fresh sign-in through the
+                // provider is the proof, checked by the server.
+                <p className="text-xs leading-relaxed text-fg-muted">{t('auth.reauth.recentHint')}</p>
+              ) : (
+                <div>
+                  <label htmlFor="deletion-password" className="mb-1 block text-xs font-medium text-fg">
+                    {t(reauth === 'code' ? 'auth.mfa.codeLabel' : 'settings.deletion.password')}
+                  </label>
+                  <input
+                    id="deletion-password"
+                    type={reauth === 'code' ? 'text' : 'password'}
+                    inputMode={reauth === 'code' ? 'numeric' : undefined}
+                    autoComplete={reauth === 'code' ? 'one-time-code' : 'current-password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    aria-invalid={error === 'settings.deletion.errors.wrongPassword'}
+                    className="input text-sm"
+                  />
+                </div>
+              )}
 
               {error && (
                 <p role="alert" className="text-xs text-danger">
@@ -178,7 +192,7 @@ export function DeletionRequestCard() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="submit"
-                  disabled={busy || password.length === 0}
+                  disabled={busy || (reauth !== 'recent_sign_in' && password.length === 0)}
                   className="btn-primary h-8 bg-danger text-xs hover:bg-danger disabled:opacity-50"
                 >
                   {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}

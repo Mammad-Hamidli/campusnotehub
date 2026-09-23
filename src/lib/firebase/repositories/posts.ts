@@ -155,9 +155,11 @@ export async function feedPage(query: FeedQuery): Promise<{
    * and the feed would look empty. Widening the read gives the filter
    * something to survive on, capped so a rare tag cannot turn one page into an
    * unbounded scan. `hasMore` is still computed from the FILTERED set, so the
-   * cursor stays correct either way.
+   * cursor stays correct either way. The same applies to a small author set
+   * (a profile page's single author, or a light 'following' list).
    */
-  const fetchSize = query.tagSlug ? Math.min(take * 10, 300) : take;
+  const narrowed = Boolean(query.tagSlug) || (query.authorIds?.length ?? Infinity) <= 30;
+  const fetchSize = narrowed ? Math.min(take * 10, 300) : take;
 
   const results = await Promise.all(
     chunks.map(async (tokens) => {

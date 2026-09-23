@@ -81,6 +81,11 @@ export async function createMediaAsset(params: {
   sha256: string;
   altText: string | null;
   bytes: Buffer;
+  /**
+   * Stored already attached - for a profile picture, which is used the moment
+   * it is uploaded and must never be collected by the abandoned-upload sweep.
+   */
+  attached?: boolean;
 }): Promise<MediaAssetRecord> {
   /**
    * Cloudinary, authenticated delivery: never publicly addressable - the bytes
@@ -111,7 +116,7 @@ export async function createMediaAsset(params: {
     storagePath,
     storageVersion: uploaded.version,
     storageFormat: uploaded.format,
-    attachedAt: null,
+    attachedAt: params.attached ? new Date() : null,
     createdAt: new Date(),
   };
 

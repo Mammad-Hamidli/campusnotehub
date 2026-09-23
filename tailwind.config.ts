@@ -147,6 +147,11 @@ export default {
         },
         marquee: { from: { transform: 'translateX(0)' }, to: { transform: 'translateX(-50%)' } },
         shimmer: { to: { transform: 'translateX(100%)' } },
+        // Landing page only: slow drift for the floating social bubbles.
+        float: {
+          '0%, 100%': { transform: 'translate3d(0, 0, 0) rotate(var(--tilt, 0deg))' },
+          '50%': { transform: 'translate3d(0, -10px, 0) rotate(var(--tilt, 0deg))' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 200ms ease-out both',
@@ -154,6 +159,9 @@ export default {
         'scale-in': 'scale-in 140ms cubic-bezier(0.22, 1, 0.36, 1) both',
         marquee: 'marquee 48s linear infinite',
         shimmer: 'shimmer 1.6s infinite',
+        float: 'float 6s ease-in-out infinite',
+        // The verified ring on avatars turns slowly (Tailwind's own `spin`).
+        'spin-slow': 'spin 8s linear infinite',
       },
     },
   },

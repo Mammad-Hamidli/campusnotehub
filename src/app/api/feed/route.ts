@@ -24,6 +24,8 @@ const querySchema = z.object({
   filter: z.enum(['all', 'university', 'following']).default('all'),
   tag: z.string().max(50).optional(),
   universityId: z.string().min(1).max(64).optional(),
+  /** One author's posts, for their profile page. A user id. */
+  authorId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/).optional(),
 });
 
 /**
@@ -41,7 +43,7 @@ export async function GET(request: NextRequest) {
   if (!params.success) {
     return NextResponse.json({ error: 'errors.validationFailed' }, { status: 400 });
   }
-  const { cursor, limit, filter, tag, universityId } = params.data;
+  const { cursor, limit, filter, tag, universityId, authorId } = params.data;
 
   const rate = await rateLimit('search', { userId: viewer?.id, ip: clientIp(request.headers) });
   if (!rate.ok) return NextResponse.json({ error: 'errors.rateLimited' }, { status: 429 });
@@ -78,7 +80,9 @@ export async function GET(request: NextRequest) {
     limit,
     before: cursorTime ? new Date(cursorTime) : null,
     universityId: narrowUniversityId,
-    authorIds: followedAuthors,
+    // A profile's own list narrows the same way the 'following' tab does: a
+    // presentation filter over posts the audience tokens already allow.
+    authorIds: authorId ? [authorId] : followedAuthors,
     tagSlug: tag ? tag.toLowerCase() : null,
   });
 

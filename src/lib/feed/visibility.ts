@@ -99,7 +99,7 @@ export async function viewerUniversityId(viewer: Viewer | null): Promise<string 
 export async function findVisiblePost(
   postId: string,
   viewer: Viewer | null,
-): Promise<{ id: string; authorId: string; commentCount: number } | null> {
+): Promise<{ id: string; authorId: string; commentCount: number; body: string } | null> {
   const post = await findPostById(postId);
   if (!post || post.isDeleted) return null;
 
@@ -116,5 +116,17 @@ export async function findVisiblePost(
   const granted = new Set(post.audience ?? []);
   if (!tokens.some((token) => granted.has(token))) return null;
 
-  return { id: post.id, authorId: post.authorId, commentCount: post.commentCount ?? 0 };
+  /**
+   * `body` is returned because reaching this line IS the authorisation to read
+   * it - the audience check above is the only gate the feed itself applies.
+   * POST /api/feed/:postId/translate needs the text and must not re-read the
+   * post to get it, since a second read could observe a different document
+   * than the one just authorised. Callers that do not need it ignore it.
+   */
+  return {
+    id: post.id,
+    authorId: post.authorId,
+    commentCount: post.commentCount ?? 0,
+    body: post.body ?? '',
+  };
 }

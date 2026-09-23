@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getViewer } from '@/lib/auth/session';
 import { MentorApplyForm } from '@/components/mentors/MentorApplyForm';
+import { MENTORS_URL } from '@/lib/site';
 import {
   DEFAULT_LOCALE,
   DICTIONARIES,
@@ -62,12 +63,11 @@ export default async function Page() {
             </p>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              {/* The account type travels in the URL so the wizard opens on the
-                  Mentor branch instead of asking a question this click already
-                  answered. RegisterWizard reads it and preselects. */}
-              <Link href="/register?type=MENTOR" className="btn-primary px-4 py-2 text-sm">
+              {/* New mentors apply on the mentors site; the main app's
+                  registration is for students only. */}
+              <a href={MENTORS_URL} className="btn-primary px-4 py-2 text-sm">
                 {t('mentors.apply.guest.cta')}
-              </Link>
+              </a>
               <span className="text-sm text-fg-muted">
                 {t('mentors.apply.guest.haveAccount')}{' '}
                 <Link

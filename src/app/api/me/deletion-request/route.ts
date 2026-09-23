@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { NotificationType, UserRole } from '@/lib/enums';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
-import { verifyPassword } from '@/lib/crypto/hash';
-import { findUserById, getCredentials, listUsers } from '@/lib/firebase/repositories/users';
+import { reauthenticate, reauthRequirement } from '@/lib/auth/reauth';
+import { findUserById, listUsers } from '@/lib/firebase/repositories/users';
 import {
   DeletionRequestError,
   closeDeletionRequest,
@@ -53,13 +53,26 @@ export async function GET(request: NextRequest) {
   if (!auth) return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
 
   return NextResponse.json(
-    { request: present(await findDeletionRequest(auth.userId)) },
+    {
+      request: present(await findDeletionRequest(auth.userId)),
+      // Which proof the form should ask for. The account's own owner already
+      // knows whether they have a password or 2FA, so this discloses nothing.
+      reauth: await reauthRequirement(auth.userId),
+    },
     { headers: { 'Cache-Control': 'private, no-store' } },
   );
 }
 
+/**
+ * The proof matches what the account has - see lib/auth/reauth.ts: an
+ * authenticator code when 2FA is on, else the password, else (an account
+ * created through Google, which has no password) a sign-in
+ * within the last ten minutes.
+ */
 const createSchema = z.object({
-  password: z.string().min(1).max(200),
+  password: z.string().min(1).max(200).optional(),
+  code: z.string().trim().max(16).optional(),
+  recoveryCode: z.string().trim().max(32).optional(),
   reason: z.string().trim().max(1000).optional().nullable(),
 });
 
@@ -88,11 +101,16 @@ export async function POST(request: NextRequest) {
    * that the account owner is at it: a borrowed laptop or a stolen cookie
    * must not be enough to set an account on the path to deletion.
    */
-  const [user, credentials] = await Promise.all([findUserById(userId), getCredentials(userId)]);
-  if (!user || !credentials) return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
-  const check = await verifyPassword(parsed.data.password, credentials.passwordHash);
-  if (!check.valid) {
-    return NextResponse.json({ error: 'settings.deletion.errors.wrongPassword' }, { status: 403 });
+  const user = await findUserById(userId);
+  if (!user) return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
+  const proof = await reauthenticate(request, auth, parsed.data);
+  if (proof instanceof Response) {
+    // Keep the long-standing message for the password case the form shows inline.
+    const body = await proof.clone().json().catch(() => ({}));
+    if (body.error === 'auth.errors.reauthFailed') {
+      return NextResponse.json({ error: 'settings.deletion.errors.wrongPassword' }, { status: 403 });
+    }
+    return proof;
   }
 
   let created: DeletionRequestRecord;

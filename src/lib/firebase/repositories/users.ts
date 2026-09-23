@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import type { AccountStatus, UserRole, VerificationStatus } from '@/lib/enums';
 import type { WeeklyRule } from '@/lib/mentors/schedule';
+import { usernameKey } from '@/lib/auth/username';
 import { adminDb } from '../admin.core';
 import { COLLECTIONS, SUBCOLLECTIONS } from '../collections';
 import { docToObject, docsToObjects, forFirestore } from '../convert';
@@ -87,6 +88,20 @@ export type UserRecord = {
   showFaculty: string;
   showGraduationYear: string;
   emailVerifiedAt: Date | null;
+  /**
+   * Historical. It was set when the owner proved the number by SMS code; SMS
+   * was removed on 2026-09-22, so nothing writes it any more and no code path
+   * reads it as a permission. Kept on the type because existing documents
+   * still carry it, and absent reads as "not verified" - the safe default.
+   */
+  phoneVerifiedAt?: Date | null;
+  /**
+   * True for an account created by a quick login (Google)
+   * that still carries its temporary "user12345" handle. The account is
+   * view-only until completeProfile() clears it - see permissions.can().
+   * Absent on every other document, which reads as "complete".
+   */
+  profileIncomplete?: boolean;
   lastLoginAt: Date | null;
   failedLoginCount: number;
   lockedUntil: Date | null;
@@ -98,13 +113,33 @@ export type UserRecord = {
 /** Never returned to a client, never joined onto a user document. */
 export type CredentialRecord = {
   id: string;
-  passwordHash: string;
+  /**
+   * Null for an account created through Google, which has
+   * never had a password. Every password check must treat null as "cannot
+   * sign in with a password" - see the login route and lib/auth/reauth.ts.
+   */
+  passwordHash: string | null;
   emailHash: string;
   phoneHash: string | null;
 };
 
 const users = () => adminDb().collection(COLLECTIONS.users);
 const credentials = () => adminDb().collection(CREDENTIALS);
+const usernames = () => adminDb().collection(COLLECTIONS.usernames);
+
+/** `usernames/{key}`. The document id IS the normalised handle. */
+export type UsernameClaim = { userId: string; createdAt: Date };
+
+/**
+ * The claim key for a stored nickname. Every stored nickname already passed
+ * USERNAME_PATTERN at registration, so a null here means corrupted data - and
+ * that must fail loudly rather than write a claim under some other key.
+ */
+function claimKeyFor(nickname: string): string {
+  const key = usernameKey(nickname);
+  if (!key) throw new Error(`nickname does not satisfy USERNAME_PATTERN: ${JSON.stringify(nickname)}`);
+  return key;
+}
 
 export async function findUserById(id: string): Promise<UserRecord | null> {
   return docToObject<UserRecord>(await users().doc(id).get()) as UserRecord | null;
@@ -133,6 +168,41 @@ export async function findUserByEmail(email: string): Promise<UserRecord | null>
 export async function findUserByNickname(nickname: string): Promise<UserRecord | null> {
   const snap = await users().where('nicknameLower', '==', nickname.toLowerCase()).limit(1).get();
   return snap.empty ? null : (docToObject<UserRecord>(snap.docs[0]) as UserRecord);
+}
+
+/**
+ * Login lookup by username. `key` must already be normalised by usernameKey().
+ *
+ * The claim document is the source of truth: a point read, and the same
+ * record createUser() makes unique. Two cross-checks keep it honest:
+ *
+ *  - A claim whose user no longer carries that handle is STALE and resolves to
+ *    nobody. It is never followed to "whoever the claim points at", because a
+ *    claim that outlived a rename would otherwise log someone into an account
+ *    by its OLD public name.
+ *  - With no claim at all, fall back to the denormalised `nicknameLower`
+ *    query. That covers accounts created before claims existed, until
+ *    scripts/backfill-usernames.mts has run. It stays afterwards on purpose: it
+ *    costs one read, only on a miss, and it gives a miss the same number of
+ *    round trips as a hit, so response time does not reveal which handles
+ *    exist.
+ *
+ * Handles of deleted accounts keep their claim and are still found here; the
+ * login route refuses a deleted account with its generic failure. They are
+ * never recycled either - a freed handle is the easiest impersonation there is.
+ */
+export async function findUserByUsername(key: string): Promise<UserRecord | null> {
+  const claim = await usernames().doc(key).get();
+  if (claim.exists) {
+    const { userId } = claim.data() as UsernameClaim;
+    const user = await findUserById(userId);
+    return user && user.nicknameLower === key ? user : null;
+  }
+  // limit(2), not 1: two legacy accounts sharing a handle (possible before the
+  // claim existed) must resolve to NOBODY rather than to whichever Firestore
+  // returned first. The backfill reports such pairs for an operator to settle.
+  const snap = await users().where('nicknameLower', '==', key).limit(2).get();
+  return snap.size === 1 ? (docToObject<UserRecord>(snap.docs[0]) as UserRecord) : null;
 }
 
 export async function findUsersByIds(ids: string[]): Promise<Map<string, UserRecord>> {
@@ -172,10 +242,101 @@ export async function findUserIdByPhoneHash(phoneHash: string): Promise<string |
   return snap.empty ? null : snap.docs[0].id;
 }
 
+/** The identifiers signup can collide on, in the order the form shows them. */
+export type ConflictField = 'email' | 'phone' | 'nickname' | 'identity';
+
+const CONFLICT_ORDER: ConflictField[] = ['email', 'phone', 'nickname', 'identity'];
+
+/**
+ * A uniqueness clash, carrying EVERY field that clashed.
+ *
+ * It used to carry exactly one, because createUser() threw on the first check
+ * that failed. That made "your email and your phone are both in use" arrive as
+ * "your email is in use", the caller fixed the email, and the same request
+ * came back a second time blaming the phone. The checks now all run before
+ * anything is thrown, so one submit produces one complete answer.
+ *
+ * `field` is kept as the FIRST clash so callers that only ever handled one
+ * (quick-signup, completeProfile) are unaffected.
+ */
 export class DuplicateUserError extends Error {
-  constructor(readonly field: 'email' | 'phone' | 'nickname') {
-    super(`duplicate ${field}`);
+  readonly fields: ConflictField[];
+
+  constructor(fields: ConflictField | ConflictField[]) {
+    const list = (Array.isArray(fields) ? fields : [fields]).slice();
+    list.sort((a, b) => CONFLICT_ORDER.indexOf(a) - CONFLICT_ORDER.indexOf(b));
+    super(`duplicate ${list.join(', ')}`);
+    this.fields = list;
   }
+
+  get field(): ConflictField {
+    return this.fields[0];
+  }
+}
+
+/**
+ * How many matches an identifier lookup reads before deciding.
+ *
+ * One was enough while every match was assumed to be real. It is not enough
+ * now that a match may be STALE (see liveOwners below): with limit(1) a single
+ * orphaned document would be purged and a second, live one behind it would go
+ * unseen. A healthy database has at most one match for any of these
+ * identifiers, so five is already far past what can legitimately exist - it is
+ * headroom for a database that has been cleared by hand, which is exactly the
+ * situation this guards.
+ */
+const IDENTIFIER_SCAN = 5;
+
+/**
+ * Splits identifier documents into the ones a LIVE account still owns and the
+ * ones that outlived their account.
+ *
+ * ===========================================================================
+ * THE BUG THIS EXISTS TO FIX
+ * ===========================================================================
+ * `credentials/{userId}` and `usernames/{handle}` are separate top-level
+ * collections from `users/{userId}`. Nothing in Firestore ties their lifetimes
+ * together - there is no ON DELETE CASCADE - so deleting user documents (from
+ * the console, from a reset script, from anything that is not a full purge)
+ * leaves their credential and claim documents behind.
+ *
+ * Those leftovers carry `emailHash` and `phoneHash`. The uniqueness check read
+ * them and refused every signup that reused the address or number, with an
+ * error the operator could not clear by emptying `users` - because `users` was
+ * never where the blocking document lived. That is the false positive.
+ *
+ * A document whose owner is gone therefore proves nothing and must not block.
+ * It is also garbage, so the caller deletes it in the same transaction rather
+ * than leaving it to fail the next signup too.
+ *
+ * WHY THIS IS NOT A SECURITY REGRESSION: identifiers that must never be reused
+ * are the BANNED ones, and those live in `blocklist/{type__hash}`, which is
+ * checked separately before this function is ever reached and is not touched
+ * here. Soft-deleted accounts keep their `users` document, so they are "live"
+ * by this test and still block - recycling the address of a deleted account
+ * remains impossible.
+ */
+type OwnerSplit = {
+  /** Ids of accounts that really hold the identifier. */
+  live: string[];
+  /** Documents whose owning account no longer exists. Safe to remove. */
+  stale: FirebaseFirestore.DocumentReference[];
+};
+
+async function liveOwners(
+  tx: FirebaseFirestore.Transaction,
+  candidates: { ref: FirebaseFirestore.DocumentReference; ownerId: string }[],
+): Promise<OwnerSplit> {
+  const split: OwnerSplit = { live: [], stale: [] };
+  if (candidates.length === 0) return split;
+
+  // Still a READ, so it stays legal before the transaction's writes.
+  const owners = await Promise.all(candidates.map((c) => tx.get(users().doc(c.ownerId))));
+  candidates.forEach((candidate, index) => {
+    if (owners[index].exists) split.live.push(candidate.ownerId);
+    else split.stale.push(candidate.ref);
+  });
+  return split;
 }
 
 /**
@@ -272,6 +433,7 @@ export function newUserDefaults(): Omit<
     showFaculty: 'VERIFIED_ONLY',
     showGraduationYear: 'VERIFIED_ONLY',
     emailVerifiedAt: null,
+    phoneVerifiedAt: null,
     lastLoginAt: null,
     failedLoginCount: 0,
     lockedUntil: null,
@@ -287,31 +449,116 @@ export function newUserId(): string {
 export async function createUser(params: {
   profile: Omit<UserRecord, 'id' | 'nicknameLower'> & { id: string };
   credentials: Omit<CredentialRecord, 'id'>;
+  /**
+   * A provider identity to link in the SAME transaction - a social sign-up.
+   * Atomic on purpose: an account created without its identity would be an
+   * account nobody can sign in to (it has no password), and an identity
+   * written without its account would point at nothing.
+   */
+  identity?: { ref: FirebaseFirestore.DocumentReference; data: Record<string, unknown> };
 }): Promise<UserRecord> {
   const db = adminDb();
-  const { profile, credentials: creds } = params;
+  const { profile, credentials: creds, identity } = params;
+  const nicknameKey = claimKeyFor(profile.nickname);
 
   await db.runTransaction(async (tx) => {
-    const [byEmail, byNickname, byEmailHash] = await Promise.all([
-      tx.get(users().where('email', '==', profile.email).limit(1)),
-      tx.get(users().where('nicknameLower', '==', profile.nickname.toLowerCase()).limit(1)),
-      tx.get(credentials().where('emailHash', '==', creds.emailHash).limit(1)),
+    // ---------------------------------------------------------------------
+    // READS. Firestore requires all of them before any write in the same
+    // transaction, and every check below is a read, so nothing is written
+    // until the last one has been decided.
+    // ---------------------------------------------------------------------
+    if (identity && (await tx.get(identity.ref)).exists) throw new DuplicateUserError('identity');
+
+    /**
+     * The username is checked TWICE, deliberately. The claim document is the
+     * real constraint: its id is the key, so two signups racing for "aysel"
+     * contend on one document and Firestore lets exactly one commit. The
+     * `nicknameLower` query still catches accounts written before claims
+     * existed that the backfill has not reached - without it, a new signup
+     * could claim a handle an older account is already displaying.
+     */
+    const [byEmail, byNickname, byEmailHash, byPhoneHash, claim] = await Promise.all([
+      tx.get(users().where('email', '==', profile.email).limit(IDENTIFIER_SCAN)),
+      tx.get(users().where('nicknameLower', '==', nicknameKey).limit(IDENTIFIER_SCAN)),
+      tx.get(credentials().where('emailHash', '==', creds.emailHash).limit(IDENTIFIER_SCAN)),
+      creds.phoneHash
+        ? tx.get(credentials().where('phoneHash', '==', creds.phoneHash).limit(IDENTIFIER_SCAN))
+        : null,
+      tx.get(usernames().doc(nicknameKey)),
     ]);
 
-    if (!byEmail.empty || !byEmailHash.empty) throw new DuplicateUserError('email');
-    if (!byNickname.empty) throw new DuplicateUserError('nickname');
+    /**
+     * Resolved against their owners, because a credential or claim document
+     * whose account is gone is leftover state, not a duplicate. See
+     * liveOwners() for the whole reasoning - it is the fix for signups that
+     * kept failing after the `users` collection had been emptied.
+     *
+     * The `users` queries need no such resolution: there the matched document
+     * IS the account.
+     */
+    const [emailCreds, phoneCreds, staleClaimOwner] = await Promise.all([
+      liveOwners(tx, byEmailHash.docs.map((doc) => ({ ref: doc.ref, ownerId: doc.id }))),
+      byPhoneHash
+        ? liveOwners(tx, byPhoneHash.docs.map((doc) => ({ ref: doc.ref, ownerId: doc.id })))
+        : Promise.resolve({ live: [], stale: [] } as OwnerSplit),
+      claim.exists
+        ? liveOwners(tx, [{ ref: claim.ref, ownerId: (claim.data() as UsernameClaim).userId }])
+        : Promise.resolve({ live: [], stale: [] } as OwnerSplit),
+    ]);
 
-    if (creds.phoneHash) {
-      const byPhoneHash = await tx.get(credentials().where('phoneHash', '==', creds.phoneHash).limit(1));
-      if (!byPhoneHash.empty) throw new DuplicateUserError('phone');
-    }
+    /**
+     * EVERY clash, not the first one.
+     *
+     * Throwing at the first failed check meant an account whose email AND
+     * phone were both taken had to submit twice to learn both. The route
+     * turns this set into one error per field.
+     */
+    const conflicts: ConflictField[] = [];
+    if (!byEmail.empty || emailCreds.live.length > 0) conflicts.push('email');
+    if (phoneCreds.live.length > 0) conflicts.push('phone');
+    if (!byNickname.empty || staleClaimOwner.live.length > 0) conflicts.push('nickname');
+    if (conflicts.length > 0) throw new DuplicateUserError(conflicts);
+
+    // ---------------------------------------------------------------------
+    // WRITES.
+    // ---------------------------------------------------------------------
+
+    /**
+     * The leftovers are removed on the way past. Leaving them would mean the
+     * next signup for a different address pays the same extra reads, and an
+     * operator reading the database would still see documents that look like
+     * live accounts.
+     *
+     * The stale CLAIM is excluded here on purpose - see the set/create below.
+     */
+    for (const ref of [...emailCreds.stale, ...phoneCreds.stale]) tx.delete(ref);
 
     tx.set(
       users().doc(profile.id),
-      forFirestore({ ...profile, nicknameLower: profile.nickname.toLowerCase() }),
+      forFirestore({ ...profile, nicknameLower: nicknameKey }),
     );
     // Separate collection, denied to clients by rule. See the header.
     tx.set(credentials().doc(profile.id), forFirestore({ ...creds }));
+
+    const claimData = forFirestore({
+      userId: profile.id,
+      createdAt: new Date(),
+    } satisfies UsernameClaim);
+    if (staleClaimOwner.stale.length > 0) {
+      /**
+       * set(), because this claim is a leftover whose account is gone and we
+       * are replacing it. It is NOT delete()-then-create(): both would land in
+       * one commit, and create()'s "must not exist" precondition is evaluated
+       * against the document as it stood before the commit - which is to say
+       * it would fail on the document we are deleting in the same breath.
+       */
+      tx.set(usernames().doc(nicknameKey), claimData);
+    } else {
+      // create(), not set(): if the claim appeared after the read above, the
+      // commit fails instead of overwriting another account's handle.
+      tx.create(usernames().doc(nicknameKey), claimData);
+    }
+    if (identity) tx.create(identity.ref, forFirestore({ ...identity.data, userId: profile.id }));
   });
 
   const created = await findUserById(profile.id);
@@ -320,12 +567,122 @@ export async function createUser(params: {
 }
 
 export async function updateUser(id: string, patch: Record<string, unknown>): Promise<void> {
-  const data = forFirestore({ ...patch, updatedAt: new Date() });
-  // Keep the denormalised lowercase handle in step with the handle itself.
-  if (typeof patch.nickname === 'string') {
-    data.nicknameLower = patch.nickname.toLowerCase();
+  /**
+   * The handle is a login identifier backed by a `usernames` claim. A plain
+   * field update would move the profile to a new name while the claim stayed
+   * on the old one - the new name unprotected, the old one unusable. Nothing
+   * renames users today; a future rename must be one transaction that releases
+   * the old claim and create()s the new one, not a patch through here.
+   */
+  if ('nickname' in patch || 'nicknameLower' in patch) {
+    throw new Error('updateUser cannot change a nickname: it is a claimed login identifier');
   }
-  await users().doc(id).update(data);
+  await users().doc(id).update(forFirestore({ ...patch, updatedAt: new Date() }));
+}
+
+/**
+ * Finishes a quick-login account: real name, chosen handle, university and -
+ * when the provider supplied none - an email address. Clears
+ * `profileIncomplete`, which is what lifts the view-only gate.
+ *
+ * ONE transaction, because the handle is a claimed login identifier (see
+ * updateUser): the temporary claim is released and the new one create()d in
+ * the same commit, so there is never a moment where the account answers to
+ * neither name, or where two racing sign-ups both get the new one.
+ */
+export async function completeProfile(
+  userId: string,
+  patch: {
+    fullName: string;
+    firstName: string | null;
+    lastName: string | null;
+    nickname: string;
+    universityId: string;
+    /** Only when the account has no usable address yet. */
+    email?: { value: string; hash: string };
+  },
+): Promise<'ok' | 'already_complete' | DuplicateUserError['field']> {
+  const db = adminDb();
+  const nextKey = claimKeyFor(patch.nickname);
+
+  try {
+    return await db.runTransaction(async (tx) => {
+      const ref = users().doc(userId);
+      const snap = await tx.get(ref);
+      const current = docToObject<UserRecord>(snap) as UserRecord | null;
+      if (!current) throw new Error('completeProfile: user not found');
+      if (current.profileIncomplete !== true) return 'already_complete' as const;
+
+      const prevKey = current.nicknameLower;
+      const renaming = prevKey !== nextKey;
+
+      const [byNickname, claim, byEmail, byEmailHash] = await Promise.all([
+        renaming ? tx.get(users().where('nicknameLower', '==', nextKey).limit(IDENTIFIER_SCAN)) : null,
+        renaming ? tx.get(usernames().doc(nextKey)) : null,
+        patch.email ? tx.get(users().where('email', '==', patch.email.value).limit(IDENTIFIER_SCAN)) : null,
+        patch.email
+          ? tx.get(credentials().where('emailHash', '==', patch.email.hash).limit(IDENTIFIER_SCAN))
+          : null,
+      ]);
+
+      /**
+       * Same orphan resolution as createUser: a credential or claim document
+       * left behind by a deleted account is not evidence that anyone holds
+       * the identifier. Without this, finishing a quick-login profile hit the
+       * identical false positive - see liveOwners().
+       */
+      const [emailCreds, claimOwner] = await Promise.all([
+        liveOwners(
+          tx,
+          (byEmailHash?.docs ?? [])
+            .filter((doc) => doc.id !== userId)
+            .map((doc) => ({ ref: doc.ref, ownerId: doc.id })),
+        ),
+        claim?.exists
+          ? liveOwners(tx, [{ ref: claim.ref, ownerId: (claim.data() as UsernameClaim).userId }])
+          : Promise.resolve({ live: [], stale: [] } as OwnerSplit),
+      ]);
+
+      if (byNickname && !byNickname.empty) throw new DuplicateUserError('nickname');
+      if (claimOwner.live.some((owner) => owner !== userId)) throw new DuplicateUserError('nickname');
+      if (byEmail && byEmail.docs.some((d) => d.id !== userId)) throw new DuplicateUserError('email');
+      if (emailCreds.live.length > 0) throw new DuplicateUserError('email');
+
+      // The stale CLAIM is not deleted here: the rename below overwrites it
+      // with set(), and deleting it first would be a second write to the same
+      // document in one commit for no gain.
+      for (const ref of emailCreds.stale) tx.delete(ref);
+
+      tx.update(
+        ref,
+        forFirestore({
+          fullName: patch.fullName,
+          firstName: patch.firstName,
+          lastName: patch.lastName,
+          nickname: patch.nickname,
+          nicknameLower: nextKey,
+          universityId: patch.universityId,
+          ...(patch.email ? { email: patch.email.value, emailVerifiedAt: null } : {}),
+          profileIncomplete: false,
+          updatedAt: new Date(),
+        }),
+      );
+      if (renaming) {
+        tx.delete(usernames().doc(prevKey));
+        const claimData = forFirestore({ userId, createdAt: new Date() } satisfies UsernameClaim);
+        // set() when we are replacing a leftover claim, create() otherwise -
+        // the same precondition reason as in createUser().
+        if (claimOwner.stale.length > 0) tx.set(usernames().doc(nextKey), claimData);
+        else tx.create(usernames().doc(nextKey), claimData);
+      }
+      // The credentials document is created with the account, so it exists.
+      if (patch.email) tx.update(credentials().doc(userId), { emailHash: patch.email.hash });
+      return 'ok' as const;
+    });
+  } catch (error) {
+    if (error instanceof DuplicateUserError) return error.field;
+    throw error;
+  }
 }
 
 export async function updateCredentials(id: string, patch: Record<string, unknown>): Promise<void> {

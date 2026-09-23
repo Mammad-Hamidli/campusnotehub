@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BadgeCheck, Search, Star, UserRoundSearch } from 'lucide-react';
+import { BadgeCheck, Briefcase, GraduationCap, Search, ShieldAlert, Star, UserRoundSearch, Video } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { SectionHeading } from '@/components/ui/SectionHeading';
 
 /**
  * The PocketMentor directory.
@@ -154,11 +155,15 @@ export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
   return (
     <div className={embedded ? 'w-full' : 'mx-auto w-full max-w-5xl px-4 py-8 sm:px-6'}>
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <Heading className="text-xl font-bold tracking-tight text-fg">{t('mentors.title')}</Heading>
-          <p className="mt-1 text-sm text-fg-muted">{t('mentors.subtitle')}</p>
-        </div>
+        <SectionHeading
+          as={Heading}
+          icon={GraduationCap}
+          tone="text-verified bg-verified-soft"
+          title={t('mentors.title')}
+          subtitle={t('mentors.subtitle')}
+        />
         <Link href="/mentors/apply" className="btn-secondary shrink-0 px-3 py-1.5 text-sm">
+          <Briefcase className="h-3.5 w-3.5" aria-hidden="true" />
           {t('mentors.becomeMentor')}
         </Link>
       </header>
@@ -166,7 +171,8 @@ export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
       {/* Browsing is open; only booking is gated. Saying so up front beats
           letting someone pick a mentor and meet the refusal at the end. */}
       {signedIn && !canBook && (
-        <p className="card mb-3 border-warn/30 bg-warn-soft p-3 text-sm text-warn-fg">
+        <p className="card mb-3 flex items-start gap-2 border-warn/30 bg-warn-soft p-3 text-sm text-warn-fg">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {t('mentors.verifiedOnly')}
         </p>
       )}
@@ -302,8 +308,11 @@ export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
                       {mentor.headline}
                     </p>
                     {(mentor.jobTitle || mentor.company) && (
-                      <p className="mt-1 truncate text-2xs text-fg-subtle">
-                        {[mentor.jobTitle, mentor.company].filter(Boolean).join(' · ')}
+                      <p className="mt-1 flex min-w-0 items-center gap-1 text-2xs text-fg-subtle">
+                        <Briefcase className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        <span className="truncate">
+                          {[mentor.jobTitle, mentor.company].filter(Boolean).join(' · ')}
+                        </span>
                       </p>
                     )}
                   </div>
@@ -337,7 +346,10 @@ export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
                       <span>({mentor.ratingCount})</span>
                     </span>
                   )}
-                  <span>{t('mentors.sessions', { count: mentor.sessionsCompleted })}</span>
+                  <span className="inline-flex items-center gap-1">
+                    <Video className="h-3 w-3" aria-hidden="true" />
+                    {t('mentors.sessions', { count: mentor.sessionsCompleted })}
+                  </span>
                   <span className="ml-auto font-medium text-fg">
                     {price ? t('mentors.rate', { price }) : t('mentors.free')}
                   </span>

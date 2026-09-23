@@ -133,7 +133,7 @@ export const PRIVACY: LocalizedLegalDocument = {
                 'lodge a complaint with the competent supervisory authority.',
               ],
             },
-            'To exercise these rights, write to support@campushub.az. We may need to confirm your identity before acting on a request.',
+            'To exercise these rights, write to supportcampushub@gmail.com. We may need to confirm your identity before acting on a request.',
           ],
         },
         {
@@ -153,7 +153,7 @@ export const PRIVACY: LocalizedLegalDocument = {
         {
           id: 'contact',
           heading: '13. Contact',
-          body: ['Questions about this policy or your personal data can be sent to support@campushub.az.'],
+          body: ['Questions about this policy or your personal data can be sent to supportcampushub@gmail.com.'],
         },
       ],
     },
@@ -271,7 +271,7 @@ export const PRIVACY: LocalizedLegalDocument = {
                 'səlahiyyətli nəzarət orqanına şikayət etmək.',
               ],
             },
-            'Bu hüquqlardan istifadə etmək üçün support@campushub.az ünvanına yazın. Sorğunu icra etməzdən əvvəl şəxsiyyətinizi təsdiqləməyiniz istənilə bilər.',
+            'Bu hüquqlardan istifadə etmək üçün supportcampushub@gmail.com ünvanına yazın. Sorğunu icra etməzdən əvvəl şəxsiyyətinizi təsdiqləməyiniz istənilə bilər.',
           ],
         },
         {
@@ -291,7 +291,7 @@ export const PRIVACY: LocalizedLegalDocument = {
         {
           id: 'contact',
           heading: '13. Əlaqə',
-          body: ['Bu siyasət və ya şəxsi məlumatlarınızla bağlı suallarınızı support@campushub.az ünvanına göndərə bilərsiniz.'],
+          body: ['Bu siyasət və ya şəxsi məlumatlarınızla bağlı suallarınızı supportcampushub@gmail.com ünvanına göndərə bilərsiniz.'],
         },
       ],
     },
@@ -409,7 +409,7 @@ export const PRIVACY: LocalizedLegalDocument = {
                 'подать жалобу в компетентный надзорный орган.',
               ],
             },
-            'Чтобы воспользоваться этими правами, напишите на support@campushub.az. Перед выполнением запроса нам может потребоваться подтвердить вашу личность.',
+            'Чтобы воспользоваться этими правами, напишите на supportcampushub@gmail.com. Перед выполнением запроса нам может потребоваться подтвердить вашу личность.',
           ],
         },
         {
@@ -429,7 +429,7 @@ export const PRIVACY: LocalizedLegalDocument = {
         {
           id: 'contact',
           heading: '13. Контакты',
-          body: ['Вопросы об этой политике или ваших персональных данных можно направить на support@campushub.az.'],
+          body: ['Вопросы об этой политике или ваших персональных данных можно направить на supportcampushub@gmail.com.'],
         },
       ],
     },

@@ -388,7 +388,7 @@ refundable without clawing back a withdrawn balance.
 ## 8. Notifications
 
 `Notification` row (in-app, always) → BullMQ fan-out → Web Push (VAPID) and/or
-email (Resend). Enqueued *after* the DB write inside the same transaction, so a
+email (Gmail SMTP). Enqueued *after* the DB write inside the same transaction, so a
 rolled-back transaction can never deliver a push.
 
 Per-type, per-channel preferences, with two overrides: security notices

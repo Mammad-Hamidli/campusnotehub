@@ -1,3 +1,5 @@
+import { configuredAppOrigin } from '@/lib/app-url';
+
 /**
  * Absolute URL construction for email bodies.
  *
@@ -11,7 +13,7 @@
  * has to carry the scheme and host.
  */
 export function appUrl(path = ''): string {
-  const base = (process.env.APP_URL ?? 'https://campushub.az').replace(/\/+$/, '');
+  const base = configuredAppOrigin() ?? 'https://www.campusnotehub.com';
   if (!path) return base;
   return `${base}/${path.replace(/^\/+/, '')}`;
 }

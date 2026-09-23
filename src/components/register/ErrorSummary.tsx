@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
-import { FIELD_LABEL_KEYS, FIELD_ORDER, type AccountForm, type FieldErrors } from './types';
+import { FIELD_LABEL_KEYS, FIELD_ORDER, type ProfileErrors, type ProfileForm } from './types';
 
 /**
  * Error summary shown above the form after a failed "Continue".
@@ -28,7 +28,7 @@ import { FIELD_LABEL_KEYS, FIELD_ORDER, type AccountForm, type FieldErrors } fro
  * the visual order of the form. An error summary in a different order than
  * the fields is worse than none.
  */
-export function ErrorSummary({ errors }: { errors: FieldErrors }) {
+export function ErrorSummary({ errors }: { errors: ProfileErrors }) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -52,26 +52,18 @@ export function ErrorSummary({ errors }: { errors: FieldErrors }) {
    * id changes is one line here, and so the pairs are readable as a list -
    * which is the only way to notice that one is missing. A key with no entry
    * focuses the element whose id IS the key, which is the common case.
-   *
-   * `academicStatus` is deliberately absent: it is a radio group with no
-   * wrapping id, and the browser focuses the first radio from the name
-   * attribute anyway. See the fallback below.
    */
-  const CONTROL_IDS: Partial<Record<keyof AccountForm, string>> = {
+  const CONTROL_IDS: Partial<Record<keyof ProfileForm, string>> = {
     universityId: 'university',
-    graduationYear: 'gradYear',
-    graduationMonth: 'gradYear',
     acceptTerms: 'terms',
   };
 
-  function focusField(field: keyof AccountForm) {
+  function focusField(field: keyof ProfileForm) {
     const id = CONTROL_IDS[field] ?? field;
 
     const element =
       document.getElementById(id) ??
-      // Radio groups (accountType, academicStatus) have no element carrying
-      // the field id - their name attribute is the group. Focusing the first
-      // member puts the user inside the group with arrow keys live.
+      // A control identified only by its name attribute.
       document.querySelector<HTMLElement>(`[name="${id}"]`);
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     element?.focus({ preventScroll: true });

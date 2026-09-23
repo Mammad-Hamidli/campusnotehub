@@ -1,33 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { registerSchema } from './auth';
-
-const base = {
-  firstName: 'Aysel',
-  lastName: 'Mammadova',
-  dateOfBirth: '2001-05-04',
-  nickname: 'aysel_m',
-  email: 'aysel@example.com',
-  phone: '+994501234567',
-  password: 'correct horse battery',
-  passwordConfirm: 'correct horse battery',
-  universityId: 'BDU',
-  acceptTerms: true,
-};
-
-const mentor = {
-  ...base,
-  accountType: 'MENTOR',
-  department: 'Kapital Bank',
-  academicTitle: 'Senior Engineer',
-};
+import { completeProfileSchema, registerSchema, splitFullName } from './auth';
 
 const student = {
-  ...base,
-  accountType: 'STUDENT',
-  academicStatus: 'STUDYING',
-  facultySlug: 'komputer-elmleri',
-  graduationYear: new Date().getFullYear() + 2,
-  graduationMonth: 6,
+  fullName: 'Aysel Mammadova',
+  nickname: 'aysel_m',
+  universityId: 'BDU',
+  email: 'aysel@gmail.com',
+  phone: '+994 50 123 45 67',
+  password: 'correct horse battery',
+  acceptTerms: true,
 };
 
 const fieldErrors = (input: unknown) => {
@@ -35,68 +16,119 @@ const fieldErrors = (input: unknown) => {
   return parsed.success ? {} : parsed.error.flatten().fieldErrors;
 };
 
-describe('registerSchema - mentor availability', () => {
-  it('requires a mentor to pick at least one slot', () => {
-    expect(fieldErrors(mentor).availability).toEqual(['mentors.schedule.errors.empty']);
-    expect(fieldErrors({ ...mentor, availability: [] }).availability).toEqual([
-      'mentors.schedule.errors.empty',
-    ]);
-  });
-
-  it('accepts a mentor schedule and normalises overlapping rules', () => {
-    const parsed = registerSchema.safeParse({
-      ...mentor,
-      timezone: 'Asia/Baku',
-      availability: [
-        { weekday: 1, startMinute: 1080, endMinute: 1200 },
-        { weekday: 1, startMinute: 1140, endMinute: 1260 },
-      ],
-    });
-    expect(parsed.success).toBe(true);
-    expect(parsed.success && parsed.data.availability).toEqual([
-      { weekday: 1, startMinute: 1080, endMinute: 1260 },
-    ]);
-  });
-
-  it('refuses a schedule on a student registration', () => {
-    const errors = fieldErrors({
-      ...student,
-      availability: [{ weekday: 1, startMinute: 1080, endMinute: 1200 }],
-    });
-    expect(errors.availability).toEqual(['errors.validationFailed']);
-  });
-
-  it('does not ask a student for a schedule', () => {
+describe('registerSchema - the six-field student sign-up', () => {
+  it('accepts name, nickname, university, personal email, phone and password', () => {
     expect(registerSchema.safeParse(student).success).toBe(true);
   });
 
-  it('rejects an unknown timezone', () => {
-    const errors = fieldErrors({
-      ...mentor,
-      timezone: 'Mars/Olympus',
-      availability: [{ weekday: 1, startMinute: 1080, endMinute: 1200 }],
-    });
-    expect(errors.timezone).toBeDefined();
+  it('accepts a personal (non-university) email', () => {
+    expect(registerSchema.safeParse({ ...student, email: 'someone@outlook.com' }).success).toBe(true);
+  });
+
+  it('asks for nothing else - no date of birth, faculty or graduation date', () => {
+    const parsed = registerSchema.safeParse(student);
+    expect(parsed.success && Object.keys(parsed.data).sort()).toEqual(
+      ['acceptTerms', 'email', 'fullName', 'locale', 'nickname', 'phone', 'password', 'universityId'].sort(),
+    );
+  });
+
+  it('strips fields that no longer belong to signup instead of trusting them', () => {
+    const parsed = registerSchema.safeParse({ ...student, accountType: 'MENTOR', social: true, role: 'ADMIN' });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && 'accountType' in parsed.data).toBe(false);
+    expect(parsed.success && 'role' in parsed.data).toBe(false);
+  });
+
+  it('requires every field', () => {
+    for (const key of ['fullName', 'nickname', 'universityId', 'email', 'phone', 'password'] as const) {
+      const rest: Record<string, unknown> = { ...student };
+      delete rest[key];
+      expect(fieldErrors(rest)[key]).toBeDefined();
+    }
+    expect(fieldErrors({ ...student, acceptTerms: false }).acceptTerms).toEqual(['auth.errors.termsRequired']);
+  });
+
+  it('refuses an unknown university code', () => {
+    expect(fieldErrors({ ...student, universityId: 'NOPE' }).universityId).toBeDefined();
+  });
+
+  it('keeps the length-first password rule', () => {
+    expect(fieldErrors({ ...student, password: 'short' }).password).toEqual(['auth.errors.weakPassword']);
+    expect(fieldErrors({ ...student, password: 'aaaaaaaaaaaaaaaa' }).password).toEqual(['auth.errors.weakPassword']);
+  });
+
+  it('normalises the name and email', () => {
+    const parsed = registerSchema.safeParse({ ...student, fullName: '  Aysel   Mammadova ', email: ' Aysel@Gmail.com ' });
+    expect(parsed.success && parsed.data.fullName).toBe('Aysel Mammadova');
+    expect(parsed.success && parsed.data.email).toBe('aysel@gmail.com');
+  });
+
+  it('refuses digits in a name', () => {
+    expect(fieldErrors({ ...student, fullName: 'Aysel 2' }).fullName).toEqual(['auth.errors.nameInvalid']);
+  });
+
+  /**
+   * Every spelling has to land on ONE value, because the E.164 string is what
+   * gets hashed into the uniqueness check. If these diverged, the same number
+   * could hold two accounts.
+   */
+  it.each([
+    '+994 50 123 45 67',
+    '050 123 45 67',
+    '994501234567',
+    '00994501234567',
+    '(050) 123-45-67',
+    '501234567',
+  ])('normalises %s to E.164', (phone) => {
+    const parsed = registerSchema.safeParse({ ...student, phone });
+    expect(parsed.success && parsed.data.phone).toBe('+994501234567');
+  });
+
+  it.each([
+    ['a landline', '+994 12 493 12 34'],
+    ['an unknown operator code', '+994 33 123 45 67'],
+    ['too few digits', '+994 50 123 45'],
+    ['too many digits', '+994 50 123 45 678'],
+    ['a foreign number', '+7 916 123 45 67'],
+    ['letters', 'not a phone'],
+  ])('refuses %s', (_label, phone) => {
+    expect(fieldErrors({ ...student, phone }).phone).toEqual(['auth.errors.phoneInvalid']);
   });
 });
 
-describe('registerSchema - university', () => {
-  const schedule = [{ weekday: 1, startMinute: 1080, endMinute: 1200 }];
-
-  it('lets a mentor register with no university', () => {
-    const parsed = registerSchema.safeParse({
-      ...mentor,
-      universityId: undefined,
-      availability: schedule,
-    });
-    expect(parsed.success).toBe(true);
+describe('nickname rules', () => {
+  it('refuses reserved handles', () => {
+    expect(fieldErrors({ ...student, nickname: 'admin' }).nickname).toEqual(['auth.errors.nicknameReserved']);
   });
 
-  it('still refuses an unknown university code from a mentor', () => {
-    expect(fieldErrors({ ...mentor, universityId: 'NOPE', availability: schedule }).universityId).toBeDefined();
+  it('refuses the temporary quick-login handle shape, so nobody can pose as an unfinished account', () => {
+    expect(fieldErrors({ ...student, nickname: 'user34232' }).nickname).toEqual(['auth.errors.nicknameReserved']);
+    expect(fieldErrors({ ...student, nickname: 'User12345' }).nickname).toEqual(['auth.errors.nicknameReserved']);
+    // Not the same shape: fine.
+    expect(fieldErrors({ ...student, nickname: 'user_34232' }).nickname).toBeUndefined();
+  });
+});
+
+describe('completeProfileSchema', () => {
+  const profile = { fullName: 'Aysel', nickname: 'aysel_m', universityId: 'ADA', acceptTerms: true };
+
+  it('needs no password (the account signs in through its provider)', () => {
+    expect(completeProfileSchema.safeParse(profile).success).toBe(true);
   });
 
-  it('requires a university from a student', () => {
-    expect(fieldErrors({ ...student, universityId: undefined }).universityId).toEqual(['errors.fieldRequired']);
+  it('accepts an email for accounts whose provider supplied none', () => {
+    expect(completeProfileSchema.safeParse({ ...profile, email: 'a@b.co' }).success).toBe(true);
+    expect(completeProfileSchema.safeParse({ ...profile, email: 'not-an-email' }).success).toBe(false);
+  });
+});
+
+describe('splitFullName', () => {
+  it('splits the first word from the rest', () => {
+    expect(splitFullName('Aysel Mammadova')).toEqual({ firstName: 'Aysel', lastName: 'Mammadova' });
+    expect(splitFullName('Ali Rza Guliyev')).toEqual({ firstName: 'Ali', lastName: 'Rza Guliyev' });
+  });
+
+  it('allows a single name', () => {
+    expect(splitFullName('Aysel')).toEqual({ firstName: 'Aysel', lastName: null });
   });
 });

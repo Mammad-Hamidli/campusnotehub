@@ -11,7 +11,7 @@ import { jwtVerify, importSPKI } from 'jose';
 
 /** Routes that require a session. */
 const PROTECTED = [
-  /^\/(dashboard|wallet|settings|notifications|profile|bookmarks|bookings|verify)/,
+  /^\/(dashboard|wallet|settings|notifications|profile|bookmarks|bookings|verify|onboarding)/,
   /^\/notes\/(new|purchases)/,
   /**
    * /mentors/apply is deliberately NOT here.
@@ -20,7 +20,7 @@ const PROTECTED = [
    * anyone without an account: a signed-out visitor clicking "Become a mentor"
    * was bounced to /api/auth/refresh and on to /login, which offers no way to
    * create the mentor account they came for. The page now renders its own
-   * signed-out state pointing at /register?type=MENTOR.
+   * signed-out state pointing at the mentors site (MENTORS_URL).
    *
    * This removes NO authorization. Submitting an application is POST
    * /api/mentors/apply, which independently requires a session, an active
@@ -70,8 +70,12 @@ const NO_STORE = [
    * either answer is wrong for the other visitor, and a stored REDIRECT is
    * worse: it sends someone who just signed out straight back to a signed-in
    * route without ever asking the server.
+   *
+   * The password-reset screens carry no session state, but they do handle a
+   * live credential (the link's token) and a new password: nothing about them
+   * belongs in a back/forward cache.
    */
-  /^\/(login|register)$/,
+  /^\/(login|register|forgot-password|reset-password)$/,
   /^\/logout$/,
 ];
 
@@ -149,7 +153,7 @@ export async function middleware(request: NextRequest) {
   const connectSrc = [
     `'self'`,
     `https://*.s3.eu-central-1.amazonaws.com`,
-    `wss://campushub.az`,
+    `wss://campushub.com`,
     // The dev server pushes hot updates over a plain-ws connection to
     // localhost, which 'self' does not cover once a scheme is involved.
     ...(isDev ? [`ws:`] : []),
@@ -159,11 +163,11 @@ export async function middleware(request: NextRequest) {
     `default-src 'self'`,
     `script-src ${scriptSrc}`,
     `style-src 'self' 'unsafe-inline'`, // Tailwind emits inline styles for animations
-    `img-src 'self' data: blob: https://cdn.campushub.az`,
+    `img-src 'self' data: blob: https://cdn.campushub.com`,
     `media-src 'self' blob:`,
     `font-src 'self' data:`,
     `connect-src ${connectSrc}`,
-    `frame-src 'self' https://meet.campushub.az`,
+    `frame-src 'self' https://meet.campushub.com`,
     `frame-ancestors 'none'`,
     `form-action 'self'`,
     `base-uri 'none'`,

@@ -84,6 +84,8 @@ function selfProjection(user: UserRecord) {
     graduationYear: user.graduationYear,
     graduationMonth: user.graduationMonth,
     emailVerifiedAt: user.emailVerifiedAt,
+    // Quick-login accounts: view-only until /onboarding is finished.
+    profileIncomplete: user.profileIncomplete === true,
     lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
     showRealName: user.showRealName,

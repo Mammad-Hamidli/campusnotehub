@@ -46,6 +46,11 @@ import { hashPassword, hashEmail, hashPhone } from '../src/lib/crypto/hash';
 import { adminDb, adminBucket } from '../src/lib/firebase/admin.core';
 import { COLLECTIONS, SUBCOLLECTIONS, STORAGE_PATHS } from '../src/lib/firebase/collections';
 import { forFirestore } from '../src/lib/firebase/convert';
+import { seal } from '../src/lib/crypto/vault';
+import { base32Decode } from '../src/lib/auth/totp';
+
+/** Test-only authenticator key for the moderator fixture. Must match scripts/e2e.mjs. */
+const E2E_TOTP_DEFAULT = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 
 const db = adminDb();
 const PASSWORD = process.env.E2E_PASSWORD ?? 'UniPathTest2026!';
@@ -131,6 +136,7 @@ for (const person of PEOPLE) {
       showPhone: 'PRIVATE',
       showUniversity: 'PUBLIC',
       showFaculty: 'PUBLIC',
+      showGraduationYear: 'VERIFIED_ONLY',
       failedLoginCount: 0,
       lockedUntil: null,
       emailVerifiedAt: now,
@@ -162,6 +168,14 @@ for (const person of PEOPLE) {
       }),
     );
 
+  // The username claim createUser() writes, so login by @handle works for the
+  // fixtures too. set() is safe here: the handle and the id are both this
+  // fixture's, and a re-run must converge rather than fail.
+  await db
+    .collection(COLLECTIONS.usernames)
+    .doc(person.nickname.toLowerCase())
+    .set(forFirestore({ userId: ref.id, createdAt: now }));
+
   await db
     .collection(COLLECTIONS.wallets)
     .doc(ref.id)
@@ -180,6 +194,34 @@ for (const person of PEOPLE) {
 
   ids.set(person.email, ref.id);
   console.log(`  ${person.role.padEnd(10)} ${person.email.padEnd(28)} @${person.nickname}`);
+}
+
+/**
+ * The moderator fixture has two-factor authentication, because staff sessions
+ * without it carry no staff role (see requireSession). The secret is a KNOWN
+ * test value - E2E_TOTP_SECRET, base32, the same variable scripts/e2e.mjs
+ * reads to answer the code prompt - which is acceptable only because this
+ * script refuses the live project unless E2E_ALLOW_LIVE_DB=1 is set on purpose.
+ * Written sealed, exactly as confirmEnrollment() stores it.
+ */
+{
+  const modId = ids.get('e2e.mod@ada.edu.az')!;
+  const secret = base32Decode(process.env.E2E_TOTP_SECRET ?? E2E_TOTP_DEFAULT);
+  const now = new Date();
+  await db.collection(COLLECTIONS.mfa).doc(modId).set(
+    forFirestore({
+      totpSecretSealed: seal(secret, { userId: modId, purpose: 'totp' }),
+      enrolledAt: now,
+      pendingSecretSealed: null,
+      pendingCreatedAt: null,
+      lastUsedStep: 0,
+      recoveryCodeHashes: [],
+      failedCount: 0,
+      lockedUntil: null,
+      updatedAt: now,
+    }),
+  );
+  console.log('  MODERATOR  2FA enrolled with E2E_TOTP_SECRET');
 }
 
 const sellerId = ids.get('e2e.student@ada.edu.az')!;

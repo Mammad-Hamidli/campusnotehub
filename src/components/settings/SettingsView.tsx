@@ -25,8 +25,8 @@ import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 import { useTheme, type ThemePreference } from '@/lib/theme/ThemeProvider';
 import { LOCALES, LOCALE_META } from '@/lib/i18n/dictionaries';
-import { VisibilitySelect, type Visibility } from './VisibilitySelect';
-import { UNIVERSITIES } from '@/components/register/StepAccount';
+import { VISIBILITY_OPTIONS, VisibilitySelect, type Visibility } from './VisibilitySelect';
+import { UNIVERSITIES } from '@/lib/universities';
 import { VerificationSection, type IdentityState } from './VerificationSection';
 import { DeletionRequestCard } from './DeletionRequestCard';
 
@@ -100,6 +100,16 @@ const EMPTY: SettingsData = {
   },
 };
 
+/**
+ * A user document written outside createUser (bootstrap-admin, seed-e2e) can
+ * lack a privacy field, and /api/me passes it through as undefined. Rendered
+ * as-is, VisibilitySelect looks up an icon for `undefined` and React throws
+ * "Element type is invalid". Fall back to the registration default instead.
+ */
+function asVisibility(value: unknown, fallback: Visibility): Visibility {
+  return VISIBILITY_OPTIONS.includes(value as Visibility) ? (value as Visibility) : fallback;
+}
+
 const SECTIONS: { id: Section; icon: typeof User }[] = [
   { id: 'profile', icon: User },
   { id: 'verification', icon: BadgeCheck },
@@ -164,12 +174,12 @@ export function SettingsView() {
           graduationMonth: u.graduationMonth ? String(u.graduationMonth) : '',
           isVerified: Boolean(u.isVerified),
           privacy: {
-            showRealName: u.showRealName,
-            showEmail: u.showEmail,
-            showPhone: u.showPhone,
-            showUniversity: u.showUniversity,
-            showFaculty: u.showFaculty,
-            showGraduationYear: u.showGraduationYear,
+            showRealName: asVisibility(u.showRealName, EMPTY.privacy.showRealName),
+            showEmail: asVisibility(u.showEmail, EMPTY.privacy.showEmail),
+            showPhone: asVisibility(u.showPhone, EMPTY.privacy.showPhone),
+            showUniversity: asVisibility(u.showUniversity, EMPTY.privacy.showUniversity),
+            showFaculty: asVisibility(u.showFaculty, EMPTY.privacy.showFaculty),
+            showGraduationYear: asVisibility(u.showGraduationYear, EMPTY.privacy.showGraduationYear),
           },
         };
         setData(next);
@@ -693,7 +703,8 @@ function AccountSection() {
   const t = useT();
 
   const actions = [
-    { icon: KeyRound, labelKey: 'settings.account.changePassword', href: '/help' },
+    { icon: ShieldCheck, labelKey: 'settings.account.security', hintKey: 'settings.account.securityHint', href: '/settings/security' },
+    { icon: KeyRound, labelKey: 'settings.account.changePassword', href: '/settings/security#password' },
     { icon: MonitorSmartphone, labelKey: 'settings.account.devices', hintKey: 'settings.account.devicesHint', href: '/help' },
     { icon: Download, labelKey: 'settings.account.exportData', hintKey: 'settings.account.exportHint', href: '/help' },
   ] as const;

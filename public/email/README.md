@@ -33,7 +33,7 @@ Controlled by `EMAIL_ASSET_MODE` in `.env` - never by editing code:
   `src="cid:logo"`. Works with no public hosting at all, which is why it is the
   default while the app is not yet deployed.
 - **`url`** - the `src` is built from `EMAIL_ASSET_BASE_URL`, e.g.
-  `https://campushub.az/email/logo.png`. Requires the app to be publicly
+  `https://campushub.com/email/logo.png`. Requires the app to be publicly
   reachable. Next.js serves this folder at `/email/...`.
 
 ## Sizing

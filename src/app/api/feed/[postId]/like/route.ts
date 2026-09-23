@@ -26,7 +26,9 @@ export const dynamic = 'force-dynamic';
 
 async function authorize(request: NextRequest) {
   const { userId, viewer } = await requireSession(request);
-  if (!can(viewer, 'feed:read')) {
+  // 'feed:react', not 'feed:read': a like is an interaction, and a quick-login
+  // account that has not finished its profile is view-only.
+  if (!can(viewer, 'feed:react')) {
     return { error: NextResponse.json({ error: 'errors.forbidden' }, { status: 403 }) } as const;
   }
   return { userId, viewer } as const;

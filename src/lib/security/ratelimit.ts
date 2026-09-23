@@ -79,13 +79,78 @@ export const LIMITS = {
    */
   'auth:login:ip': { limit: 60, windowMs: 15 * 60_000 },
   'auth:register': { limit: 3, windowMs: 60 * 60_000 },
+  /**
+   * Forgotten password. Three buckets, because they stop three different
+   * things:
+   *
+   *   `auth:password-reset`        per ACCOUNT, consumed per email actually
+   *                                sent. Each one lands in a real inbox, so
+   *                                this is what stops a stranger flooding
+   *                                someone with reset mail from many
+   *                                addresses. Charged in the background, after
+   *                                the response: a 429 here would reveal that
+   *                                the account exists.
+   *   `auth:password-reset:ip`     per address, consumed per request, known or
+   *                                unknown email alike - bounds how fast one
+   *                                machine can drive the endpoint at all.
+   *   `auth:password-reset:redeem` per address, per submitted token. Tokens
+   *                                are 256-bit, so this stops noise and the
+   *                                argon2id cost of it, not guessing.
+   */
   'auth:password-reset': { limit: 3, windowMs: 60 * 60_000 },
+  'auth:password-reset:ip': { limit: 20, windowMs: 60 * 60_000 },
+  'auth:password-reset:redeem': { limit: 10, windowMs: 15 * 60_000 },
+  /** Changing the password while signed in; failed current-password checks share `auth:reauth`. */
+  'auth:password-change': { limit: 10, windowMs: 60 * 60_000 },
+  /**
+   * Second factor. Charged on FAILED codes only, like the login buckets.
+   *
+   * These sit in front of - not instead of - the hard lockout in
+   * repositories/mfa.ts (10 wrong codes -> 15 minutes, across every address).
+   * `auth:mfa` is per account, for the signed-in step-up endpoints;
+   * `auth:mfa:ip` is per address across all tickets, which is what a script
+   * cycling through stolen passwords' tickets looks like. A login ticket also
+   * dies after five wrong codes on its own.
+   */
+  'auth:mfa': { limit: 5, windowMs: 15 * 60_000 },
+  'auth:mfa:ip': { limit: 30, windowMs: 15 * 60_000 },
+  /** Generating secrets is cheap but each one is a vault write; consumed per call. */
+  'auth:mfa:setup': { limit: 10, windowMs: 60 * 60_000 },
+  /**
+   * Social sign-in, per address. `start` creates a state document per call;
+   * `callback` is charged on every arrival, since a flood of forged callbacks
+   * costs a transaction and a token-endpoint round trip each.
+   */
+  'auth:oauth:start': { limit: 30, windowMs: 15 * 60_000 },
+  'auth:oauth:callback': { limit: 30, windowMs: 15 * 60_000 },
+  /**
+   * Verification emails. Per account, consumed per send: each one is a real
+   * email to a real inbox, and a flood of them is harassment of whoever owns
+   * the address. Per address as a backstop across accounts.
+   */
+  'email:verify:send': { limit: 3, windowMs: 60 * 60_000 },
+  'email:verify:send:ip': { limit: 10, windowMs: 60 * 60_000 },
+  /** Redeem attempts per account; tokens are 256-bit, this only stops noise. */
+  'email:verify:redeem': { limit: 10, windowMs: 15 * 60_000 },
+  /** Re-entering the password before a sensitive change; failures only. */
+  'auth:reauth': { limit: 5, windowMs: 15 * 60_000 },
   // Document uploads are expensive downstream (OCR + model inference).
   'verification:submit': { limit: 3, windowMs: 24 * 60 * 60_000 },
   'verification:presign': { limit: 20, windowMs: 60 * 60_000 },
   // Content endpoints: generous enough that a real user never sees them.
   'feed:post': { limit: 20, windowMs: 60 * 60_000 },
   'feed:comment': { limit: 60, windowMs: 60 * 60_000 },
+  /**
+   * Post translation. Its own bucket, and tighter than `search`, because this
+   * is the only read endpoint in the app that COSTS MONEY PER CALL - Cloud
+   * Translation bills per character. A cache hit is charged here too, on
+   * purpose: the limit exists to bound a scripted loop, and a loop that only
+   * ever hits the cache is still a loop.
+   *
+   * 120/hour is roughly six full feed pages translated post by post, which is
+   * far beyond reading and far below useful abuse.
+   */
+  'feed:translate': { limit: 120, windowMs: 60 * 60_000 },
   'notes:upload': { limit: 10, windowMs: 24 * 60 * 60_000 },
   // Its own bucket: uploading notes must never use up the right to apply.
   'mentors:apply': { limit: 5, windowMs: 24 * 60 * 60_000 },
@@ -99,6 +164,11 @@ export const LIMITS = {
   'mentors:schedule': { limit: 60, windowMs: 60 * 60_000 },
   'bookings:create': { limit: 10, windowMs: 24 * 60 * 60_000 },
   'search': { limit: 120, windowMs: 60_000 },
+  // Finishing a quick-login profile: a handful of attempts covers typos and
+  // taken nicknames without letting the form probe which handles exist.
+  'profile:complete': { limit: 20, windowMs: 60 * 60_000 },
+  'profile:avatar': { limit: 20, windowMs: 60 * 60_000 },
+  'users:follow': { limit: 200, windowMs: 60 * 60_000 },
 } as const;
 
 export type LimitKey = keyof typeof LIMITS;

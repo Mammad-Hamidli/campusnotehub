@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { getViewer } from '@/lib/auth/session';
 import { UserRole } from '@/lib/enums';
+import { enabledProviders } from '@/lib/auth/oauth/providers';
 
 export const metadata: Metadata = { title: 'Log in', robots: { index: false, follow: false } };
 
@@ -60,7 +61,8 @@ export default async function LoginPage({
 
   return (
     <main id="main" className="flex min-h-dvh items-center justify-center px-4 py-12">
-      <LoginForm />
+      {/* Only providers whose credentials are configured get a button. */}
+      <LoginForm providers={enabledProviders()} />
     </main>
   );
 }
