@@ -1618,6 +1618,10 @@
       "revoked": "That device has been signed out.",
       "revokedOthers": "All other devices have been signed out.",
       "unknown": "Unknown device",
+      "sessions": "{count} sessions",
+      "sessionsHint": "This browser signed in more than once. Signing it out ends every one of its sessions.",
+      "revokeExtra": "Sign out other sessions",
+      "revokedExtra": "The other sessions on this device have been signed out.",
       "errors": {
         "current": "Use Sign out to end this device's session."
       },
@@ -1748,7 +1752,9 @@
       "reject": "Decline",
       "accepted": "@{nickname} now follows you",
       "rejected": "Request from @{nickname} declined",
-      "gone": "That request was already answered or withdrawn."
+      "gone": "That request was already answered or withdrawn.",
+      "followBack": "Follow back",
+      "dismiss": "Dismiss"
     }
   },
   "site": {

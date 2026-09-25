@@ -2,8 +2,13 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { NotificationType } from '@/lib/enums';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
-import { acceptFollowRequest, rejectFollowRequest } from '@/lib/firebase/repositories/followRequests';
-import { followerCount } from '@/lib/firebase/repositories/follows';
+import { can, type Viewer } from '@/lib/permissions';
+import {
+  acceptFollowRequest,
+  hasPendingRequest,
+  rejectFollowRequest,
+} from '@/lib/firebase/repositories/followRequests';
+import { followerCount, isFollowing } from '@/lib/firebase/repositories/follows';
 import { createNotification } from '@/lib/firebase/repositories/notifications';
 import { findUserById } from '@/lib/firebase/repositories/users';
 
@@ -20,11 +25,19 @@ const bodySchema = z.object({ action: z.enum(['accept', 'reject']) });
  * else's behalf. Rejecting deletes the request and tells the requester
  * nothing - they may ask again whenever they like. 404 when the request was
  * already answered or withdrawn, so a stale button cannot double-apply.
+ *
+ * An accept also reports `followBack` - where the viewer stands towards the
+ * requester - so the row can offer "Follow back" in place: 'available' (no
+ * edge, no pending request), 'requested', 'following', or null when the
+ * viewer may not follow anyone right now (users:follow denied). Following
+ * back is an ordinary follow REQUEST: accepting someone is consent to be
+ * followed by them, not consent to follow them.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ requesterId: string }> }) {
   let userId: string;
+  let viewer: Viewer;
   try {
-    ({ userId } = await requireSession(request));
+    ({ userId, viewer } = await requireSession(request));
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
@@ -59,5 +72,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }).catch((error) => console.error('[follow] accept notification failed', error));
   }
 
-  return NextResponse.json({ ok: true, action: 'accept', followers: await followerCount(userId) });
+  const [followers, followBack] = await Promise.all([
+    followerCount(userId),
+    followBackState(userId, requesterId, can(viewer, 'users:follow')),
+  ]);
+  return NextResponse.json({ ok: true, action: 'accept', followers, followBack });
+}
+
+async function followBackState(
+  userId: string,
+  requesterId: string,
+  allowed: boolean,
+): Promise<'available' | 'requested' | 'following' | null> {
+  if (!allowed) return null;
+  const [following, requested] = await Promise.all([
+    isFollowing(userId, requesterId),
+    hasPendingRequest(userId, requesterId),
+  ]);
+  return following ? 'following' : requested ? 'requested' : 'available';
 }

@@ -184,15 +184,27 @@ export async function listOpenUserSessions(userId: string): Promise<SessionRecor
   }));
 }
 
-/** Revokes one of the account's own sessions; false when it is not theirs or already gone. */
-export async function revokeOwnSession(userId: string, sessionId: string): Promise<boolean> {
-  const ref = sessions().doc(sessionId);
-  return adminDb().runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists || snap.get('userId') !== userId || snap.get('revokedAt')) return false;
-    tx.update(ref, forFirestore({ revokedAt: new Date() }));
-    return true;
-  });
+/**
+ * Revokes some of the account's own sessions - one device's worth, from the
+ * Devices list. Rows that are not theirs or are already revoked are skipped,
+ * inside the transaction, so a stale id can neither reach another account nor
+ * move an existing revocation's timestamp. Returns how many were revoked.
+ */
+export async function revokeOwnSessions(userId: string, sessionIds: string[]): Promise<number> {
+  const refs = [...new Set(sessionIds)].map((id) => sessions().doc(id));
+  const now = new Date();
+  let revoked = 0;
+  // Chunked like revokeUserSessions: a transaction is capped at 500 writes, and
+  // one browser that signs in over and over can hold more sessions than that.
+  for (let i = 0; i < refs.length; i += 400) {
+    revoked += await adminDb().runTransaction(async (tx) => {
+      const snaps = await tx.getAll(...refs.slice(i, i + 400));
+      const live = snaps.filter((snap) => snap.exists && snap.get('userId') === userId && !snap.get('revokedAt'));
+      for (const snap of live) tx.update(snap.ref, forFirestore({ revokedAt: now }));
+      return live.length;
+    });
+  }
+  return revoked;
 }
 
 export async function touchSession(id: string, at: Date): Promise<void> {

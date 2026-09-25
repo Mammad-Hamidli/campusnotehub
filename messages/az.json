@@ -1618,6 +1618,10 @@
       "revoked": "Həmin cihazdan çıxış edildi.",
       "revokedOthers": "Bütün digər cihazlardan çıxış edildi.",
       "unknown": "Naməlum cihaz",
+      "sessions": "{count} sessiya",
+      "sessionsHint": "Bu brauzerdə bir neçə dəfə daxil olunub. Çıxış etmək onun bütün sessiyalarını bağlayır.",
+      "revokeExtra": "Digər sessiyalardan çıx",
+      "revokedExtra": "Bu cihazdakı digər sessiyalar bağlandı.",
       "errors": {
         "current": "Bu cihazdan çıxmaq üçün Çıxış düyməsindən istifadə edin."
       },
@@ -1748,7 +1752,9 @@
       "reject": "Rədd et",
       "accepted": "@{nickname} artıq sizi izləyir",
       "rejected": "@{nickname} sorğusu rədd edildi",
-      "gone": "Bu sorğu artıq cavablandırılıb və ya geri götürülüb."
+      "gone": "Bu sorğu artıq cavablandırılıb və ya geri götürülüb.",
+      "followBack": "Sən də izlə",
+      "dismiss": "Bağla"
     }
   },
   "site": {

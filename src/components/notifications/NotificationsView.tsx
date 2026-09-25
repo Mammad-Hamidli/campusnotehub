@@ -9,6 +9,7 @@ import {
   CalendarClock,
   Check,
   CheckCheck,
+  Clock,
   Heart,
   Loader2,
   MessageCircle,
@@ -365,16 +366,27 @@ type FollowRequest = {
   requester: { nickname: string; avatarUrl: string | null; isVerified: boolean; headline: string | null };
 };
 
+/** Where the viewer stands towards someone they just accepted (see the accept route). */
+type FollowBack = 'available' | 'requested' | 'following' | null;
+
+type AcceptedRequest = FollowRequest & { followBack: FollowBack };
+
 /**
  * Pending follow requests, answered in place. Re-read whenever the live
  * count moves, so a request that arrives while this page is open appears
  * here too. Rejecting leaves no trace - the requester may ask again.
+ *
+ * Accepting does not make the row vanish when a follow back is possible: it
+ * stays, as "@x now follows you", with a Follow back button next to it. Those
+ * rows live in their own state, so the refetch the accept triggers (the live
+ * count drops) cannot wipe them; they last until dismissed or the page is left.
  */
 function FollowRequests() {
   const t = useT();
   const toast = useToast();
   const live = useLiveNotifications();
   const [requests, setRequests] = useState<FollowRequest[] | null>(null);
+  const [accepted, setAccepted] = useState<AcceptedRequest[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
@@ -409,6 +421,10 @@ function FollowRequests() {
             nickname: request.requester.nickname,
           }),
         );
+        const followBack = (body as { followBack?: FollowBack }).followBack ?? null;
+        if (action === 'accept' && (followBack === 'available' || followBack === 'requested')) {
+          setAccepted((rows) => [{ ...request, followBack }, ...rows.filter((r) => r.requesterId !== request.requesterId)]);
+        }
       }
       live.refresh();
     } catch {
@@ -418,31 +434,41 @@ function FollowRequests() {
     }
   }
 
-  if (!requests || requests.length === 0) return null;
+  /** An ordinary follow request to the person just accepted. */
+  async function followBack(row: AcceptedRequest) {
+    setBusy(row.requesterId);
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(row.requester.nickname)}/follow`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(t(body.error ?? 'errors.generic'));
+        return;
+      }
+      const next: FollowBack = body.following ? 'following' : body.requested ? 'requested' : row.followBack;
+      setAccepted((rows) => rows.map((r) => (r.requesterId === row.requesterId ? { ...r, followBack: next } : r)));
+      if (body.requested) toast.success(t('publicProfile.requestSent', { nickname: row.requester.nickname }));
+    } catch {
+      toast.error(t('errors.network'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const dismiss = (requesterId: string) => setAccepted((rows) => rows.filter((r) => r.requesterId !== requesterId));
+
+  const pending = requests ?? [];
+  if (pending.length === 0 && accepted.length === 0) return null;
 
   return (
     <section className="card mb-5 p-4" aria-labelledby="follow-requests-heading">
       <h2 id="follow-requests-heading" className="text-sm font-semibold text-fg">
         {t('social.requests.title')}{' '}
-        <span className="font-normal text-fg-muted">({requests.length})</span>
+        {pending.length > 0 && <span className="font-normal text-fg-muted">({pending.length})</span>}
       </h2>
       <ul className="mt-3 divide-y divide-edge">
-        {requests.map((request) => (
+        {pending.map((request) => (
           <li key={request.requesterId} className="flex flex-wrap items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-            <Link href={`/u/${request.requester.nickname}`} className="flex min-w-0 flex-1 items-center gap-2.5">
-              <UserAvatar
-                nickname={request.requester.nickname}
-                src={request.requester.avatarUrl}
-                verified={request.requester.isVerified}
-                size="sm"
-              />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-fg">@{request.requester.nickname}</span>
-                {request.requester.headline && (
-                  <span className="block truncate text-xs text-fg-muted">{request.requester.headline}</span>
-                )}
-              </span>
-            </Link>
+            <Requester request={request} />
             <div className="flex shrink-0 gap-1.5">
               <button
                 type="button"
@@ -469,7 +495,68 @@ function FollowRequests() {
             </div>
           </li>
         ))}
+        {accepted.map((row) => (
+          <li key={row.requesterId} className="flex flex-wrap items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+            <Requester
+              request={row}
+              subtitle={t('social.requests.accepted', { nickname: row.requester.nickname })}
+            />
+            <div className="flex shrink-0 items-center gap-1.5">
+              {row.followBack === 'available' ? (
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => void followBack(row)}
+                  className="btn-primary h-8 px-3 text-xs"
+                >
+                  {busy === row.requesterId ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  {t('social.requests.followBack')}
+                </button>
+              ) : (
+                <span className="inline-flex h-8 items-center gap-1.5 px-2 text-xs font-medium text-fg-muted">
+                  {row.followBack === 'following' ? (
+                    <UserCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : (
+                    <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  {t(row.followBack === 'following' ? 'publicProfile.following' : 'publicProfile.requested')}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => dismiss(row.requesterId)}
+                className="btn-ghost h-8 w-8 p-0 text-fg-muted"
+                aria-label={t('social.requests.dismiss')}
+                title={t('social.requests.dismiss')}
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          </li>
+        ))}
       </ul>
     </section>
+  );
+}
+
+function Requester({ request, subtitle }: { request: FollowRequest; subtitle?: string }) {
+  const line = subtitle ?? request.requester.headline;
+  return (
+    <Link href={`/u/${request.requester.nickname}`} className="flex min-w-0 flex-1 items-center gap-2.5">
+      <UserAvatar
+        nickname={request.requester.nickname}
+        src={request.requester.avatarUrl}
+        verified={request.requester.isVerified}
+        size="sm"
+      />
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-medium text-fg">@{request.requester.nickname}</span>
+        {line && <span className="block truncate text-xs text-fg-muted">{line}</span>}
+      </span>
+    </Link>
   );
 }
