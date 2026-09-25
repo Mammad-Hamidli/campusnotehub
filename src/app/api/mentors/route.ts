@@ -5,6 +5,7 @@ import { listMentors } from '@/lib/firebase/repositories/mentors';
 import { findUsersByIds } from '@/lib/firebase/repositories/users';
 import { findUniversitiesByIds, findUniversityByCode } from '@/lib/firebase/repositories/reference';
 import { getViewer } from '@/lib/auth/session';
+import { visibleAvatar } from '@/lib/profile/visibility';
 import { can } from '@/lib/permissions';
 
 export const runtime = 'nodejs';
@@ -132,7 +133,7 @@ export async function GET(request: NextRequest) {
           user: user
             ? {
                 nickname: user.nickname,
-                avatarUrl: user.avatarUrl,
+                avatarUrl: visibleAvatar(user, viewer),
                 isVerified: user.isVerified,
                 university: university ? { code: university.code } : null,
               }

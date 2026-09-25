@@ -5,7 +5,6 @@ import {
   type DeletionRequestStatus,
 } from '@/lib/firebase/repositories/deletionRequests';
 import { findUsersByIds } from '@/lib/firebase/repositories/users';
-import { findWalletByUserId } from '@/lib/firebase/repositories/wallets';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,8 +18,7 @@ const STATUSES: DeletionRequestStatus[] = ['PENDING', 'APPROVED', 'REJECTED', 'C
  * ADMIN-only action everywhere else in the panel (DELETE /api/admin/users).
  *
  * Each row carries what the reviewer needs to decide without opening three
- * other screens - above all the wallet balance, because deleting an account
- * that still holds money strands it.
+ * other screens.
  */
 export async function GET(request: NextRequest) {
   return withAdmin(request, 'ADMIN', async () => {
@@ -29,11 +27,10 @@ export async function GET(request: NextRequest) {
 
     const rows = await listDeletionRequests(status);
     const users = await findUsersByIds(rows.map((r) => r.userId));
-    const wallets = await Promise.all(rows.map((r) => findWalletByUserId(r.userId).catch(() => null)));
 
     return NextResponse.json(
       {
-        requests: rows.map((r, i) => {
+        requests: rows.map((r) => {
           const user = users.get(r.userId);
           return {
             userId: r.userId,
@@ -42,8 +39,6 @@ export async function GET(request: NextRequest) {
             requestedAt: r.requestedAt,
             decidedAt: r.decidedAt,
             decisionNote: r.decisionNote,
-            // Available plus escrowed: both are money deletion would strand.
-            balanceMinor: wallets[i] ? wallets[i]!.availableMinor + wallets[i]!.pendingMinor : null,
             user: user
               ? {
                   nickname: user.nickname,

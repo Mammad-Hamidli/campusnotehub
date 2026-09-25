@@ -23,13 +23,7 @@
  *    composite-key idempotency the SQL primary key gave - liking twice writes
  *    the same document id.
  *
- * 3. THE LEDGER STAYS FLAT AND APPEND-ONLY.
- *    `ledger_transactions` and `ledger_entries` are separate top-level
- *    collections because they are audited as a unit and must never be nested
- *    under something deletable. Deleting a wallet must not cascade away the
- *    money record.
- *
- * 4. FILE BYTES LEAVE THE DATABASE.
+ * 3. FILE BYTES LEAVE THE DATABASE.
  *    note_attachments.bytes and media_assets.bytes are BYTEA columns today.
  *    Firestore's 1 MiB document limit makes that impossible and it would be
  *    wrong anyway - they go to Cloud Storage, and the document keeps only the
@@ -61,13 +55,12 @@ export const COLLECTIONS = {
   tags: 'tags',
 
   notes: 'notes',
-  orders: 'orders',
   noteReviews: 'noteReviews',
-
-  wallets: 'wallets',
-  ledgerAccounts: 'ledgerAccounts',
-  ledgerTransactions: 'ledgerTransactions',
-  ledgerEntries: 'ledgerEntries',
+  /**
+   * `followRequests/{requesterId}__{targetId}`: a pending follow. Deleted on
+   * accept or reject, so a rejected requester may simply ask again.
+   */
+  followRequests: 'followRequests',
 
   mentorProfiles: 'mentorProfiles',
   bookings: 'bookings',
@@ -111,6 +104,12 @@ export const COLLECTIONS = {
    * Server-only; TTL policy on expiresAt. See repositories/passwordResets.ts.
    */
   passwordResets: 'passwordResets',
+  /**
+   * `emailChanges/{hash(token)}`: a confirmed-by-password request to move the
+   * account to a new address, awaiting a click from that address. 1 hour,
+   * single use, redeemable only by the owner's session.
+   */
+  emailChanges: 'emailChanges',
   userDevices: 'userDevices',
   scheduledTasks: 'scheduledTasks',
   mediaAssets: 'mediaAssets',

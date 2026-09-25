@@ -46,17 +46,18 @@ export async function isFollowing(followerId: string, followeeId: string): Promi
   return (await following(followerId).doc(followeeId).get()).exists;
 }
 
-/** Writes both edges, or neither. */
-export async function follow(followerId: string, followeeId: string): Promise<void> {
-  // Self-follow is meaningless and would put a user in their own follower
-  // count; refused here rather than at each call site.
-  if (followerId === followeeId) return;
-
-  const now = new Date();
-  const batch = adminDb().batch();
-  batch.set(following(followerId).doc(followeeId), forFirestore({ userId: followeeId, createdAt: now }));
-  batch.set(followers(followeeId).doc(followerId), forFirestore({ userId: followerId, createdAt: now }));
-  await batch.commit();
+/**
+ * Writes both edges inside a caller's atomic unit (a batch or a transaction).
+ * Following happens only through an accepted request - see followRequests.ts.
+ */
+export function writeFollowEdges(
+  writer: { set(ref: FirebaseFirestore.DocumentReference, data: FirebaseFirestore.DocumentData): unknown },
+  followerId: string,
+  followeeId: string,
+  now = new Date(),
+): void {
+  writer.set(following(followerId).doc(followeeId), forFirestore({ userId: followeeId, createdAt: now }));
+  writer.set(followers(followeeId).doc(followerId), forFirestore({ userId: followerId, createdAt: now }));
 }
 
 export async function unfollow(followerId: string, followeeId: string): Promise<void> {

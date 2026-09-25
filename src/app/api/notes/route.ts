@@ -32,7 +32,7 @@ export const maxDuration = 60;
  *
  * `?sort=trending` backs the "Populyar konspektlər" sidebar, which previously
  * rendered a hardcoded array of four invented notes with invented ratings and
- * purchase counts. Trending is ordered by real purchases, then rating, then
+ * counts. Trending is ordered by real downloads, then rating, then
  * recency - so an empty database correctly shows an empty panel rather than
  * fiction.
  *
@@ -72,8 +72,6 @@ const createSchema = z.object({
   courseCode: z.string().trim().max(32).optional(),
   academicYear: z.string().trim().max(16).optional(),
   language: z.enum(['az', 'en', 'ru']).default('az'),
-  /** Minor units (qepik). 0 means a free note. */
-  priceMinor: z.coerce.number().int().min(0).max(100_000).default(0),
   /** Multi-select; de-duplicated and existence-checked below. */
   universityIds: z.array(z.string().min(1).max(64)).max(10).default([]),
 });
@@ -112,7 +110,7 @@ export async function POST(request: NextRequest) {
    * table, not a new rule - see REQUIRES_VERIFICATION in src/lib/permissions.ts
    * for why earning money is gated where spending it is not.
    */
-  if (!can(viewer, 'notes:sell')) {
+  if (!can(viewer, 'notes:share')) {
     return NextResponse.json({ error: 'errors.verificationRequired' }, { status: 403 });
   }
 
@@ -144,7 +142,6 @@ export async function POST(request: NextRequest) {
     courseCode: form.get('courseCode') || undefined,
     academicYear: form.get('academicYear') || undefined,
     language: form.get('language') || 'az',
-    priceMinor: form.get('priceMinor') ?? 0,
     // `universityId` still accepted so older clients keep working.
     universityIds: [
       ...new Set(
@@ -227,7 +224,6 @@ export async function POST(request: NextRequest) {
       courseCode: fields.data.courseCode,
       academicYear: fields.data.academicYear,
       language: fields.data.language,
-      priceMinor: fields.data.priceMinor,
       universityIds: fields.data.universityIds,
       // Listed once a moderator approves it in the admin panel (Reviews).
       status: NoteStatus.PENDING_REVIEW,

@@ -28,7 +28,6 @@
     "feed": "Lent",
     "notes": "UniNotes",
     "mentors": "PocketMentor",
-    "wallet": "Balans",
     "notifications": "Bildirişlər",
     "profile": "Profil",
     "settings": "Tənzimləmələr",
@@ -66,7 +65,7 @@
       "createAccount": "Hesab yarat",
       "haveAccount": "Artıq hesabınız var?",
       "phone": "Telefon nömrəsi",
-      "phoneHint": "Hesabı bərpa etmək və ödənişləri təsdiqləmək üçün istifadə olunur",
+      "phoneHint": "Hesabı bərpa etmək üçün istifadə olunur",
       "nickname": "İstifadəçi adı",
       "nicknameHint": "Platformada bu ad görünəcək. Hərf, rəqəm və alt xətt, 3-24 simvol.",
       "graduationDate": "Məzuniyyət tarixi",
@@ -113,7 +112,6 @@
         "student": {
           "title": "Tələbə",
           "body": "Hazırda universitetdə oxuyan tələbələr üçün.",
-          "point1": "Doğrulamadan sonra konspekt sata və mentor sifariş edə bilərsiniz",
           "point2": "Sonra şəxsiyyət vəsiqəsi və tələbə bileti ilə doğrulayın"
         },
         "teacher": {
@@ -142,7 +140,7 @@
       },
       "graduatedDate": "Məzuniyyət tarixi",
       "expectedGraduationDate": "Gözlənilən məzuniyyət tarixi",
-      "verifyLater": "Qeydiyyat üçün sənəd tələb olunmur. Hesabın dərhal hazırdır — dərs notları al və sat, balans və mentor sifarişləri üçün şəxsiyyətini istədiyin vaxt Tənzimləmələrdə doğrula.",
+      "verifyLater": "Qeydiyyat üçün sənəd tələb olunmur. Hesabın dərhal hazırdır — doğrulanmış nişan və mentor sifarişləri üçün şəxsiyyətini istədiyin vaxt Tənzimləmələrdə doğrula.",
       "schedule": {
         "title": "İş qrafikiniz",
         "subtitle": "Tələbələrin hər həftə sizinlə görüş təyin edə biləcəyi vaxtları seçin.",
@@ -377,9 +375,8 @@
     },
     "restricted": {
       "title": "Bu funksiya doğrulama tələb edir",
-      "body": "Doğrulanmayan hesablar konspekt ala və ya sata, balans artıra və ya çıxara, mentor sifarişi verə bilmir.",
       "allowed": "İndi edə bilərsiniz: lenti oxumaq, paylaşım etmək, konspektlərə və mentorlara baxmaq.",
-      "action": "Konspekt almaq və balansı artırmaq üçün şəxsiyyətinizi doğrulayın."
+      "action": "Mentorla görüş sifariş etmək üçün şəxsiyyətinizi doğrulayın."
     },
     "graduation": {
       "promptTitle": "Məzun olmusunuz?",
@@ -397,11 +394,12 @@
     },
     "prompt": {
       "title": "Şəxsiyyətinizi doğrulayın",
-      "body": "Konspekt almaq və satmaq, balansı artırmaq, mentor sifariş etmək və pul çıxarmaq üçün sənədlərinizi yükləyin. Bir neçə dəqiqə çəkir.",
+      "body": "Doğrulanmış nişan almaq, mentorla görüş sifariş etmək və ya mentorluq etmək üçün sənədlərinizi yükləyin. Bir neçə dəqiqə çəkir.",
       "rejectedBody": "Son yoxlama alınmadı. Daha aydın şəkillər yükləyib yenidən cəhd edin.",
       "cta": "İndi doğrula",
       "reviewTitle": "Sənədləriniz yoxlanılır",
-      "reviewBody": "Nəticə hazır olan kimi sizə bildiriş göndərəcəyik."
+      "reviewBody": "Nəticə hazır olan kimi sizə bildiriş göndərəcəyik.",
+      "dismiss": "Bağla"
     }
   },
   "feed": {
@@ -474,40 +472,49 @@
       "attribution": "{language} dilinə maşın tərcüməsi. Dəqiq olmaya bilər.",
       "errors": {
         "failed": "Bu paylaşım tərcümə edilə bilmədi. Yenidən cəhd edin.",
-        "unavailable": "Tərcümə hazırda əlçatan deyil.",
-        "unsupported": "Bu dil dəstəklənmir.",
-        "empty": "Tərcümə ediləcək mətn yoxdur."
+        "unavailable": "Tərcümə hazırda əlçatan deyil. Bağlantınızı yoxlayıb yenidən cəhd edin.",
+        "empty": "Tərcümə ediləcək mətn yoxdur.",
+        "quota": "Bugünkü pulsuz tərcümə limiti bitib. Sabah yenidən cəhd edin.",
+        "sameLanguage": "Bu paylaşım artıq həmin dildədir."
       }
     },
     "posted": "Paylaşımınız uğurla dərc olundu.",
-    "commentPosted": "Şərhiniz əlavə olundu."
+    "commentPosted": "Şərhiniz əlavə olundu.",
+    "templates": {
+      "prompt": "Bu hashtag-i şablon olaraq saxlamaq istərsinizmi?",
+      "save": "Bəli, saxla",
+      "dismiss": "Xeyr",
+      "label": "Hashtag şablonları",
+      "insert": "{tag} əlavə et",
+      "remove": "{tag} şablonunu sil",
+      "saved": "{tag} şablon olaraq saxlanıldı",
+      "errors": {
+        "invalid": "Bu düzgün hashtag deyil.",
+        "full": "Ən çox {max} şablon saxlaya bilərsiniz. Əvvəlcə birini silin.",
+        "failed": "Şablon saxlanılmadı. Yenidən cəhd edin."
+      }
+    }
   },
   "notes": {
     "title": "UniNotes",
     "subtitle": "Tələbədən tələbəyə konspekt bazarı",
     "browse": "Konspektlərə bax",
-    "sell": "Konspekt sat",
-    "myPurchases": "Aldıqlarım",
     "myListings": "Satdıqlarım",
     "filters": {
       "university": "Universitet",
       "subject": "Fənn",
       "courseCode": "Fənn kodu",
       "language": "Dil",
-      "priceRange": "Qiymət aralığı",
       "rating": "Reytinq",
       "freeOnly": "Yalnız pulsuz"
     },
     "card": {
       "pages": "{count} səhifə",
       "sales": "{count} satış",
-      "byAuthor": "{name} tərəfindən",
-      "free": "Pulsuz"
+      "byAuthor": "{name} tərəfindən"
     },
     "detail": {
       "preview": "İlk səhifə önizləməsi",
-      "previewNote": "Tam sənəd alışdan sonra əlçatan olur",
-      "buy": "Al - {price}",
       "download": "Yüklə",
       "alreadyOwned": "Bu konspekt sizdədir",
       "reviews": "Rəylər ({count})",
@@ -521,8 +528,6 @@
       "noteTitle": "Başlıq",
       "description": "Təsvir",
       "subject": "Fənn",
-      "price": "Qiymət (AZN)",
-      "priceHint": "0 yazsanız pulsuz olacaq. Maksimum 50 AZN.",
       "processing": "Fayl emal olunur: önizləmə yaradılır...",
       "pendingReview": "Konspekt moderasiyada. Təsdiqdən sonra dərc olunacaq.",
       "subtitle": "PDF və ya Word (.pdf, .doc, .docx). Maksimum 10 MB.",
@@ -537,7 +542,6 @@
         "subject": "Fənn",
         "courseCode": "Kurs kodu",
         "university": "Universitet",
-        "price": "Qiymət (qəpik, 0 = pulsuz)",
         "universities": "Universitetlər"
       },
       "errors": {
@@ -562,50 +566,30 @@
       "retry": "Yenidən cəhd et",
       "success": "Konspekt yükləndi",
       "maxSize": "{mb} MB-a qədər. PDF və ya Word (.pdf, .doc, .docx).",
-      "verifyFirstTitle": "Əvvəlcə şəxsiyyətinizi təsdiqləyin",
-      "verifyFirstBody": "Konspekt satmaq üçün təsdiqlənmiş şəxsiyyət tələb olunur. Təsdiq tamamlandıqdan sonra konspekt yükləyə bilərsiniz.",
       "selected": "{name} ({size})",
       "universitiesHint": "Konspektin aid olduğu bütün universitetləri seçin (10-a qədər).",
-      "titleFromFile": "Fayl adından dolduruldu — istədiyiniz kimi dəyişin."
+      "titleFromFile": "Fayl adından dolduruldu — istədiyiniz kimi dəyişin.",
+      "blockedTitle": "Hələ konspekt paylaşa bilməzsiniz"
     },
     "errors": {
-      "notVerified": "Konspekt satmaq üçün hesabınız doğrulanmalıdır",
-      "insufficientFunds": "Balansınız kifayət etmir",
       "duplicate": "Eyni fayl artıq platformada mövcuddur",
-      "encrypted": "Şifrələnmiş PDF qəbul edilmir",
-      "notForSale": "Bu konspekt satışda deyil.",
-      "cannotBuyOwn": "Öz konspektinizi ala bilməzsiniz.",
-      "alreadyOwned": "Bu konspekt artıq sizdədir."
+      "encrypted": "Şifrələnmiş PDF qəbul edilmir"
     },
-    "free": "Pulsuz",
     "download": "Yüklə",
     "stats": {
-      "purchases": "{n} alış"
+      "downloads": "{n} yükləmə"
     },
     "empty": "Hələ heç bir konspekt yüklənməyib.",
     "addNote": "Konspekt əlavə et",
-    "purchases": {
-      "subtitle": "Aldığınız konspektlər",
-      "empty": "Hələ alış yoxdur",
-      "emptyHint": "Aldığınız konspektlər burada yüklənməyə hazır görünəcək.",
-      "browse": "UniNotes-a bax",
-      "download": "Yüklə",
-      "refunded": "Geri qaytarılıb"
-    },
-    "buy": "Al",
-    "buyFree": "Pulsuz götür",
-    "buying": "Alınır…",
     "owned": "Sizdədir",
-    "bought": "Alış tamamlandı",
     "creatorStats": "{avg}⭐ ({reviews} rəy, {files} fayl üzrə)",
-    "lockedUntilPurchase": "Alışdan sonra açılır",
     "reviews": {
       "rate": "Konspekti qiymətləndir",
       "yourRating": "Sizin qiymətiniz",
       "stars": "{n} ulduz",
       "summary": "{avg} ({count} rəy)",
       "errors": {
-        "purchaseRequired": "Yalnız bu konspekti alanlar qiymət verə bilər."
+        "ownNote": "Öz konspektinizi qiymətləndirə bilməzsiniz."
       },
       "saved": "Təşəkkürlər - qiymətləndirməniz yadda saxlanıldı."
     },
@@ -619,7 +603,7 @@
       "removed": "Saxlanılanlardan çıxarıldı.",
       "failed": "Saxlanılanlar yenilənmədi. Yenidən cəhd edin."
     },
-    "purchased": "Alış uğurla tamamlandı - konspekti artıq yükləyə bilərsiniz."
+    "signInToDownload": "Yükləmək üçün daxil olun"
   },
   "mentors": {
     "title": "PocketMentor",
@@ -639,7 +623,6 @@
     "profile": {
       "sessions": "{count} görüş",
       "experience": "{years} il təcrübə",
-      "rate": "{price} / {minutes} dəq",
       "languages": "Dillər",
       "about": "Haqqında",
       "bookSession": "Görüş təyin et",
@@ -654,8 +637,6 @@
       "topicPlaceholder": "Nə haqqında danışmaq istəyirsiniz?",
       "confirm": "Təsdiqlə və ödə",
       "summary": "{date}, {time} - {duration} dəqiqə",
-      "total": "Cəmi: {price}",
-      "escrowNote": "Məbləğ görüş bitənə qədər saxlanılır",
       "confirmed": {
         "title": "Görüş təsdiqləndi",
         "body": "Video zəng linki görüşdən 30 dəqiqə əvvəl aktivləşəcək.",
@@ -663,7 +644,6 @@
         "joinCall": "Zəngə qoşul"
       },
       "cancel": "Görüşü ləğv et",
-      "cancelPolicy": "24 saatdan əvvəl ləğv edilərsə tam məbləğ qaytarılır",
       "menteeNote": "Əlavə qeyd (istəyə bağlı)",
       "menteeNotePlaceholder": "Mentorunuzun hazırlaşmasına kömək edəcək məlumat"
     },
@@ -799,42 +779,6 @@
       }
     }
   },
-  "wallet": {
-    "title": "Balans",
-    "available": "İstifadəyə hazır",
-    "pending": "Gözləyən",
-    "topUp": "Balans artır",
-    "withdraw": "Çıxarış et",
-    "history": "Əməliyyat tarixçəsi",
-    "pendingNote": "Satış məbləği {hours} saat sonra istifadəyə açılır",
-    "txn": {
-      "TOPUP": "Balans artırma",
-      "NOTE_PURCHASE": "Konspekt alışı",
-      "NOTE_PAYOUT_RELEASE": "Konspekt satışı",
-      "BOOKING_ESCROW_HOLD": "Görüş ödənişi",
-      "BOOKING_ESCROW_RELEASE": "Mentorluq gəliri",
-      "BOOKING_REFUND": "Görüş qaytarılması",
-      "WITHDRAWAL": "Çıxarış",
-      "PLATFORM_FEE": "Platforma komissiyası",
-      "ADJUSTMENT": "Düzəliş"
-    },
-    "empty": "Hələ əməliyyat yoxdur",
-    "subtitle": "Balansınız və son əməliyyatlar",
-    "availableHint": "Konspekt və sessiyalara xərcləməyə hazırdır",
-    "frozen": "Bu pul kisəsi dondurulub. Dəstəklə əlaqə saxlayın.",
-    "topUpForm": {
-      "title": "Balansı artır",
-      "hint": "{min}–{max} AZN arasında məbləğ əlavə edin.",
-      "amount": "Məbləğ (AZN)",
-      "submit": "Balansı artır",
-      "success": "Balansınıza {amount} AZN əlavə olundu.",
-      "providerNote": "Test ödəniş rejimi: ödəniş provayderi qoşulana qədər kartdan pul tutulmur.",
-      "errors": {
-        "amount": "{min} ilə {max} AZN arasında məbləğ daxil edin.",
-        "declined": "Ödəniş rədd edildi."
-      }
-    }
-  },
   "notifications": {
     "title": "Bildirişlər",
     "markAllRead": "Hamısını oxunmuş et",
@@ -844,7 +788,6 @@
       "VERIFICATION_APPROVED": "Hesabınız doğrulandı",
       "VERIFICATION_REJECTED": "Doğrulama alınmadı",
       "GRADUATION_TRANSITION_PROMPT": "Məzun statusunu yeniləyin",
-      "NOTE_SOLD": "Konspektiniz satıldı: {title}",
       "NOTE_REVIEWED": "Konspektinizə yeni rəy",
       "BOOKING_REQUESTED": "Yeni görüş sorğusu",
       "BOOKING_CONFIRMED": "Görüş təsdiqləndi",
@@ -854,9 +797,10 @@
       "POST_REPLY": "{name} paylaşımınıza cavab yazdı",
       "POST_LIKE": "{name} paylaşımınızı bəyəndi",
       "NEW_FOLLOWER": "{name} sizi izləməyə başladı",
-      "WALLET_CREDIT": "Balansınıza {amount} əlavə olundu",
       "VERIFICATION_NEEDS_REVIEW": "Əlavə yoxlama tələb olunur",
-      "VERIFICATION_RESUBMIT_REQUIRED": "Sənədləri yenidən yükləyin"
+      "VERIFICATION_RESUBMIT_REQUIRED": "Sənədləri yenidən yükləyin",
+      "FOLLOW_REQUEST": "{name} sizi izləmək istəyir",
+      "FOLLOW_ACCEPTED": "{name} izləmə sorğunuzu qəbul etdi"
     },
     "subtitle": "Hesabınızda baş verən hər şey",
     "loading": "Bildirişlər yüklənir…",
@@ -885,9 +829,6 @@
       "title": "Hesab bərpa olundu",
       "body": "Hesabınızdakı dondurma götürüldü"
     },
-    "noteSold": {
-      "body": "Kimsə \"{title}\" konspektini aldı"
-    },
     "mentor": {
       "approvedTitle": "Mentor müraciəti təsdiqləndi",
       "approvedBody": "Artıq PocketMentor siyahısındasınız.",
@@ -900,10 +841,6 @@
       "rejectedTitle": "Qeyd təsdiqlənmədi",
       "rejectedBody": "\"{title}\" təsdiqlənmədi."
     },
-    "wallet": {
-      "topUpTitle": "Balans artırıldı",
-      "topUpBody": "Pul kisənizə {amount} əlavə olundu."
-    },
     "deletionRequest": {
       "title": "Hesabın silinməsi tələb olunub",
       "body": "@{nickname} hesabının silinməsini istəyir. Admin panelində yoxlayın.",
@@ -915,6 +852,14 @@
     "newFollower": {
       "title": "Yeni izləyici",
       "body": "@{nickname} səni izləməyə başladı"
+    },
+    "followRequest": {
+      "title": "Yeni izləmə sorğusu",
+      "body": "@{nickname} sizi izləmək istəyir"
+    },
+    "followAccepted": {
+      "title": "İzləmə sorğusu qəbul edildi",
+      "body": "@{nickname} izləmə sorğunuzu qəbul etdi"
     }
   },
   "errors": {
@@ -933,7 +878,7 @@
     "methodNotAllowed": "Bu sorğu üsulu dəstəklənmir",
     "unsupportedMediaType": "Sorğunun formatı dəstəklənmir",
     "credentialsInQueryString": "Təhlükəsizlik səbəbindən sorğu ləğv edildi. Səhifəni yeniləyin və yenidən cəhd edin.",
-    "verificationRequired": "Konspekt satmazdan əvvəl şəxsiyyətinizi təsdiqləyin."
+    "verificationRequired": "Mentor sifarişindən əvvəl şəxsiyyətinizi təsdiqləyin."
   },
   "a11y": {
     "openMenu": "Menyunu aç",
@@ -952,9 +897,9 @@
     },
     "hero": {
       "badge": "Tələbələrin sosial məkanı",
-      "titleLead": "Dərs notları al və sat,",
+      "titleLead": "Dərs notlarını pulsuz paylaş,",
       "titleAccent": "kampusun ən canlı icmasına qoşul",
-      "subtitle": "Kurs yoldaşlarını izlə, lentdə paylaş, sual ver və cavabla, dərs notları al və sat, mentorlarla tanış ol — hamısı bir yerdə, doğrulanmış tələbələrlə.",
+      "subtitle": "Kurs yoldaşlarını izlə, lentdə paylaş, sual ver və cavabla, dərs notlarını paylaş, mentorlarla tanış ol — hamısı bir yerdə, doğrulanmış tələbələrlə.",
       "ctaNotes": "Dərs notlarına bax",
       "trust": "Saxta profil yoxdur — hər hesab doğrulanır",
       "ctaJoin": "Pulsuz qoşul"
@@ -969,13 +914,13 @@
     "features": {
       "eyebrow": "Bir hesab, üç dünya",
       "title": "Dərs, dostluq və karyera — hamısı bir yerdə",
-      "subtitle": "Lentdə danış, dərs notları al və sat, mentor tap. Bir dəfə qoşul, hər yerdə istifadə et.",
+      "subtitle": "Lentdə danış, dərs notlarını paylaş, mentor tap. Bir dəfə qoşul, hər yerdə istifadə et.",
       "notes": {
         "title": "UniNotes",
-        "body": "Dərs notları al və sat. Yüklə, qazan və ya imtahandan əvvəl lazım olanı tap.",
+        "body": "Dərs notları hamı üçün pulsuzdur. Özününkünü yüklə və ya imtahandan əvvəl lazım olanı tap.",
         "p1": "İlk səhifə önizləməsi avtomatik yaradılır",
-        "p2": "Daxili balans ilə təhlükəsiz ödəniş",
-        "p3": "Yalnız alanlar rəy yaza bilir",
+        "p2": "Oxumaq və yükləmək pulsuzdur",
+        "p3": "Faydalı olan notları qiymətləndir",
         "cta": "Dərs notlarına bax"
       },
       "mentor": {
@@ -983,7 +928,7 @@
         "body": "Sahəsində çalışan peşəkarlarla fərdi karyera məsləhəti.",
         "p1": "IT, marketinq, hüquq, mühəndislik və daha çox",
         "p2": "Boş vaxtlardan seç, dərhal təsdiqlə",
-        "p3": "Görüş bitənə qədər ödəniş saxlanılır",
+        "p3": "Yalnız doğrulanmış mentorlar",
         "cta": "Mentor tap"
       },
       "feed": {
@@ -1005,7 +950,7 @@
     },
     "cta": {
       "title": "Kampus səni gözləyir 🎉",
-      "body": "Qeydiyyat bir dəqiqə çəkir. Qoşul, izlə, paylaş, dərs notları al və sat.",
+      "body": "Qeydiyyat bir dəqiqə çəkir. Qoşul, izlə, paylaş, dərs notlarını bölüş.",
       "button": "Pulsuz hesab yarat",
       "secondary": "Əvvəlcə dərs notlarına bax"
     },
@@ -1026,7 +971,7 @@
         "follow": "Kurs yoldaşlarını izlə",
         "feed": "Kampus lentində paylaş",
         "comment": "Şərh yaz, bəyən, müzakirə et",
-        "notes": "Dərs notları al və sat",
+        "notes": "Dərs notlarını paylaş",
         "mentor": "Mentorlarla tanış ol",
         "campus": "Universitetinə görə kəşf et"
       }
@@ -1053,7 +998,7 @@
       "title": "İndi qeydiyyatdan keçin, sonra doğrulayın",
       "b1": "İndi sənəd axtarmağa ehtiyac yoxdur — hesab yalnız bu formadan yaradılır",
       "b2": "Doğrulama — nə vaxt istəsəniz — saxta profillərin və oğurlanmış konspektlərin qarşısını alır",
-      "b3": "Dərs notları al və sat, balans və mentor sifarişlərini açır",
+      "b3": "Doğrulanmış nişanı və mentor sifarişlərini açır",
       "privacy": "Doğrulama zamanı şəkillər həmin anda emal olunur və dərhal silinir. Serverlərimizdə heç vaxt saxlanılmır."
     },
     "scanner": {
@@ -1109,7 +1054,6 @@
       "viewAll": "Hamısına bax"
     },
     "quickActions": "Sürətli əməliyyatlar",
-    "sellNote": "Konspekt sat",
     "findMentor": "Mentor tap"
   },
   "admin": {
@@ -1269,7 +1213,7 @@
         "confirmRevokeTitle": "Məcburi çıxış edilsin?",
         "confirmRevokeBody": "Bütün sessiyalar dərhal ləğv edilir. Giriş tokenləri hər sorğuda sessiya qeydi ilə yoxlanır, ona görə bu dərhal qüvvəyə minir.",
         "confirmDeleteTitle": "Bu istifadəçi silinsin?",
-        "confirmDeleteBody": "Bu yumşaq silmədir: hesab siyahılardan çıxarılır və daxil ola bilmir, lakin qeyd, audit izi və pul kisəsi tarixçəsi saxlanılır."
+        "confirmDeleteBody": "Bu yumşaq silmədir: hesab siyahılardan çıxarılır və daxil ola bilmir, lakin qeyd və audit izi saxlanılır."
       },
       "errors": {
         "bannedImmutable": "Bloklanmış hesab burada bərpa oluna bilməz. Əvvəlcə blok siyahısı qeydləri götürülməlidir.",
@@ -1287,7 +1231,7 @@
       "frozenUntil": "{date} tarixinədək dondurulub",
       "frozenIndefinitely": "Müddətsiz dondurulub",
       "freezeTitle": "Bu hesabı müvəqqəti dondur",
-      "freezeBody": "Hesab yalnız oxuma imkanı saxlayır və hər yerdən çıxarılır. Paylaşım, alqı-satqı və mesajlaşma dayandırılır.",
+      "freezeBody": "Hesab yalnız oxuma imkanı saxlayır və hər yerdən çıxarılır. Paylaşım və mesajlaşma dayandırılır.",
       "freezeDuration": "Müddət",
       "freezeReason": "Səbəb (istifadəçiyə göstərilir)",
       "freezeConfirm": "Hesabı dondur",
@@ -1466,9 +1410,7 @@
       "approved": "Hesab silindi.",
       "alreadyDeleted": "Artıq silinib",
       "memberSince": "Üzvlük tarixi",
-      "balance": "Balans",
       "noReason": "Səbəb göstərilməyib.",
-      "balanceWarning": "Bu hesabda hələ {amount} var. Silmək bu vəsaiti itirər - əvvəlcə həll edin.",
       "rejectHint": "Rədd səbəbi (istifadəçiyə e-poçtla göndərilir)",
       "confirmTitle": "Bu hesab silinsin?",
       "confirmBody": "@{nickname} hesabı silinəcək, bütün cihazlardan çıxış ediləcək və ona e-poçt göndəriləcək. Təsdiq üçün ləqəbi yazın."
@@ -1499,12 +1441,13 @@
     "academic": {
       "title": "Akademik məlumat",
       "description": "Universitet və məzuniyyət tarixi",
-      "universityLocked": "Hesabın bu universitetdə təsdiqlənib. Dəyişmək üçün yenidən təsdiq lazımdır - dəstək xidmətinə yaz."
+      "universityLocked": "Hesabın bu universitetdə təsdiqlənib. Dəyişmək üçün yenidən təsdiq lazımdır - dəstək xidmətinə yaz.",
+      "universityMissing": "Hələ universitet əlavə etməmisiniz — kampus lentini görmək üçün universitetinizi seçin."
     },
     "privacy": {
       "title": "Məxfilik",
       "description": "Hansı məlumatınızı kimin görəcəyini seçin",
-      "note": "İstifadəçi adınız və profil şəkliniz həmişə ictimaidir — platforma onlarsız işləmir.",
+      "note": "Nikneyminiz həmişə ictimaidir — platforma onsuz işləmir.",
       "realName": "Ad və soyad",
       "realNameHint": "Şəxsiyyət vəsiqənizdəki ad",
       "email": "E-poçt",
@@ -1519,7 +1462,9 @@
         "VERIFIED_ONLY_hint": "Yalnız sənədi təsdiqlənmiş istifadəçilər",
         "PRIVATE": "Yalnız mən",
         "PRIVATE_hint": "Heç kim görməyəcək"
-      }
+      },
+      "avatar": "Profil şəkli",
+      "avatarHint": "Digərləri əvəzinə baş hərflərinizi görür"
     },
     "theme": {
       "label": "Mövzu",
@@ -1536,8 +1481,6 @@
       "title": "Hesab",
       "description": "Təhlükəsizlik və hesabın idarə edilməsi",
       "changePassword": "Şifrəni dəyiş",
-      "devices": "Cihazlar",
-      "devicesHint": "Hesabınıza daxil olmuş cihazlar",
       "exportData": "Məlumatlarımı yüklə",
       "exportHint": "Bütün məlumatlarınızın JSON kopyası",
       "deleteAccount": "Hesabı sil",
@@ -1559,11 +1502,9 @@
       "unlockedTitle": "Sizin üçün açıqdır",
       "unlocksTitle": "Doğrulamadan sonra açılır",
       "unlocks": {
-        "buy": "Konspekt almaq",
-        "topup": "Balansı artırmaq",
-        "sell": "Konspektlərinizi satmaq",
         "book": "Mentorla görüş sifariş etmək",
-        "withdraw": "Qazancı çıxarmaq"
+        "offer": "Mentorluq etmək",
+        "badge": "Adınızın yanında doğrulanmış nişan"
       },
       "needTitle": "Sizdən tələb olunan sənədlər",
       "need": {
@@ -1581,8 +1522,7 @@
       "request": "Hesabın silinməsini tələb et",
       "what": {
         "review": "Sorğunuzu administrator yoxlayır; nəticə barədə sizə e-poçt göndəriləcək.",
-        "signOut": "Təsdiqləndikdən sonra hesabınız silinir və bütün cihazlardan çıxış edilir.",
-        "wallet": "Balansınızdakı vəsaiti əvvəlcədən çıxarın - silindikdən sonra geri qaytarıla bilməz."
+        "signOut": "Təsdiqləndikdən sonra hesabınız silinir və bütün cihazlardan çıxış edilir."
       },
       "reason": "Niyə ayrılırsınız?",
       "password": "Şifrənizlə təsdiqləyin",
@@ -1635,6 +1575,36 @@
       "disabledToast": "İki mərhələli doğrulama söndürüldü",
       "verifiedToast": "Sessiya təsdiqləndi",
       "loadFailed": "Təhlükəsizlik parametrlərini yükləmək mümkün olmadı."
+    },
+    "email": {
+      "change": "E-poçtu dəyiş",
+      "newLabel": "Yeni e-poçt ünvanı",
+      "currentPassword": "Cari şifrə",
+      "changeHint": "Yeni ünvana təsdiq linki göndərəcəyik. Tamamlamaq üçün onu burada daxil olmuş halda açın — o vaxta qədər cari ünvanınız istifadə olunur.",
+      "sendLink": "Təsdiq linkini göndər",
+      "pending": "Dəyişikliyi tamamlamaq üçün {email} ünvanını yoxlayın və linki daxil olmuş halda açın.",
+      "confirmTitle": "Yeni e-poçtunuzu təsdiqləyin",
+      "changed": "E-poçt ünvanınız dəyişdirildi. Digər cihazlardan çıxış edildi.",
+      "errors": {
+        "same": "Bu artıq sizin e-poçt ünvanınızdır.",
+        "taken": "Bu ünvandan istifadə etmək mümkün deyil. Başqasını yoxlayın.",
+        "linkInvalid": "Bu link etibarsızdır və ya vaxtı keçib. Dəyişikliyə Tənzimləmələrdən yenidən başlayın."
+      }
+    },
+    "devices": {
+      "title": "Cihazlar",
+      "description": "Hesabınıza daxil olmuş brauzerlər. Tanımadığınız cihazdan çıxış edin.",
+      "thisDevice": "Bu cihaz",
+      "signedIn": "Giriş: {when}",
+      "lastActive": "Son fəaliyyət: {when}",
+      "revoke": "Çıxış et",
+      "revokeOthers": "Digər cihazlardan çıxış et",
+      "revoked": "Həmin cihazdan çıxış edildi.",
+      "revokedOthers": "Bütün digər cihazlardan çıxış edildi.",
+      "unknown": "Naməlum cihaz",
+      "errors": {
+        "current": "Bu cihazdan çıxmaq üçün Çıxış düyməsindən istifadə edin."
+      }
     }
   },
   "stub": {
@@ -1714,6 +1684,19 @@
     "posts": "Paylaşımlar",
     "noPosts": "Hələ paylaşım yoxdur.",
     "follow": "İzlə",
-    "following": "İzləyirsən"
+    "following": "İzləyirsən",
+    "requested": "Sorğu göndərildi",
+    "requestedHint": "Sorğunu geri götürmək üçün toxunun",
+    "requestSent": "@{nickname} istifadəçisinə izləmə sorğusu göndərildi"
+  },
+  "social": {
+    "requests": {
+      "title": "İzləmə sorğuları",
+      "accept": "Qəbul et",
+      "reject": "Rədd et",
+      "accepted": "@{nickname} artıq sizi izləyir",
+      "rejected": "@{nickname} sorğusu rədd edildi",
+      "gone": "Bu sorğu artıq cavablandırılıb və ya geri götürülüb."
+    }
   }
 }

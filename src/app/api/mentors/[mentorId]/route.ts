@@ -8,6 +8,7 @@ import {
 import { findUserById, findUsersByIds } from '@/lib/firebase/repositories/users';
 import { findUniversityById } from '@/lib/firebase/repositories/reference';
 import { getViewer } from '@/lib/auth/session';
+import { visibleAvatar } from '@/lib/profile/visibility';
 import { can } from '@/lib/permissions';
 
 export const runtime = 'nodejs';
@@ -119,7 +120,7 @@ export async function GET(
         sessionsCompleted: mentor.sessionsCompleted,
         user: {
           nickname: owner.nickname,
-          avatarUrl: owner.avatarUrl,
+          avatarUrl: visibleAvatar(owner, viewer),
           isVerified: owner.isVerified,
           headline: owner.headline,
           bio: owner.bio,

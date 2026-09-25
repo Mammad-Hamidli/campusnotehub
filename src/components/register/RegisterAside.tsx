@@ -1,6 +1,6 @@
 'use client';
 
-import { Lock, ShieldCheck, UserCheck, Wallet } from 'lucide-react';
+import { Lock, ShieldCheck, UserCheck, Users } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -9,7 +9,7 @@ import { useT } from '@/lib/i18n/LocaleProvider';
 const REASONS = [
   { key: 'b1', icon: ShieldCheck },
   { key: 'b2', icon: UserCheck },
-  { key: 'b3', icon: Wallet },
+  { key: 'b3', icon: Users },
 ] as const;
 
 /**

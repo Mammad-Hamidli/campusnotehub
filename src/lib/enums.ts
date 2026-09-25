@@ -126,40 +126,6 @@ export const NoteStatus = {
 export type NoteStatus = (typeof NoteStatus)[keyof typeof NoteStatus];
 export const NoteStatusValues = Object.values(NoteStatus) as NoteStatus[];
 
-export const OrderStatus = {
-  PENDING: 'PENDING',
-  PAID: 'PAID',
-  REFUNDED: 'REFUNDED',
-  FAILED: 'FAILED',
-  DISPUTED: 'DISPUTED',
-} as const;
-export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
-export const OrderStatusValues = Object.values(OrderStatus) as OrderStatus[];
-
-export const LedgerAccountType = {
-  USER_AVAILABLE: 'USER_AVAILABLE',
-  USER_PENDING: 'USER_PENDING',
-  PLATFORM_REVENUE: 'PLATFORM_REVENUE',
-  PLATFORM_ESCROW: 'PLATFORM_ESCROW',
-  EXTERNAL_GATEWAY: 'EXTERNAL_GATEWAY',
-} as const;
-export type LedgerAccountType = (typeof LedgerAccountType)[keyof typeof LedgerAccountType];
-export const LedgerAccountTypeValues = Object.values(LedgerAccountType) as LedgerAccountType[];
-
-export const LedgerTxnKind = {
-  TOPUP: 'TOPUP',
-  NOTE_PURCHASE: 'NOTE_PURCHASE',
-  NOTE_PAYOUT_RELEASE: 'NOTE_PAYOUT_RELEASE',
-  BOOKING_ESCROW_HOLD: 'BOOKING_ESCROW_HOLD',
-  BOOKING_ESCROW_RELEASE: 'BOOKING_ESCROW_RELEASE',
-  BOOKING_REFUND: 'BOOKING_REFUND',
-  WITHDRAWAL: 'WITHDRAWAL',
-  PLATFORM_FEE: 'PLATFORM_FEE',
-  ADJUSTMENT: 'ADJUSTMENT',
-} as const;
-export type LedgerTxnKind = (typeof LedgerTxnKind)[keyof typeof LedgerTxnKind];
-export const LedgerTxnKindValues = Object.values(LedgerTxnKind) as LedgerTxnKind[];
-
 export const MentorIndustry = {
   IT: 'IT',
   MARKETING: 'MARKETING',
@@ -201,7 +167,6 @@ export const NotificationType = {
   VERIFICATION_NEEDS_REVIEW: 'VERIFICATION_NEEDS_REVIEW',
   VERIFICATION_RESUBMIT_REQUIRED: 'VERIFICATION_RESUBMIT_REQUIRED',
   GRADUATION_TRANSITION_PROMPT: 'GRADUATION_TRANSITION_PROMPT',
-  NOTE_SOLD: 'NOTE_SOLD',
   NOTE_REVIEWED: 'NOTE_REVIEWED',
   NOTE_MODERATION: 'NOTE_MODERATION',
   BOOKING_REQUESTED: 'BOOKING_REQUESTED',
@@ -212,7 +177,8 @@ export const NotificationType = {
   POST_REPLY: 'POST_REPLY',
   POST_LIKE: 'POST_LIKE',
   NEW_FOLLOWER: 'NEW_FOLLOWER',
-  WALLET_CREDIT: 'WALLET_CREDIT',
+  FOLLOW_REQUEST: 'FOLLOW_REQUEST',
+  FOLLOW_ACCEPTED: 'FOLLOW_ACCEPTED',
   SYSTEM: 'SYSTEM',
 } as const;
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];

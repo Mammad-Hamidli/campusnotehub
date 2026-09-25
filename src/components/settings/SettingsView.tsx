@@ -12,7 +12,6 @@ import {
   KeyRound,
   Loader2,
   Monitor,
-  MonitorSmartphone,
   Moon,
   Palette,
   ShieldCheck,
@@ -29,6 +28,7 @@ import { VISIBILITY_OPTIONS, VisibilitySelect, type Visibility } from './Visibil
 import { UNIVERSITIES } from '@/lib/universities';
 import { VerificationSection, type IdentityState } from './VerificationSection';
 import { DeletionRequestCard } from './DeletionRequestCard';
+import { DevicesPanel } from './DevicesPanel';
 import { AvatarUploader } from '@/components/profile/AvatarUploader';
 
 type Section = 'profile' | 'verification' | 'privacy' | 'appearance' | 'account';
@@ -47,6 +47,7 @@ export type SettingsData = {
   graduationMonth: string;
   isVerified: boolean;
   privacy: {
+    showAvatar: Visibility;
     showRealName: Visibility;
     showEmail: Visibility;
     showPhone: Visibility;
@@ -95,6 +96,7 @@ const EMPTY: SettingsData = {
   graduationMonth: '',
   isVerified: false,
   privacy: {
+    showAvatar: 'PUBLIC',
     showRealName: 'VERIFIED_ONLY',
     showEmail: 'PRIVATE',
     showPhone: 'PRIVATE',
@@ -179,6 +181,7 @@ export function SettingsView() {
           graduationMonth: u.graduationMonth ? String(u.graduationMonth) : '',
           isVerified: Boolean(u.isVerified),
           privacy: {
+            showAvatar: asVisibility(u.showAvatar, EMPTY.privacy.showAvatar),
             showRealName: asVisibility(u.showRealName, EMPTY.privacy.showRealName),
             showEmail: asVisibility(u.showEmail, EMPTY.privacy.showEmail),
             showPhone: asVisibility(u.showPhone, EMPTY.privacy.showPhone),
@@ -263,6 +266,7 @@ export function SettingsView() {
       if (data.bio.trim() !== baseline.bio.trim()) patch.bio = data.bio.trim();
 
       for (const key of [
+        'showAvatar',
         'showRealName',
         'showEmail',
         'showPhone',
@@ -332,7 +336,7 @@ export function SettingsView() {
       <header className="sticky top-0 z-30 border-b border-edge bg-canvas/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-shell items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <Logo />
+            <Logo href="/dashboard" />
             <ChevronRight className="h-3.5 w-3.5 text-fg-subtle" aria-hidden="true" />
             <span className="text-sm font-medium text-fg">{t('settings.title')}</span>
           </div>
@@ -393,6 +397,7 @@ export function SettingsView() {
             {section === 'profile' && (
               <ProfileSection
                 data={data}
+                universityLocked={baseline.isVerified && Boolean(baseline.universityId)}
                 onChange={patch}
                 onAvatarChange={(avatarUrl) => {
                   // Already persisted by the upload - move the baseline too, so
@@ -462,10 +467,17 @@ export function SettingsView() {
 
 function ProfileSection({
   data,
+  universityLocked,
   onChange,
   onAvatarChange,
 }: {
   data: SettingsData;
+  /**
+   * Verified against a student card from the stored university, so moving
+   * elsewhere is refused. An account with NO university (a quick-login or
+   * older signup) can always add one.
+   */
+  universityLocked: boolean;
   onChange: (patch: Partial<SettingsData>) => void;
   onAvatarChange: (avatarUrl: string | null) => void;
 }) {
@@ -529,13 +541,19 @@ function ProfileSection({
       <Card title={t('settings.academic.title')} description={t('settings.academic.description')}>
         <Row
           label={t('auth.register.university')}
-          hint={data.isVerified ? t('settings.academic.universityLocked') : undefined}
+          hint={
+            universityLocked
+              ? t('settings.academic.universityLocked')
+              : data.universityId
+                ? undefined
+                : t('settings.academic.universityMissing')
+          }
           htmlFor="university"
         >
           <select
             id="university"
             value={data.universityId}
-            disabled={data.isVerified}
+            disabled={universityLocked}
             onChange={(e) => onChange({ universityId: e.target.value })}
             className="input appearance-none disabled:cursor-not-allowed disabled:opacity-70"
           >
@@ -606,6 +624,7 @@ function PrivacySection({
   const t = useT();
 
   const fields = [
+    { key: 'showAvatar', labelKey: 'settings.privacy.avatar', hintKey: 'settings.privacy.avatarHint' },
     { key: 'showRealName', labelKey: 'settings.privacy.realName', hintKey: 'settings.privacy.realNameHint' },
     { key: 'showEmail', labelKey: 'settings.privacy.email' },
     { key: 'showPhone', labelKey: 'settings.privacy.phone' },
@@ -752,7 +771,6 @@ function AccountSection() {
   const actions = [
     { icon: ShieldCheck, labelKey: 'settings.account.security', hintKey: 'settings.account.securityHint', href: '/settings/security' },
     { icon: KeyRound, labelKey: 'settings.account.changePassword', href: '/settings/security#password' },
-    { icon: MonitorSmartphone, labelKey: 'settings.account.devices', hintKey: 'settings.account.devicesHint', href: '/help' },
     { icon: Download, labelKey: 'settings.account.exportData', hintKey: 'settings.account.exportHint', href: '/help' },
   ] as const;
 
@@ -779,6 +797,8 @@ function AccountSection() {
           ))}
         </ul>
       </Card>
+
+      <DevicesPanel />
 
       {/* Destructive actions get their own card with a danger border, well
           away from everything else. It files a request an administrator

@@ -29,12 +29,10 @@ const BUCKET_LABEL: Record<Bucket, Record<string, string>> = {
 export function SlotPicker({
   mentorId,
   sessionMinutes,
-  priceMinor,
   onSelect,
 }: {
   mentorId: string;
   sessionMinutes: number;
-  priceMinor: number;
   onSelect: (startsAt: string) => void;
 }) {
   const { locale, t } = useLocale();
@@ -57,10 +55,6 @@ export function SlotPicker({
   );
   const fmtLongDate = useMemo(
     () => new Intl.DateTimeFormat(intlLocale, { day: 'numeric', month: 'long' }),
-    [intlLocale],
-  );
-  const fmtMoney = useMemo(
-    () => new Intl.NumberFormat(intlLocale, { style: 'currency', currency: 'AZN' }),
     [intlLocale],
   );
 
@@ -221,10 +215,6 @@ export function SlotPicker({
               duration: sessionMinutes,
             })}
           </p>
-          <p className="mt-1 text-fg-muted">
-            {t('mentors.booking.total', { price: fmtMoney.format(priceMinor / 100) })}
-          </p>
-          <p className="mt-1 text-xs text-fg-muted">{t('mentors.booking.escrowNote')}</p>
         </div>
       )}
     </div>

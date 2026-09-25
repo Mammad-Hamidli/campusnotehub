@@ -19,8 +19,8 @@ export const SET_PASSWORD_PATH = '/set-password';
  *
  * For /admin that gap was already covered: its layout calls getAdminViewer(),
  * which reads live state. Every other protected route had no second layer at
- * all - /dashboard, /wallet, /settings, /notifications, /profile, /bookmarks,
- * /bookings, /verify and /notes/purchases were rendering a full 200 for a
+ * all - /dashboard, /settings, /notifications, /profile, /bookmarks,
+ * /bookings and /verify were rendering a full 200 for a
  * session that had been revoked, because nothing between the edge check and
  * the response ever consulted the database. That is the "logged out but still
  * signed in" report: the shell painted, and only the API calls inside it

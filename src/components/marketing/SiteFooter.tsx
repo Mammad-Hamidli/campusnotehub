@@ -27,7 +27,6 @@ export function SiteFooter() {
         { label: t('nav.notes'), href: '/notes' },
         { label: t('nav.mentors'), href: '/mentors' },
         { label: t('nav.feed'), href: '/dashboard' },
-        { label: t('nav.wallet'), href: '/wallet' },
       ],
     },
     {

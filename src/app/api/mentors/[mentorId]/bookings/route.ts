@@ -1,22 +1,17 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { FieldValue } from 'firebase-admin/firestore';
-import { LedgerAccountType, LedgerTxnKind } from '@/lib/enums';
 import { z } from 'zod';
 import { adminDb } from '@/lib/firebase/admin';
-import { COLLECTIONS } from '@/lib/firebase/collections';
 import { forFirestore } from '@/lib/firebase/convert';
 import {
   ACTIVE_BOOKING_STATUSES,
   bookingIdFor,
   mentorCollections,
 } from '@/lib/firebase/repositories/mentors';
-import { getAccountTx, postTx, txnIdFor } from '@/lib/firebase/repositories/ledger';
 import { scheduleTx } from '@/lib/firebase/repositories/scheduledTasks';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { can } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { assertSlotBookable, BookingError, getDaySlots } from '@/lib/mentors/availability';
-import { splitPrice } from '@/lib/wallet/ledger';
 import { sealJson } from '@/lib/crypto/vault';
 import { enqueueNotificationTx } from '@/lib/notifications/dispatch';
 import { createMeetingRoom } from '@/lib/mentors/meeting';
@@ -64,10 +59,9 @@ const createSchema = z.object({
 /**
  * POST /api/mentors/:id/bookings
  *
- * Books a slot and moves money into escrow in a single transaction. The
- * mentor is not paid on booking - funds sit in PLATFORM_ESCROW and are
- * released when the session is marked complete, so a no-show is refundable
- * without clawing back an already-withdrawn balance.
+ * Books a slot in a single transaction: the overlap check, the booking, the
+ * mentor's notification and the reminders commit together or not at all.
+ * Bookings are free - the platform holds no money.
  */
 export async function POST(
   request: NextRequest,
@@ -111,7 +105,7 @@ export async function POST(
     const { endsAt, sessionMinutes } = await assertSlotBookable({ mentorId, startsAt, menteeId: userId });
 
     /**
-     * The booking id, the meeting room and the escrow reference are all
+     * The booking id and the meeting room are both
      * DERIVED, and all computed before the transaction opens.
      *
      * That is not a micro-optimisation, it is what makes the transaction
@@ -131,10 +125,8 @@ export async function POST(
     // Encrypted at rest and only handed out inside a 30-minute window around
     // the session - a link that leaks days early is a link strangers can join.
     const meetingUrlEnc = await sealJson({ url: meeting.url }, { bookingId });
-    const escrowTxnId = txnIdFor(`booking:${bookingId}`);
 
     const bookingRef = mentorCollections.bookings().doc(bookingId);
-    const walletRef = adminDb().collection(COLLECTIONS.wallets).doc(userId);
 
     const booking = await adminDb().runTransaction(async (tx) => {
       // ------------------------------------------------------------- reads
@@ -142,7 +134,6 @@ export async function POST(
       if (!mentorSnap.exists) throw new BookingError('errors.notFound');
       const mentor = mentorSnap.data() as {
         userId: string;
-        hourlyRateMinor: number;
         sessionMinutes: number;
         timezone: string;
       };
@@ -175,28 +166,9 @@ export async function POST(
       });
       if (clash) throw new BookingError('mentors.errors.slotTaken');
 
-      const priceMinor = Math.round((mentor.hourlyRateMinor * sessionMinutes) / 60);
-      const { platformFeeMinor } = splitPrice(priceMinor);
-
-      const walletSnap = await tx.get(walletRef);
-      const wallet = walletSnap.data() as { availableMinor: number } | undefined;
-      if (!wallet || wallet.availableMinor < priceMinor) {
-        throw new BookingError('notes.errors.insufficientFunds');
-      }
-
-      const menteeAvailable = await getAccountTx(tx, userId, LedgerAccountType.USER_AVAILABLE);
-      const escrow = await getAccountTx(tx, null, LedgerAccountType.PLATFORM_ESCROW);
-
       // ------------------------------------------------------------ writes
-      for (const account of [menteeAvailable, escrow]) {
-        if (!account.existed) {
-          tx.set(
-            adminDb().collection(COLLECTIONS.ledgerAccounts).doc(account.id),
-            forFirestore(account.data),
-          );
-        }
-      }
-
+      // Bookings are free: the platform no longer holds money, so there is no
+      // wallet debit or escrow leg - the booking document is the whole record.
       const now = new Date();
       const record = {
         mentorId,
@@ -209,10 +181,6 @@ export async function POST(
         menteeNote: parsed.data.menteeNote ?? null,
         meetingProvider: meeting.provider,
         meetingUrlEnc,
-        priceMinor,
-        platformFeeMinor,
-        currency: 'AZN',
-        escrowTxnId,
         idempotencyKey: parsed.data.idempotencyKey,
         confirmedAt: now,
         completedAt: null,
@@ -222,33 +190,8 @@ export async function POST(
         updatedAt: now,
       };
       // `create`, not `set`: a resubmitted form must collide on the derived id
-      // rather than overwrite a booking that already charged someone.
+      // rather than overwrite someone else's booking.
       tx.create(bookingRef, forFirestore(record));
-
-      postTx(tx, {
-        kind: LedgerTxnKind.BOOKING_ESCROW_HOLD,
-        referenceKey: `booking:${bookingId}`,
-        description: `Escrow hold for booking ${bookingId}`,
-        legs: [
-          {
-            accountId: menteeAvailable.id,
-            walletId: userId,
-            accountType: LedgerAccountType.USER_AVAILABLE,
-            amountMinor: -priceMinor,
-          },
-          {
-            accountId: escrow.id,
-            walletId: null,
-            accountType: LedgerAccountType.PLATFORM_ESCROW,
-            amountMinor: priceMinor,
-          },
-        ],
-      });
-
-      tx.update(walletRef, {
-        availableMinor: FieldValue.increment(-priceMinor),
-        version: FieldValue.increment(1),
-      });
 
       enqueueNotificationTx(tx, {
         userId: mentor.userId,
@@ -298,7 +241,7 @@ export async function POST(
     /**
      * ALREADY_EXISTS on the derived booking id: someone else won the race for
      * this exact slot. The successor to the GiST exclusion constraint firing,
-     * and the same answer - the slot is taken, and nobody was charged.
+     * and the same answer - the slot is taken.
      */
     if ((error as { code?: number }).code === 6) {
       return NextResponse.json({ error: 'mentors.errors.slotTaken' }, { status: 409 });

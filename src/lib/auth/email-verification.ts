@@ -4,6 +4,8 @@ import { appUrl } from '@/lib/email/urls';
 
 /** The confirmation page. NOT under /verify: the middleware protects that prefix. */
 export const CONFIRM_EMAIL_PATH = '/confirm-email';
+/** Where the link that finishes an email CHANGE lands (token in the fragment). */
+export const CONFIRM_EMAIL_CHANGE_PATH = '/confirm-email-change';
 
 /**
  * Issues a token and emails the link.

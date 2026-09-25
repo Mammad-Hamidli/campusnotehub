@@ -45,7 +45,6 @@ export function NoteUploadForm({ universities }: { universities: { id: string; c
     courseCode: '',
     academicYear: '',
     language: 'az',
-    priceMinor: '0',
   });
   const [universityIds, setUniversityIds] = useState<string[]>([]);
   /** Last title we generated; lets a new file replace it but never a user edit. */
@@ -309,14 +308,6 @@ export function NoteUploadForm({ universities }: { universities: { id: string; c
           </div>
           <span className="text-2xs text-fg-subtle">{t('notes.upload.universitiesHint')}</span>
         </fieldset>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-2xs font-medium text-fg-muted">{t('notes.upload.fields.price')}</span>
-          {/* Minor units (qepik), matching how money is stored everywhere else
-              in this schema. Never a float. */}
-          <input type="number" min={0} max={100000} step={50} className={field}
-            value={form.priceMinor} onChange={(e) => setForm({ ...form, priceMinor: e.target.value })} />
-        </label>
       </div>
 
       {error && (

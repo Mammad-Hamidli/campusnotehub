@@ -11,8 +11,8 @@ import { jwtVerify, importSPKI } from 'jose';
 
 /** Routes that require a session. */
 const PROTECTED = [
-  /^\/(dashboard|wallet|settings|notifications|profile|bookmarks|bookings|verify|onboarding|set-password)/,
-  /^\/notes\/(new|purchases)/,
+  /^\/(dashboard|settings|notifications|profile|bookmarks|bookings|verify|onboarding|set-password)/,
+  /^\/notes\/new/,
   /**
    * /mentors/apply is deliberately NOT here.
    *
@@ -59,8 +59,8 @@ const PROTECTED = [
  * the same disclosure with a smaller blast radius.
  */
 const NO_STORE = [
-  /^\/(admin|dashboard|wallet|settings|notifications|profile|bookmarks|bookings|verify)/,
-  /^\/notes\/(new|purchases)/,
+  /^\/(admin|dashboard|settings|notifications|profile|bookmarks|bookings|verify)/,
+  /^\/notes\/new/,
   /**
    * The auth screens are here too, and that is not cosmetic.
    *
@@ -153,6 +153,9 @@ export async function middleware(request: NextRequest) {
   const connectSrc = [
     `'self'`,
     `https://*.s3.eu-central-1.amazonaws.com`,
+    // Post translation runs in the browser against MyMemory's free API; see
+    // src/lib/translate/mymemory.ts.
+    `https://api.mymemory.translated.net`,
     `wss://campusnotehub.com`,
     // The dev server pushes hot updates over a plain-ws connection to
     // localhost, which 'self' does not cover once a scheme is involved.

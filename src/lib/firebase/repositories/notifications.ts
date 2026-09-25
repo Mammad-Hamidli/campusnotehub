@@ -65,12 +65,14 @@ export async function createNotification(input: {
  */
 export async function listNotifications(
   userId: string,
-  options: { limit?: number; before?: Date | null; unreadOnly?: boolean } = {},
+  options: { limit?: number; before?: Date | null; after?: Date | null; unreadOnly?: boolean } = {},
 ): Promise<NotificationRecord[]> {
   const limit = options.limit ?? 30;
 
   let query: FirebaseFirestore.Query = notifications().where('userId', '==', userId);
   if (options.before) query = query.where('createdAt', '<', options.before);
+  // Same (userId, createdAt desc) index: a range on the ordered field needs nothing new.
+  if (options.after) query = query.where('createdAt', '>', options.after);
 
   const snap = await query.orderBy('createdAt', 'desc').limit(limit).get();
   const rows = docsToObjects<NotificationRecord>(snap.docs) as NotificationRecord[];

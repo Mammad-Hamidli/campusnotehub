@@ -97,10 +97,6 @@ export type BookingRecord = {
   menteeNote: string | null;
   meetingUrlEnc: string | null;
   meetingProvider: string | null;
-  priceMinor: number;
-  platformFeeMinor: number;
-  currency: string;
-  escrowTxnId: string | null;
   idempotencyKey: string;
   confirmedAt: Date | null;
   completedAt: Date | null;

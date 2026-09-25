@@ -30,12 +30,10 @@ import { SlotPicker } from './SlotPicker';
 export function BookingPanel({
   mentorId,
   sessionMinutes,
-  priceMinor,
   onClose,
 }: {
   mentorId: string;
   sessionMinutes: number;
-  priceMinor: number;
   onClose: () => void;
 }) {
   const t = useT();
@@ -79,9 +77,8 @@ export function BookingPanel({
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
-        // The server answers with a locale KEY - including
-        // notes.errors.insufficientFunds when the wallet cannot cover the
-        // session - so the reason is shown in the reader's own language.
+        // The server answers with a locale KEY, so the reason is shown in the
+        // reader's own language.
         setError(payload?.error ?? 'errors.generic');
         return;
       }
@@ -134,7 +131,6 @@ export function BookingPanel({
       <SlotPicker
         mentorId={mentorId}
         sessionMinutes={sessionMinutes}
-        priceMinor={priceMinor}
         onSelect={setStartsAt}
       />
 

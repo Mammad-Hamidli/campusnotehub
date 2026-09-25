@@ -1,6 +1,7 @@
 import type { PostRecord } from '@/lib/firebase/repositories/posts';
 import type { UserRecord } from '@/lib/firebase/repositories/users';
 import type { UniversityRecord } from '@/lib/firebase/repositories/reference';
+import { visibleAvatar, type VisibilityViewer } from '@/lib/profile/visibility';
 
 /**
  * The one definition of what a post looks like over the wire.
@@ -53,7 +54,7 @@ import type { UniversityRecord } from '@/lib/firebase/repositories/reference';
  */
 export type PostAuthor = Pick<
   UserRecord,
-  'id' | 'nickname' | 'fullName' | 'avatarUrl' | 'role' | 'isVerified' | 'headline'
+  'id' | 'nickname' | 'fullName' | 'avatarUrl' | 'showAvatar' | 'role' | 'isVerified' | 'headline'
 >;
 
 /**
@@ -66,6 +67,8 @@ export type PostContext = {
   author: PostAuthor | null;
   university: Pick<UniversityRecord, 'code' | 'nameAz' | 'nameEn' | 'nameRu'> | null;
   viewerId?: string | null;
+  /** Decides whether the author's avatar is shown (their showAvatar setting). */
+  viewer?: VisibilityViewer;
   likedByViewer?: boolean;
   shareCount?: number;
 };
@@ -136,7 +139,7 @@ export function serializePost(post: PostRecord, context: PostContext): Serialize
       id: author?.id ?? post.authorId,
       nickname: author?.nickname ?? 'unknown',
       fullName: author?.fullName ?? '',
-      avatarUrl: author?.avatarUrl ?? null,
+      avatarUrl: author ? visibleAvatar(author, context.viewer) : null,
       headline: author?.headline ?? null,
       role: author?.role ?? 'STUDENT',
       isVerified: author?.isVerified ?? false,

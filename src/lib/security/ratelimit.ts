@@ -140,21 +140,9 @@ export const LIMITS = {
   // Content endpoints: generous enough that a real user never sees them.
   'feed:post': { limit: 20, windowMs: 60 * 60_000 },
   'feed:comment': { limit: 60, windowMs: 60 * 60_000 },
-  /**
-   * Post translation. Its own bucket, and tighter than `search`, because this
-   * is the only read endpoint in the app that COSTS MONEY PER CALL - Cloud
-   * Translation bills per character. A cache hit is charged here too, on
-   * purpose: the limit exists to bound a scripted loop, and a loop that only
-   * ever hits the cache is still a loop.
-   *
-   * 120/hour is roughly six full feed pages translated post by post, which is
-   * far beyond reading and far below useful abuse.
-   */
-  'feed:translate': { limit: 120, windowMs: 60 * 60_000 },
   'notes:upload': { limit: 10, windowMs: 24 * 60 * 60_000 },
   // Its own bucket: uploading notes must never use up the right to apply.
   'mentors:apply': { limit: 5, windowMs: 24 * 60 * 60_000 },
-  'orders:create': { limit: 30, windowMs: 60 * 60_000 },
   'notes:review': { limit: 30, windowMs: 60 * 60_000 },
   'mentors:review': { limit: 30, windowMs: 60 * 60_000 },
   // Checks a password, so it is kept tight like the auth buckets.
@@ -171,7 +159,23 @@ export const LIMITS = {
   // Renaming frees the old handle for anyone to take, so a rename is rare by
   // design: enough to fix a typo, not enough to cycle through handles.
   'profile:rename': { limit: 5, windowMs: 24 * 60 * 60_000 },
-  'users:follow': { limit: 200, windowMs: 60 * 60_000 },
+  /**
+   * Follow requests themselves are NOT limited - a rejected requester may ask
+   * again at once. Only the EMAIL is: one per (requester, target) per hour, so
+   * request-cancel-request cannot turn someone's inbox into a spam channel.
+   * The in-app notification is always written.
+   */
+  'email:followRequest': { limit: 1, windowMs: 60 * 60_000 },
+  /**
+   * Starting an email change mails the NEW address, so it is bounded like any
+   * other outbound mail an account can trigger.
+   */
+  'email:change': { limit: 5, windowMs: 60 * 60_000 },
+  'email:change:redeem': { limit: 10, windowMs: 15 * 60_000 },
+  /** Revoking one's own sessions: generous, it only protects the write path. */
+  'sessions:revoke': { limit: 60, windowMs: 60 * 60_000 },
+  /** Saving and removing hashtag templates. */
+  'profile:templates': { limit: 60, windowMs: 60 * 60_000 },
 } as const;
 
 export type LimitKey = keyof typeof LIMITS;

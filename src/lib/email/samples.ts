@@ -36,16 +36,6 @@ export const SAMPLE_PARAMS = {
   accountUnfrozen: { nickname: 'aysel' },
   roleAssigned: { nickname: 'aysel', role: 'MENTOR' },
   noteUploaded: { nickname: 'aysel', title: 'Alqoritmlər - tam semestr konspekti' },
-  notePurchased: {
-    nickname: 'aysel',
-    title: 'Alqoritmlər - tam semestr konspekti',
-    priceLabel: '5.00 AZN',
-  },
-  noteSold: {
-    nickname: 'aysel',
-    title: 'Alqoritmlər - tam semestr konspekti',
-    earnedLabel: '4.25 AZN',
-  },
   newDeviceLogin: { nickname: 'aysel', device: 'Chrome on Windows', when: '12 Sep 2026, 17:04' },
   profileUpdated: { nickname: 'aysel', fields: ['headline', 'bio'] },
   passwordChanged: { nickname: 'aysel' },
@@ -68,7 +58,7 @@ export const SAMPLE_PARAMS = {
   accountDeletionRequested: { nickname: 'aysel' },
   accountDeletionRejected: {
     nickname: 'aysel',
-    reason: 'Your wallet still holds 12.50 AZN. Withdraw it first so it is not lost.',
+    reason: 'You have an open report under review. Please try again once it is resolved.',
   },
   newNotification: {
     nickname: 'aysel',
@@ -82,13 +72,16 @@ export const SAMPLE_PARAMS = {
     nickname: 'aysel',
     reason: 'Please add more detail about your work experience.',
   },
-  balanceToppedUp: { nickname: 'aysel', amountLabel: '10.00 AZN', balanceLabel: '34.50 AZN' },
   noteApproved: { nickname: 'aysel', title: 'Alqoritmlər - tam semestr konspekti' },
   noteRejected: {
     nickname: 'aysel',
     title: 'Alqoritmlər - tam semestr konspekti',
     reason: 'Pages 4 to 9 are unreadable.',
   },
+  followRequest: { nickname: 'aysel', requester: 'nigar_h', url: 'https://campusnotehub.com/notifications' },
+  emailChangeConfirm: { nickname: 'aysel', url: 'https://campusnotehub.com/confirm-email-change#token=example', minutes: 60 },
+  emailChangeRequested: { nickname: 'aysel', newEmail: 'aysel.new@example.com' },
+  emailChanged: { nickname: 'aysel', newEmail: 'aysel.new@example.com' },
 } satisfies SampleMap;
 
 /** Every template name, for iterating in the preview route and the tests. */

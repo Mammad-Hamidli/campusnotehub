@@ -13,7 +13,6 @@ import {
   MessagesSquare,
   Settings,
   UserRoundSearch,
-  Wallet,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -22,15 +21,15 @@ import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Menu, MenuItem, MenuSeparator } from '@/components/ui/Menu';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useLiveNotifications } from '@/components/notifications/LiveNotifications';
 
-export type DashboardTab = 'feed' | 'notes' | 'saved' | 'mentors' | 'wallet';
+export type DashboardTab = 'feed' | 'notes' | 'saved' | 'mentors';
 
 const TABS: { tab: DashboardTab; icon: LucideIcon; labelKey: string }[] = [
   { tab: 'feed', icon: MessagesSquare, labelKey: 'nav.feed' },
   { tab: 'notes', icon: BookOpen, labelKey: 'nav.notes' },
   { tab: 'saved', icon: Bookmark, labelKey: 'nav.saved' },
   { tab: 'mentors', icon: UserRoundSearch, labelKey: 'nav.mentors' },
-  { tab: 'wallet', icon: Wallet, labelKey: 'nav.wallet' },
 ];
 
 /** Secondary destinations. All resolve to real 200 pages. */
@@ -57,6 +56,8 @@ export function Sidebar({
 }) {
   const t = useT();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const live = useLiveNotifications();
+  const pending = live.unread + live.followRequests;
 
   const nav = (
     <nav className="space-y-0.5" aria-label="Dashboard">
@@ -102,6 +103,14 @@ export function Sidebar({
         >
           <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="min-w-0 truncate">{t(labelKey)}</span>
+          {href === '/notifications' && pending > 0 && (
+            <span
+              className="ml-auto min-w-5 rounded-full bg-accent px-1.5 text-center text-2xs font-semibold leading-5 text-accent-fg"
+              aria-label={t('notifications.unreadCount', { count: pending })}
+            >
+              {pending > 99 ? '99+' : pending}
+            </span>
+          )}
         </Link>
       ))}
     </nav>
@@ -189,7 +198,7 @@ export function Sidebar({
           beats squeezing a 240px rail onto a 360px screen. */}
       <div className="sticky top-0 z-40 flex h-14 w-full max-w-full items-center justify-between gap-2 border-b border-edge bg-canvas/85 px-3 backdrop-blur sm:px-4 lg:hidden">
         <div className="min-w-0 shrink">
-          <Logo />
+          <Logo href="/dashboard" />
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <LanguageToggle />
@@ -218,7 +227,7 @@ export function Sidebar({
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col justify-between border-r border-edge px-3 py-4 lg:flex">
         <div>
           <div className="mb-6 px-2">
-            <Logo />
+            <Logo href="/dashboard" />
           </div>
           {nav}
         </div>

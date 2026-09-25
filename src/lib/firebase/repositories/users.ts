@@ -87,6 +87,10 @@ export type UserRecord = {
   showUniversity: string;
   showFaculty: string;
   showGraduationYear: string;
+  /** Who sees the profile picture. Absent on older documents: PUBLIC. */
+  showAvatar?: string;
+  /** The composer's quick hashtag buttons, without '#'. Absent: none. */
+  hashtagTemplates?: string[];
   emailVerifiedAt: Date | null;
   /**
    * Historical. It was set when the owner proved the number by SMS code; SMS
@@ -481,6 +485,7 @@ export function newUserDefaults(): Omit<
     showUniversity: 'PUBLIC',
     showFaculty: 'VERIFIED_ONLY',
     showGraduationYear: 'VERIFIED_ONLY',
+    showAvatar: 'PUBLIC',
     emailVerifiedAt: null,
     phoneVerifiedAt: null,
     lastLoginAt: null,
@@ -674,6 +679,74 @@ export async function updateUser(id: string, patch: Record<string, unknown>): Pr
     throw new Error('updateUser cannot change a nickname: it is a claimed login identifier');
   }
   await users().doc(id).update(forFirestore({ ...patch, updatedAt: new Date() }));
+}
+
+/**
+ * Moves an account to a new email address, inside the CALLER's transaction
+ * (so the confirmation token is consumed in the same commit - see
+ * repositories/emailChanges.ts). Reads first, then writes, as Firestore
+ * requires.
+ *
+ * The same uniqueness rule as completeProfile(): another live account holding
+ * the address - by `email` or by its HMAC in `credentials` - refuses the move;
+ * credential documents left behind by vanished accounts are cleared. The
+ * address is marked verified, because following the link sent to it is the
+ * proof. 'stale' when the account's address changed since the request.
+ */
+export async function changeEmailTx(
+  tx: FirebaseFirestore.Transaction,
+  userId: string,
+  expectedEmail: string,
+  next: { value: string; hash: string },
+): Promise<'ok' | 'stale' | 'email'> {
+  const ref = users().doc(userId);
+  const [snap, byEmail, byEmailHash] = await Promise.all([
+    tx.get(ref),
+    tx.get(users().where('email', '==', next.value).limit(IDENTIFIER_SCAN)),
+    tx.get(credentials().where('emailHash', '==', next.hash).limit(IDENTIFIER_SCAN)),
+  ]);
+  const current = docToObject<UserRecord>(snap) as UserRecord | null;
+  if (!current || current.deletedAt || current.email.toLowerCase() !== expectedEmail) return 'stale';
+
+  const emailCreds = await liveOwners(
+    tx,
+    byEmailHash.docs.filter((doc) => doc.id !== userId).map((doc) => ({ ref: doc.ref, ownerId: doc.id })),
+  );
+  if (byEmail.docs.some((doc) => doc.id !== userId) || emailCreds.live.length > 0) return 'email';
+
+  for (const stale of emailCreds.stale) tx.delete(stale);
+  const now = new Date();
+  tx.update(ref, forFirestore({ email: next.value, emailVerifiedAt: now, updatedAt: now }));
+  tx.update(credentials().doc(userId), forFirestore({ emailHash: next.hash }));
+  return 'ok';
+}
+
+export const MAX_HASHTAG_TEMPLATES = 20;
+
+/**
+ * Adds or removes one composer hashtag template. A transaction, so the cap
+ * holds under two tabs saving at once; case-insensitive, so #Exam and #exam
+ * are one template. Returns the stored list, or 'full' at the cap.
+ */
+export async function editHashtagTemplates(
+  userId: string,
+  tag: string,
+  op: 'add' | 'remove',
+): Promise<string[] | 'full'> {
+  const ref = users().doc(userId);
+  return adminDb().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const current = ((snap.get('hashtagTemplates') as string[] | undefined) ?? []).filter(Boolean);
+    const key = tag.toLowerCase();
+    const without = current.filter((t) => t.toLowerCase() !== key);
+    let next: string[];
+    if (op === 'remove') next = without;
+    else if (without.length !== current.length) return current;
+    else if (current.length >= MAX_HASHTAG_TEMPLATES) return 'full' as const;
+    else next = [...current, tag];
+    tx.update(ref, { hashtagTemplates: next, updatedAt: new Date() });
+    return next;
+  });
 }
 
 /**

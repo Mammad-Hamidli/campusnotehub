@@ -7,16 +7,25 @@ import {
   Bell,
   BookOpen,
   CalendarClock,
+  Check,
   CheckCheck,
   Heart,
+  Loader2,
   MessageCircle,
   ShieldAlert,
+  UserCheck,
   UserPlus,
-  Wallet,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
+import { UserAvatar } from '@/components/ui/UserAvatar';
+import {
+  NOTIFICATIONS_EVENT,
+  useLiveNotifications,
+  type NotificationsEventDetail,
+} from './LiveNotifications';
 
 /**
  * The notifications screen.
@@ -66,7 +75,6 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   VERIFICATION_NEEDS_REVIEW: { icon: ShieldAlert, tone: 'text-warn bg-warn-soft' },
   VERIFICATION_RESUBMIT_REQUIRED: { icon: ShieldAlert, tone: 'text-warn bg-warn-soft' },
   GRADUATION_TRANSITION_PROMPT: { icon: CalendarClock, tone: 'text-accent bg-accent-soft' },
-  NOTE_SOLD: { icon: Wallet, tone: 'text-verified bg-verified-soft' },
   NOTE_REVIEWED: { icon: BookOpen, tone: 'text-accent bg-accent-soft' },
   NOTE_MODERATION: { icon: ShieldAlert, tone: 'text-warn bg-warn-soft' },
   BOOKING_REQUESTED: { icon: CalendarClock, tone: 'text-accent bg-accent-soft' },
@@ -77,7 +85,8 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   POST_REPLY: { icon: MessageCircle, tone: 'text-accent bg-accent-soft' },
   POST_LIKE: { icon: Heart, tone: 'text-danger bg-danger-soft' },
   NEW_FOLLOWER: { icon: UserPlus, tone: 'text-accent bg-accent-soft' },
-  WALLET_CREDIT: { icon: Wallet, tone: 'text-verified bg-verified-soft' },
+  FOLLOW_REQUEST: { icon: UserPlus, tone: 'text-accent bg-accent-soft' },
+  FOLLOW_ACCEPTED: { icon: UserCheck, tone: 'text-verified bg-verified-soft' },
   SYSTEM: { icon: Bell, tone: 'text-fg-muted bg-surface-inset' },
 };
 
@@ -134,6 +143,25 @@ export function NotificationsView() {
     void load(controller.signal);
     return () => controller.abort();
   }, [load]);
+
+  /**
+   * Live rows from LiveNotificationsProvider: prepended as they arrive, so a
+   * like or a follow request shows up here without a reload. Both filters
+   * want them - a new row is by definition unread.
+   */
+  useEffect(() => {
+    const onLive = (event: Event) => {
+      const { latest } = (event as CustomEvent<NotificationsEventDetail>).detail;
+      setItems((rows) => {
+        const known = new Set(rows.map((row) => row.id));
+        const added = latest.filter((row) => !known.has(row.id));
+        return added.length ? [...added, ...rows] : rows;
+      });
+      setUnread((count) => count + latest.filter((row) => !row.read).length);
+    };
+    window.addEventListener(NOTIFICATIONS_EVENT, onLive);
+    return () => window.removeEventListener(NOTIFICATIONS_EVENT, onLive);
+  }, []);
 
   /**
    * Marks rows read.
@@ -209,6 +237,8 @@ export function NotificationsView() {
           </button>
         )}
       </header>
+
+      <FollowRequests />
 
       <div className="mb-3 flex gap-1.5" role="group" aria-label={t('notifications.title')}>
         {(['all', 'unread'] as const).map((option) => (
@@ -326,5 +356,120 @@ export function NotificationsView() {
         </ul>
       )}
     </div>
+  );
+}
+
+type FollowRequest = {
+  requesterId: string;
+  createdAt: string;
+  requester: { nickname: string; avatarUrl: string | null; isVerified: boolean; headline: string | null };
+};
+
+/**
+ * Pending follow requests, answered in place. Re-read whenever the live
+ * count moves, so a request that arrives while this page is open appears
+ * here too. Rejecting leaves no trace - the requester may ask again.
+ */
+function FollowRequests() {
+  const t = useT();
+  const toast = useToast();
+  const live = useLiveNotifications();
+  const [requests, setRequests] = useState<FollowRequest[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/me/follow-requests', { signal: controller.signal, cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : { requests: [] }))
+      .then((body: { requests?: FollowRequest[] }) => setRequests(body.requests ?? []))
+      .catch((error) => {
+        if ((error as Error)?.name !== 'AbortError') setRequests([]);
+      });
+    return () => controller.abort();
+  }, [live.followRequests]);
+
+  async function answer(request: FollowRequest, action: 'accept' | 'reject') {
+    setBusy(request.requesterId);
+    try {
+      const res = await fetch(`/api/me/follow-requests/${encodeURIComponent(request.requesterId)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const body = await res.json().catch(() => ({}));
+      // 404: answered in another tab or withdrawn - either way it is gone.
+      if (!res.ok && res.status !== 404) {
+        toast.error(t(body.error ?? 'errors.generic'));
+        return;
+      }
+      setRequests((rows) => rows?.filter((row) => row.requesterId !== request.requesterId) ?? rows);
+      if (res.ok) {
+        toast.success(
+          t(action === 'accept' ? 'social.requests.accepted' : 'social.requests.rejected', {
+            nickname: request.requester.nickname,
+          }),
+        );
+      }
+      live.refresh();
+    } catch {
+      toast.error(t('errors.network'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (!requests || requests.length === 0) return null;
+
+  return (
+    <section className="card mb-5 p-4" aria-labelledby="follow-requests-heading">
+      <h2 id="follow-requests-heading" className="text-sm font-semibold text-fg">
+        {t('social.requests.title')}{' '}
+        <span className="font-normal text-fg-muted">({requests.length})</span>
+      </h2>
+      <ul className="mt-3 divide-y divide-edge">
+        {requests.map((request) => (
+          <li key={request.requesterId} className="flex flex-wrap items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+            <Link href={`/u/${request.requester.nickname}`} className="flex min-w-0 flex-1 items-center gap-2.5">
+              <UserAvatar
+                nickname={request.requester.nickname}
+                src={request.requester.avatarUrl}
+                verified={request.requester.isVerified}
+                size="sm"
+              />
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium text-fg">@{request.requester.nickname}</span>
+                {request.requester.headline && (
+                  <span className="block truncate text-xs text-fg-muted">{request.requester.headline}</span>
+                )}
+              </span>
+            </Link>
+            <div className="flex shrink-0 gap-1.5">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void answer(request, 'accept')}
+                className="btn-primary h-8 px-3 text-xs"
+              >
+                {busy === request.requesterId ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+                {t('social.requests.accept')}
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void answer(request, 'reject')}
+                className="btn-secondary h-8 px-3 text-xs"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('social.requests.reject')}
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

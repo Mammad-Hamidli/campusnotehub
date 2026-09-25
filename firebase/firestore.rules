@@ -28,7 +28,7 @@ rules_version = '2';
 // own user document" would expose every field in it. Under SQL those fields
 // were protected by never appearing in a SELECT list; that protection does not
 // survive the move. So collections holding anything sensitive - sessions,
-// audit logs, verification cases, the ledger, the blocklist - are denied to
+// audit logs, verification cases, the blocklist - are denied to
 // clients completely and reached only through the server.
 
 service cloud.firestore {
@@ -162,19 +162,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // A review doc carries the reviewer's userId, and only buyers can review,
-    // so reading it would disclose who purchased what. Aggregates are served
-    // by the API (ratingAvg / ratingCount on the note).
+    // A review doc carries the reviewer's userId, so reading it would disclose
+    // who rated what. Aggregates are served by the API (ratingAvg /
+    // ratingCount on the note).
     match /noteReviews/{id} {
       allow read, write: if false;
-    }
-
-    // An order is a purchase record: what someone bought and what they paid.
-    // Readable by the buyer alone.
-    match /orders/{orderId} {
-      allow get: if isSelf(resource.data.buyerId) || isStaff();
-      allow list: if isStaff();
-      allow write: if false;
     }
 
     // ---- mentors -----------------------------------------------------------
@@ -264,6 +256,10 @@ service cloud.firestore {
     match /emailVerifications/{id} { allow read, write: if false; }
     // Forgotten-password links: whoever can write one owns the account.
     match /passwordResets/{id}     { allow read, write: if false; }
+    // Email-change tokens and pending follow requests: server-only, reached
+    // through /api/me/email/change and /api/me/follow-requests.
+    match /emailChanges/{id}       { allow read, write: if false; }
+    match /followRequests/{id}     { allow read, write: if false; }
 
     // Verification cases carry fraud signals and per-check scores. Naming the
     // check that fired is free tuning feedback for whoever is forging a
@@ -281,13 +277,6 @@ service cloud.firestore {
     match /moderationActions/{id} { allow read, write: if false; }
     match /contentReports/{id}    { allow read, write: if false; }
 
-    // Money. The ledger is the record of truth and is never client-readable;
-    // a wallet balance is served by the API alongside its own activity.
-    match /wallets/{id}            { allow read, write: if false; }
-    match /ledgerAccounts/{id}     { allow read, write: if false; }
-    match /ledgerTransactions/{id} { allow read, write: if false; }
-    match /ledgerEntries/{id}      { allow read, write: if false; }
-
     // Deferred work and raw media metadata are infrastructure.
     match /scheduledTasks/{id} { allow read, write: if false; }
 
@@ -302,20 +291,6 @@ service cloud.firestore {
      */
     match /rateLimits/{id} { allow read, write: if false; }
 
-    /**
-     * Cached machine translations of post bodies.
-     *
-     * Denied, and not because a translation is secret in itself: the cache is
-     * keyed by post id, so a client that could read the collection could read
-     * the body of any UNIVERSITY_ONLY or FOLLOWERS post by asking for its
-     * translation - the audience check in src/lib/feed/visibility.ts lives in
-     * POST /api/feed/:postId/translate and cannot be expressed here.
-     *
-     * Written only by the Admin SDK. Documents expire by way of a Firestore
-     * TTL policy on `expiresAt`, exactly as rateLimits does - see the header
-     * of src/lib/firebase/repositories/translations.ts.
-     */
-    match /postTranslations/{id} { allow read, write: if false; }
     match /mediaAssets/{id}    { allow read, write: if false; }
     // Email dedupe keys (SHA-256 only) - see src/lib/email/send.ts.
     match /emailDispatches/{id} { allow read, write: if false; }

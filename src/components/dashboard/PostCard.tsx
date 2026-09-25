@@ -12,6 +12,7 @@ import { FollowingBadge } from '@/components/social/Following';
 import { VerifiedBadge } from './VerificationBanner';
 import { CommentThread } from './CommentThread';
 import { PostTranslation } from './PostTranslation';
+import { splitHashtags } from '@/lib/feed/hashtags';
 
 export type Post = {
   id: string;
@@ -273,7 +274,15 @@ export function PostCard({
 
       {/* break-words: a pasted URL has no spaces and would otherwise widen the card. */}
       <p className="mt-3 whitespace-pre-wrap break-words text-[0.9375rem] leading-relaxed text-fg">
-        {post.body}
+        {splitHashtags(post.body).map((part, i) =>
+          part.tag ? (
+            <span key={i} className="font-medium text-accent">
+              {part.text}
+            </span>
+          ) : (
+            part.text
+          ),
+        )}
       </p>
 
       {/*
@@ -322,7 +331,7 @@ export function PostCard({
       {/* Under the body and above the tags: it belongs to the text it
           translates, not to the actions. A post with no words (an image-only
           post) has nothing to translate, so the control is not rendered. */}
-      {post.body.trim().length > 0 && <PostTranslation postId={post.id} />}
+      {post.body.trim().length > 0 && <PostTranslation text={post.body} />}
 
       {post.tags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">

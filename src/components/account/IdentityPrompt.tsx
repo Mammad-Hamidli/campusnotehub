@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { AlertTriangle, ArrowRight, Clock, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Clock, ShieldAlert, X } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { VERIFICATION_SETTINGS_HREF } from '@/lib/verification/requirements';
+import { REVIEW_DISMISS_COOKIE, REVIEW_DISMISS_MAX_AGE_S } from './reviewNotice';
 
 /**
  * Every state short of VERIFIED, collapsed into what the user can DO:
@@ -42,15 +44,15 @@ const BODY_KEY: Record<PromptState, string> = {
  * The persistent "Verify your identity" banner, at the TOP of every page.
  *
  * ---------------------------------------------------------------------------
- * PERSISTENT MEANS NOT DISMISSIBLE
+ * ACTIONABLE STATES ARE NOT DISMISSIBLE; THE REVIEW NOTICE IS
  * ---------------------------------------------------------------------------
- * There is no close button and no collapsed state. The state it reports is
- * real and blocking - an unverified account cannot buy notes, book a mentor,
- * sell or withdraw - so there is no honest version of this that can be put
- * away. A dismissible predecessor produced "why can't I buy notes" tickets
- * from people who clicked the x on day one and never saw it again. It goes
- * away exactly when the account is VERIFIED, because the slot stops
- * rendering it.
+ * UNVERIFIED and REJECTED have no close button: the state is real and there is
+ * something to do about it, and a dismissible predecessor produced tickets
+ * from people who clicked the x on day one and never saw it again.
+ *
+ * IN_REVIEW is different - "your documents are being checked" asks nothing of
+ * the user, and the outcome arrives as a notification. So it can be closed
+ * (REVIEW_DISMISS_COOKIE). A rejection still reappears as its own state.
  *
  * ---------------------------------------------------------------------------
  * IN FLOW, NOT FIXED
@@ -62,12 +64,20 @@ const BODY_KEY: Record<PromptState, string> = {
  * is what "persistent" needs; the headers still stick normally once it has
  * scrolled past. One line on desktop, two short lines on a phone.
  */
-export function IdentityPrompt({ state }: { state: PromptState }) {
+export function IdentityPrompt({ state, accountId }: { state: PromptState; accountId: string }) {
   const t = useT();
   const pathname = usePathname();
+  const [dismissed, setDismissed] = useState(false);
 
-  if (SILENT_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+  if (dismissed || SILENT_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return null;
+  }
+
+  function dismiss() {
+    document.cookie = `${REVIEW_DISMISS_COOKIE}=${encodeURIComponent(accountId)}; Max-Age=${REVIEW_DISMISS_MAX_AGE_S}; Path=/; SameSite=Lax${
+      location.protocol === 'https:' ? '; Secure' : ''
+    }`;
+    setDismissed(true);
   }
 
   const tone = TONE[state];
@@ -108,6 +118,18 @@ export function IdentityPrompt({ state }: { state: PromptState }) {
             {t('verification.prompt.cta')}
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
           </Link>
+        )}
+
+        {!actionable && (
+          <button
+            type="button"
+            onClick={dismiss}
+            aria-label={t('verification.prompt.dismiss')}
+            title={t('verification.prompt.dismiss')}
+            className="ml-auto shrink-0 rounded-md p-1 text-fg-muted transition hover:bg-surface-inset hover:text-fg"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
         )}
       </div>
     </div>

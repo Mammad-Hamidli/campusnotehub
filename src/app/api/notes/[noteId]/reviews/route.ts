@@ -16,8 +16,8 @@ const schema = z.object({
 /**
  * PUT /api/notes/:noteId/reviews - rate a note (1-5 stars), create or update.
  *
- * Verified purchase only: the PAID order is re-read inside the review
- * transaction (upsertNoteReview), never inferred from the client.
+ * Any signed-in reader except the note's author; the note's status and
+ * authorship are re-read inside the review transaction (upsertNoteReview).
  */
 export async function PUT(
   request: NextRequest,
@@ -34,8 +34,8 @@ export async function PUT(
     throw error;
   }
   // Same gate as buying: only a verified, non-frozen buyer reviews.
-  if (!can(viewer, 'notes:buy')) {
-    return NextResponse.json({ error: denialKey(viewer, 'notes:buy') }, { status: 403 });
+  if (!can(viewer, 'notes:review')) {
+    return NextResponse.json({ error: denialKey(viewer, 'notes:review') }, { status: 403 });
   }
 
   const limit = await rateLimit('notes:review', { userId, ip: clientIp(request.headers) });

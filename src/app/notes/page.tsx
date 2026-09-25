@@ -12,13 +12,13 @@ export const dynamic = 'force-dynamic';
  * Replaces the previous StubPage. Every row comes from the database.
  *
  * Browsing stays open to signed-out visitors (`notes:browse`); the create
- * button is offered only to viewers holding `notes:sell`.
+ * button is offered only to viewers holding `notes:share`.
  */
 export default async function NotesPage() {
   const viewer = await getViewer();
   return (
     <main id="main" className="min-h-dvh bg-surface-muted">
-      <NotesList canUpload={can(viewer, 'notes:sell')} />
+      <NotesList canUpload={can(viewer, 'notes:share')} />
     </main>
   );
 }

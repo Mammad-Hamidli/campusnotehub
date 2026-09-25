@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { findNoteById, hasPaidOrder, readNoteBytes } from '@/lib/firebase/repositories/notes';
+import { NoteStatus } from '@/lib/enums';
+import { findNoteById, readNoteBytes, recordNoteDownload } from '@/lib/firebase/repositories/notes';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 
@@ -14,16 +15,10 @@ export const dynamic = 'force-dynamic';
  * readNoteBytes() and never sent to a browser, so there is no CDN link to
  * share or guess. Access, decided per request:
  *
- *   - the seller;
- *   - staff (moderation);
- *   - a buyer with a PAID order (keyed read on the derived order id).
+ *   - any signed-in account, once the note is PUBLISHED (notes are free);
+ *   - the author and staff, in any status (moderation, own drafts).
  *
- * FREE NOTES ARE NOT AN EXCEPTION. They previously skipped the order check,
- * which let anyone fetch a free listing's file by URL without "buying" it.
- * A free note is acquired through POST /purchase like any other (a zero-value
- * PAID order), so "no completed transaction, no bytes" holds without a carve-out.
- *
- * Everyone else gets 404 (not 403), so note ids cannot be probed.
+ * Everyone else gets 404 (not 403), so unpublished note ids cannot be probed.
  */
 export async function GET(
   request: NextRequest,
@@ -55,10 +50,10 @@ export async function GET(
   }
 
   const allowed =
+    note.status === NoteStatus.PUBLISHED ||
     note.sellerId === userId ||
     viewer.role === 'MODERATOR' ||
-    viewer.role === 'ADMIN' ||
-    (await hasPaidOrder(userId, note.id));
+    viewer.role === 'ADMIN';
 
   if (!allowed) {
     return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
@@ -66,6 +61,7 @@ export async function GET(
 
   // Bytes only after the decision: no 10 MB fetch for a caller about to be refused.
   const bytes = await readNoteBytes(note);
+  if (note.sellerId !== userId) recordNoteDownload(note.id);
   const { fileName, mime } = note.attachment;
 
   return new NextResponse(new Uint8Array(bytes), {

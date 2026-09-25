@@ -1,8 +1,6 @@
 // Must stay the first import: loads .env* the same way Next.js does.
 import '../load-env';
-import { LedgerTxnKind } from '@/lib/enums';
 import { dueTasks, markExecuted, markFailed } from '@/lib/firebase/repositories/scheduledTasks';
-import { releasePending } from '@/lib/wallet/ledger';
 import { reapExpired, sweepExpiredAssets } from '@/lib/verification/reviewBuffer';
 import { runGraduationSweep } from './graduation';
 import { retryQueuedEmails } from '@/lib/email/send';
@@ -14,7 +12,7 @@ import { retryQueuedEmails } from '@/lib/email/send';
  * containers, because all three are cheap and all three need the same Firebase
  * Admin app:
  *
- *   every  1 min  run due scheduled tasks (escrow releases, booking reminders)
+ *   every  1 min  run due scheduled tasks (booking reminders), retry queued email
  *   every 15 min  reap expired review buffers
  *   1 May 06:00   graduation sweep
  *
@@ -35,24 +33,11 @@ let stopping = false;
 /**
  * Runs work that was scheduled to happen later.
  *
- * ---------------------------------------------------------------------------
- * THIS LOOP IS NEW, AND IT IS NOT AN ADDITION - IT IS A REPAIR
- * ---------------------------------------------------------------------------
- * `scheduled_tasks` rows have always been written by the purchase and booking
- * paths, and nothing has ever read them. The consumer was going to be a BullMQ
- * worker at src/server/queue/notes.worker.ts, which package.json referenced but
- * which was never written - so every ESCROW_RELEASE ever queued has simply sat
- * there, and no seller's funds have ever cleared from PENDING to AVAILABLE.
- *
- * Removing Redis removed the last reason to keep waiting for that worker: the
- * queue was the only thing this needed a broker for, and Firestore holds the
- * schedule already. So the sweep lives here.
- *
- * ESCROW_RELEASE is the only kind handled. The two BOOKING_REMINDER_* kinds
- * are marked executed without acting, because push and email fan-out does not
- * exist yet (see the note in src/lib/notifications/dispatch.ts) - leaving them
- * due forever would grow an unbounded backlog of work nothing can do, and
- * pretending to send a reminder would be worse.
+ * The two BOOKING_REMINDER_* kinds are marked executed without acting,
+ * because push and email fan-out does not exist yet (see the note in
+ * src/lib/notifications/dispatch.ts) - leaving them due forever would grow an
+ * unbounded backlog of work nothing can do. Legacy ESCROW_RELEASE rows from
+ * the retired wallet are closed the same way: there is no money to move.
  */
 async function runDueTasks(): Promise<void> {
   let tasks;
@@ -65,45 +50,9 @@ async function runDueTasks(): Promise<void> {
 
   for (const task of tasks) {
     try {
-      if (task.kind === 'ESCROW_RELEASE') {
-        const payload = task.payload as
-          | { orderId?: string; walletId?: string; amountMinor?: number }
-          | null;
-
-        if (!payload?.walletId || !payload.amountMinor || !payload.orderId) {
-          // A payload we cannot act on is a permanent failure, not a transient
-          // one. Recorded and left undone rather than retried forever.
-          await markFailed(task.id, 'ESCROW_RELEASE payload is incomplete');
-          continue;
-        }
-
-        /**
-         * The reference key is derived from the ORDER, so releasePending() is
-         * exactly-once by construction: a re-run posts to the same ledger
-         * transaction id and is refused. That is what makes it safe for this
-         * loop to retry a task whose `markExecuted` did not land.
-         */
-        await releasePending({
-          referenceKey: `release:order:${payload.orderId}`,
-          walletId: payload.walletId,
-          amountMinor: payload.amountMinor,
-          kind: LedgerTxnKind.NOTE_PAYOUT_RELEASE,
-        });
-      }
-
       await markExecuted(task.id);
     } catch (error) {
-      /**
-       * ALREADY_EXISTS means the posting is already in the ledger - the money
-       * moved on an earlier run whose `markExecuted` did not land. The work is
-       * done, so the task is closed rather than retried.
-       */
-      if ((error as { code?: number }).code === 6) {
-        await markExecuted(task.id);
-        continue;
-      }
-
-      // Anything else leaves `executedAt` null so the next sweep tries again,
+      // A failure leaves `executedAt` null so the next sweep tries again,
       // and increments the attempt counter so a task that will never succeed
       // is visible to a human.
       const message = error instanceof Error ? error.message : String(error);

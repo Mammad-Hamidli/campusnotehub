@@ -37,7 +37,6 @@ export async function GET(request: NextRequest) {
             title: n.title,
             description: n.description,
             subject: n.subject,
-            priceMinor: n.priceMinor,
             status: n.status,
             createdAt: n.createdAt,
             rejectionReason: n.rejectionReason,

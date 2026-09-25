@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, GraduationCap, Loader2, Pencil, UserCheck, UserPlus } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clock, GraduationCap, Loader2, Pencil, UserCheck, UserPlus } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 import { UserAvatar } from '@/components/ui/UserAvatar';
@@ -86,6 +86,7 @@ export function PublicProfileView({
               <FollowButton
                 nickname={profile.nickname}
                 initiallyFollowing={profile.viewer.isFollowing}
+                initiallyRequested={profile.viewer.requested}
                 canFollow={profile.viewer.canFollow}
                 signedIn={signedIn}
                 viewOnly={viewOnly}
@@ -161,12 +162,14 @@ export function PublicProfileView({
 }
 
 /**
- * Follow / unfollow. Optimistic, then corrected by the server's follower
- * count, so a double tap or a second tab cannot leave the number wrong.
+ * Follow is a REQUEST: Follow -> Requested (tap again to withdraw) -> Following
+ * once the other person accepts. The follower count moves only on unfollow,
+ * and is then corrected by the server's number.
  */
 function FollowButton({
   nickname,
   initiallyFollowing,
+  initiallyRequested,
   canFollow,
   signedIn,
   viewOnly,
@@ -174,6 +177,7 @@ function FollowButton({
 }: {
   nickname: string;
   initiallyFollowing: boolean;
+  initiallyRequested: boolean;
   canFollow: boolean;
   signedIn: boolean;
   viewOnly: boolean;
@@ -182,6 +186,7 @@ function FollowButton({
   const t = useT();
   const toast = useToast();
   const [following, setFollowingLocal] = useState(initiallyFollowing);
+  const [requested, setRequested] = useState(initiallyRequested);
   const [busy, setBusy] = useState(false);
   const shared = useFollowing();
 
@@ -218,36 +223,54 @@ function FollowButton({
   }
 
   async function toggle() {
-    const next = !following;
+    // Following or Requested: this tap undoes it. Otherwise it asks.
+    const asking = !following && !requested;
+    const wasFollowing = following;
     setBusy(true);
-    setFollowing(next);
-    onFollowers((c) => c + (next ? 1 : -1));
+    if (asking) setRequested(true);
+    else {
+      setRequested(false);
+      setFollowing(false);
+      if (wasFollowing) onFollowers((c) => Math.max(0, c - 1));
+    }
     try {
-      const res = await fetch(`/api/users/${encodeURIComponent(nickname)}/follow`, { method: next ? 'POST' : 'DELETE' });
+      const res = await fetch(`/api/users/${encodeURIComponent(nickname)}/follow`, { method: asking ? 'POST' : 'DELETE' });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? 'errors.generic');
       setFollowing(Boolean(body.following));
+      setRequested(Boolean(body.requested));
       if (typeof body.followers === 'number') onFollowers(body.followers);
+      if (asking && body.requested) toast.success(t('publicProfile.requestSent', { nickname }));
     } catch (error) {
-      setFollowing(!next);
-      onFollowers((c) => c + (next ? -1 : 1));
+      setFollowing(wasFollowing);
+      setRequested(!asking && !wasFollowing);
+      if (wasFollowing) onFollowers((c) => c + 1);
       toast.error(t(error instanceof Error ? error.message : 'errors.generic'));
     } finally {
       setBusy(false);
     }
   }
 
+  const label = following ? 'publicProfile.following' : requested ? 'publicProfile.requested' : 'publicProfile.follow';
+
   return (
     <button
       type="button"
       onClick={toggle}
-      // A frozen account may still UNfollow; it just cannot follow anyone new.
-      disabled={busy || (!canFollow && !following)}
-      aria-pressed={following}
-      className={following ? 'btn-secondary' : 'btn-primary'}
+      // A frozen account may still UNfollow or withdraw; it just cannot ask anyone new.
+      disabled={busy || (!canFollow && !following && !requested)}
+      aria-pressed={following || requested}
+      title={requested ? t('publicProfile.requestedHint') : undefined}
+      className={following || requested ? 'btn-secondary' : 'btn-primary'}
     >
-      {following ? <UserCheck className="h-4 w-4" aria-hidden="true" /> : <UserPlus className="h-4 w-4" aria-hidden="true" />}
-      {t(following ? 'publicProfile.following' : 'publicProfile.follow')}
+      {following ? (
+        <UserCheck className="h-4 w-4" aria-hidden="true" />
+      ) : requested ? (
+        <Clock className="h-4 w-4" aria-hidden="true" />
+      ) : (
+        <UserPlus className="h-4 w-4" aria-hidden="true" />
+      )}
+      {t(label)}
     </button>
   );
 }

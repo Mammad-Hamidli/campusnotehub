@@ -320,7 +320,6 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
         <BookingPanel
           mentorId={mentor.id}
           sessionMinutes={mentor.sessionMinutes}
-          priceMinor={mentor.hourlyRateMinor}
           onClose={() => setBooking(false)}
         />
       )}

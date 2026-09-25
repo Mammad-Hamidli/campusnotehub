@@ -102,9 +102,8 @@ export type TrendingNote = {
   title: string;
   subject: string;
   university: string;
-  priceMinor: number;
   rating: number;
-  purchases: number;
+  downloads: number;
 };
 
 /**
@@ -113,14 +112,11 @@ export type TrendingNote = {
  *   GET /api/notes?sort=popular&limit=4&window=7d
  *
  * Serve from a materialised view refreshed every 15 minutes rather than an
- * ORDER BY on a live purchase count — this is a sidebar widget and must never
+ * ORDER BY on a live download count — this is a sidebar widget and must never
  * be able to slow the feed down.
  */
 export function TrendingNotes({ notes }: { notes: TrendingNote[] }) {
   const t = useT();
-
-  const price = (minor: number) =>
-    minor === 0 ? t('notes.card.free') : `${(minor / 100).toFixed(2)} ₼`;
 
   return (
     <section className="card p-4">
@@ -139,7 +135,7 @@ export function TrendingNotes({ notes }: { notes: TrendingNote[] }) {
           <li key={note.id}>
             <Link
               // There is no per-note page; the listing is where a note is
-              // previewed and bought.
+              // previewed and downloaded.
               href="/notes"
               className="group flex gap-3 rounded-lg p-2 transition hover:bg-surface-muted"
             >
@@ -165,13 +161,9 @@ export function TrendingNotes({ notes }: { notes: TrendingNote[] }) {
                   </span>
                   <span className="flex items-center gap-0.5">
                     <Flame className="h-2.5 w-2.5 text-warn" aria-hidden="true" />
-                    {note.purchases}
+                    {note.downloads}
                   </span>
                 </span>
-              </span>
-
-              <span className="shrink-0 self-center text-xs font-semibold text-fg">
-                {price(note.priceMinor)}
               </span>
             </Link>
           </li>

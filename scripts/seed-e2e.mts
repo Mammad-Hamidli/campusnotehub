@@ -176,21 +176,6 @@ for (const person of PEOPLE) {
     .doc(person.nickname.toLowerCase())
     .set(forFirestore({ userId: ref.id, createdAt: now }));
 
-  await db
-    .collection(COLLECTIONS.wallets)
-    .doc(ref.id)
-    .set(
-      forFirestore({
-        userId: ref.id,
-        currency: 'AZN',
-        availableMinor: 0,
-        pendingMinor: 0,
-        version: 0,
-        isFrozen: false,
-        createdAt: now,
-      }),
-      { merge: true },
-    );
 
   ids.set(person.email, ref.id);
   console.log(`  ${person.role.padEnd(10)} ${person.email.padEnd(28)} @${person.nickname}`);
@@ -225,7 +210,6 @@ for (const person of PEOPLE) {
 }
 
 const sellerId = ids.get('e2e.student@ada.edu.az')!;
-const buyerId = ids.get('e2e.unverified@ada.edu.az')!;
 const frozenId = ids.get('e2e.frozen@ada.edu.az')!;
 
 // One account is left frozen so the enforcement path has something to test.
@@ -238,9 +222,6 @@ await db.collection(COLLECTIONS.users).doc(frozenId).update(
   }),
 );
 
-// Funds for the buyer. There is no top-up endpoint (no payment provider is
-// wired), so an operator credit stands in for one.
-await db.collection(COLLECTIONS.wallets).doc(buyerId).update({ availableMinor: 50_000 });
 
 /**
  * The mentor profile is keyed by the mentor's USER id.
@@ -295,14 +276,11 @@ for (const rule of [
 }
 
 /**
- * A fresh purchasable note, tagged with the run's timestamp.
- *
- * The title carries a marker the suite matches on, and the timestamp makes it
- * unique so the purchase test always exercises a real purchase rather than the
- * already-owned branch.
+ * A fresh shared note, tagged with the run's timestamp so the suite can find
+ * the one this run created. Notes are free: any signed-in account downloads it.
  */
 const stamp = Date.now();
-const bytes = Buffer.from(`E2E purchasable note ${stamp}.\n`.repeat(40));
+const bytes = Buffer.from(`E2E shared note ${stamp}.\n`.repeat(40));
 const sha = createHash('sha256').update(bytes).digest('hex');
 
 const noteRef = db.collection(COLLECTIONS.notes).doc();
@@ -310,21 +288,19 @@ const storagePath = STORAGE_PATHS.noteFile(noteRef.id, 'e2e-note.txt');
 
 // Bytes first, document second - the same ordering createNote() uses, and for
 // the same reason: an orphaned object is harmless, a note whose file is
-// missing 404s for the buyer who paid.
+// missing 404s for everyone who opens it.
 await adminBucket().file(storagePath).save(bytes, { contentType: 'text/plain' });
 
 await noteRef.set(
   forFirestore({
     sellerId,
-    title: `E2E purchasable note ${stamp}`,
-    description: 'A note created by scripts/seed-e2e.mts for the purchase test.',
+    title: `E2E shared note ${stamp}`,
+    description: 'A note created by scripts/seed-e2e.mts for the notes test.',
     subject: 'Testing',
     courseCode: null,
     academicYear: null,
     universityId,
     language: 'en',
-    priceMinor: 500,
-    currency: 'AZN',
     status: 'PUBLISHED',
     publishedAt: new Date(),
     fileKey: storagePath,
@@ -333,7 +309,6 @@ await noteRef.set(
     pageCount: null,
     previewKey: null,
     downloadCount: 0,
-    purchaseCount: 0,
     ratingAvg: 0,
     ratingCount: 0,
     rejectionReason: null,
@@ -350,5 +325,5 @@ await noteRef.set(
 );
 
 console.log(`\n  mentor profile : ${mentorId}`);
-console.log(`  purchasable    : ${noteRef.id} ("E2E purchasable note ${stamp}")`);
+console.log(`  purchasable    : ${noteRef.id} ("E2E shared note ${stamp}")`);
 console.log(`  password       : ${PASSWORD}\n`);

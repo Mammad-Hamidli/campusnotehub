@@ -52,7 +52,7 @@ export function FileChip({
   mime: string;
   sizeBytes: number;
   downloadLabel: string;
-  /** Not purchased: no link is rendered at all (the route would 404 anyway). */
+  /** Signed out: no link is rendered at all (the route would 401 anyway). */
   locked?: boolean;
   lockedLabel?: string;
 }) {

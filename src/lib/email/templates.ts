@@ -39,8 +39,6 @@ export type TemplateName =
   | 'accountUnfrozen'
   | 'roleAssigned'
   | 'noteUploaded'
-  | 'notePurchased'
-  | 'noteSold'
   | 'newDeviceLogin'
   | 'profileUpdated'
   | 'passwordChanged'
@@ -62,9 +60,12 @@ export type TemplateName =
   | 'mentorApplicationSubmitted'
   | 'mentorApplicationApproved'
   | 'mentorApplicationRejected'
-  | 'balanceToppedUp'
   | 'noteApproved'
-  | 'noteRejected';
+  | 'noteRejected'
+  | 'followRequest'
+  | 'emailChangeConfirm'
+  | 'emailChangeRequested'
+  | 'emailChanged';
 
 /** Greeting line. Nickname, never the legal name - see the User model. */
 const hi = (nickname: string) => `Hi @${nickname},`;
@@ -89,7 +90,7 @@ export const TEMPLATES = {
   welcome: (p: { nickname: string; university?: string | null; faculty?: string | null }): EmailContent => ({
     subject: 'Welcome to UniPath',
     heading: 'Your account is ready',
-    preheader: 'Verify your student status to unlock selling, mentoring and payouts.',
+    preheader: 'Verify your student status to unlock mentoring and your verified badge.',
     blocks: [
       // Hero: opt-in, and this is one of the three messages that earns one.
       // See the 'hero' block comment in layout.ts for why the account and
@@ -115,7 +116,7 @@ export const TEMPLATES = {
         // States the capability gate exactly as REQUIRES_VERIFICATION in
         // src/lib/permissions.ts defines it, so the email and the product
         // cannot tell the user different things.
-        body: 'Until you are verified you can browse and post, but you cannot sell notes, offer mentoring, or withdraw funds.',
+        body: 'Until you are verified you can post, share notes and follow people, but you cannot book or offer mentoring.',
       },
       { kind: 'button', label: 'Verify my account', href: appUrl('/verify') },
       { kind: 'divider' },
@@ -151,14 +152,14 @@ export const TEMPLATES = {
   verificationApproved: (p: { nickname: string }): EmailContent => ({
     subject: 'You are verified on UniPath',
     heading: 'Verification approved',
-    preheader: 'Selling, mentoring and payouts are now unlocked.',
+    preheader: 'Mentoring is now unlocked, and your verified badge is live.',
     blocks: [
       { kind: 'hero', image: 'hero.jpg', alt: 'Verified student account' },
       { kind: 'paragraph', text: hi(p.nickname) },
       { kind: 'callout', tone: 'success', title: 'Your student status is confirmed' },
       {
         kind: 'paragraph',
-        text: 'You can now sell notes on UniNotes, book and offer mentoring sessions, and withdraw your balance. Your verified badge is visible next to your handle.',
+        text: 'You can now book and offer mentoring sessions. Your verified badge is visible next to your handle.',
       },
       { kind: 'button', label: 'Go to my dashboard', href: appUrl('/dashboard') },
     ],
@@ -211,7 +212,7 @@ export const TEMPLATES = {
         kind: 'paragraph',
         // Matches ALWAYS_ALLOWED in src/lib/permissions.ts exactly: a frozen
         // account keeps the read-only escape hatch.
-        text: 'You can still sign in, read the feed, and browse notes and mentors. Posting, buying, selling and withdrawals are paused for the duration.',
+        text: 'You can still sign in, read the feed, and browse notes and mentors. Posting, sharing and bookings are paused for the duration.',
       },
       {
         kind: 'paragraph',
@@ -260,52 +261,6 @@ export const TEMPLATES = {
         text: 'Your file passed our safety checks and has been saved as a draft. Publish it when you are ready and it will appear in UniNotes.',
       },
       { kind: 'button', label: 'Open UniNotes', href: appUrl('/notes') },
-    ],
-  }),
-
-  notePurchased: (p: { nickname: string; title: string; priceLabel: string }): EmailContent => ({
-    subject: 'Your UniNotes purchase',
-    heading: 'Purchase confirmed',
-    preheader: `You now have access to "${p.title}".`,
-    blocks: [
-      { kind: 'paragraph', text: hi(p.nickname) },
-      {
-        kind: 'facts',
-        rows: [
-          { label: 'Note', value: p.title },
-          { label: 'Paid', value: p.priceLabel },
-        ],
-      },
-      { kind: 'button', label: 'Download', href: appUrl('/notes/purchases') },
-      {
-        kind: 'paragraph',
-        // No link is embedded: download URLs are signed, expire in 120s and
-        // identify the buyer (see presignNoteDownload), so mailing one would
-        // both break and be traceable to the recipient if forwarded.
-        text: 'Download links are generated when you open the page and expire quickly, so please download from your purchases page rather than saving a link.',
-      },
-    ],
-  }),
-
-  noteSold: (p: { nickname: string; title: string; earnedLabel: string }): EmailContent => ({
-    subject: 'You sold a note on UniNotes',
-    heading: 'You made a sale',
-    preheader: `"${p.title}" was purchased.`,
-    blocks: [
-      { kind: 'paragraph', text: hi(p.nickname) },
-      { kind: 'callout', tone: 'success', title: 'A student bought your note' },
-      {
-        kind: 'facts',
-        rows: [
-          { label: 'Note', value: p.title },
-          { label: 'You earned', value: p.earnedLabel },
-        ],
-      },
-      {
-        kind: 'paragraph',
-        text: 'Earnings clear after the refund window closes, then become available to withdraw.',
-      },
-      { kind: 'button', label: 'Open wallet', href: appUrl('/wallet') },
     ],
   }),
 
@@ -582,7 +537,7 @@ export const TEMPLATES = {
             ? 'Some features of your account have been restricted by a moderator.'
             : p.level === 'banned'
               ? 'Your account has been suspended by a moderator and you can no longer sign in.'
-              : 'Your account has been suspended by a moderator. You can browse, but posting, selling and bookings are paused.',
+              : 'Your account has been suspended by a moderator. You can browse, but posting, sharing and bookings are paused.',
       },
       ...(p.reason ? [{ kind: 'facts' as const, rows: [{ label: 'Reason', value: p.reason }] }] : []),
       {
@@ -715,23 +670,6 @@ export const TEMPLATES = {
     ],
   }),
 
-  balanceToppedUp: (p: { nickname: string; amountLabel: string; balanceLabel: string }): EmailContent => ({
-    subject: 'Balance topped up: ' + p.amountLabel,
-    heading: 'Balance topped up',
-    preheader: p.amountLabel + ' was added to your wallet.',
-    blocks: [
-      { kind: 'paragraph', text: hi(p.nickname) },
-      {
-        kind: 'facts',
-        rows: [
-          { label: 'Added', value: p.amountLabel },
-          { label: 'Available balance', value: p.balanceLabel },
-        ],
-      },
-      { kind: 'button', label: 'Open wallet', href: appUrl('/wallet') },
-    ],
-  }),
-
   noteApproved: (p: { nickname: string; title: string }): EmailContent => ({
     subject: 'Your note is published: ' + p.title,
     heading: 'Note approved',
@@ -752,6 +690,69 @@ export const TEMPLATES = {
       { kind: 'paragraph', text: 'A moderator reviewed "' + p.title + '" and could not approve it.' },
       ...(p.reason ? [{ kind: 'facts' as const, rows: [{ label: 'Reason', value: p.reason }] }] : []),
       { kind: 'button', label: 'Upload a new version', href: appUrl('/notes/new') },
+    ],
+  }),
+
+  followRequest: (p: { nickname: string; requester: string; url: string }): EmailContent => ({
+    subject: `@${p.requester} wants to follow you on UniPath`,
+    heading: 'New follow request',
+    preheader: `@${p.requester} asked to follow you. Accept or decline in the app.`,
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: `@${p.requester} sent you a follow request. Nothing is shared until you accept it.` },
+      { kind: 'button', label: 'Review the request', href: p.url },
+    ],
+  }),
+
+  emailChangeConfirm: (p: { nickname: string; url: string; minutes: number }): EmailContent => ({
+    subject: 'Confirm your new email address for UniPath',
+    heading: 'Confirm your new email',
+    preheader: `Confirm this address to finish moving your account to it. The link works for ${p.minutes} minutes.`,
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: `You asked to move your UniPath account to this address. Open the link in the browser where you are signed in - it only works there, once, for ${p.minutes} minutes.`,
+      },
+      { kind: 'button', label: 'Confirm new email', href: p.url },
+      {
+        kind: 'callout',
+        tone: 'neutral',
+        title: 'Did not ask for this?',
+        body: 'Ignore this email. The account keeps its current address unless someone signed in to it opens the link.',
+      },
+    ],
+  }),
+
+  emailChangeRequested: (p: { nickname: string; newEmail: string }): EmailContent => ({
+    subject: 'An email change was requested on your UniPath account',
+    heading: 'Email change requested',
+    preheader: 'Someone signed in to your account asked to move it to a new address.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'facts', rows: [{ label: 'New address', value: p.newEmail }] },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Was this not you?',
+        body: 'Change your password and sign out other devices in Settings. The change only completes when the new address confirms it.',
+      },
+    ],
+  }),
+
+  emailChanged: (p: { nickname: string; newEmail: string }): EmailContent => ({
+    subject: 'Your UniPath email address was changed',
+    heading: 'Email address changed',
+    preheader: 'Your account now signs in and receives mail at a new address.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'facts', rows: [{ label: 'New address', value: p.newEmail }] },
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Was this not you?',
+        body: 'Contact support right away. This is the last message sent to this address about the account.',
+      },
     ],
   }),
 } satisfies Record<TemplateName, (params: never) => EmailContent>;

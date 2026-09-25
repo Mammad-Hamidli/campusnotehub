@@ -10,8 +10,8 @@ const viewer = (patch: Partial<Viewer> = {}): Viewer => ({
   ...patch,
 });
 
-describe('verification unlocks shopping', () => {
-  it.each(['notes:buy', 'wallet:topup', 'notes:sell', 'mentors:book', 'wallet:withdraw'] as const)(
+describe('verification unlocks mentorship only', () => {
+  it.each(['mentors:book'] as const)(
     'refuses %s to an unverified account and grants it once verified',
     (capability) => {
       expect(can(viewer(), capability)).toBe(false);
@@ -19,7 +19,7 @@ describe('verification unlocks shopping', () => {
     },
   );
 
-  it.each(['feed:read', 'feed:post', 'notes:browse', 'mentors:browse'] as const)(
+  it.each(['feed:read', 'feed:post', 'notes:browse', 'notes:share', 'notes:review', 'mentors:browse'] as const)(
     'keeps %s open to an unverified account',
     (capability) => {
       expect(can(viewer(), capability)).toBe(true);
@@ -27,18 +27,18 @@ describe('verification unlocks shopping', () => {
   );
 
   it('treats an in-review account as unverified', () => {
-    expect(can(viewer({ verificationStatus: VerificationStatus.NEEDS_REVIEW }), 'notes:buy')).toBe(false);
+    expect(can(viewer({ verificationStatus: VerificationStatus.NEEDS_REVIEW }), 'mentors:book')).toBe(false);
   });
 });
 
 describe('denialKey', () => {
   it('names verification when it is the only thing missing', () => {
-    expect(denialKey(viewer(), 'notes:buy')).toBe('verification.restricted.action');
+    expect(denialKey(viewer(), 'mentors:book')).toBe('verification.restricted.action');
   });
 
   it('stays generic when the account is suspended, verified or not', () => {
     const frozen = viewer({ accountStatus: AccountStatus.SUSPENDED });
-    expect(denialKey(frozen, 'notes:buy')).toBe('errors.forbidden');
+    expect(denialKey(frozen, 'mentors:book')).toBe('errors.forbidden');
   });
 
   it('stays generic for a capability verification does not gate', () => {
@@ -53,7 +53,7 @@ describe('an unfinished quick-login profile is view-only', () => {
     expect(can(incomplete, capability)).toBe(true);
   });
 
-  it.each(['feed:post', 'feed:comment', 'feed:react', 'users:follow', 'notes:buy', 'mentors:book'] as const)(
+  it.each(['feed:post', 'feed:comment', 'feed:react', 'users:follow', 'notes:review', 'mentors:book'] as const)(
     'cannot %s - even when verified',
     (capability) => {
       expect(can(incomplete, capability)).toBe(false);

@@ -170,6 +170,31 @@ export async function revokeUserSessions(userId: string): Promise<number> {
   return written;
 }
 
+/**
+ * The account's unrevoked sessions. Equality-only (userId + revokedAt), the
+ * same query revokeUserSessions() uses, so no composite index. Not "the latest
+ * N rows": every token refresh rotates the row, so an active device would push
+ * every other device off a recency-limited list.
+ */
+export async function listOpenUserSessions(userId: string): Promise<SessionRecord[]> {
+  const snap = await sessions().where('userId', '==', userId).where('revokedAt', '==', null).get();
+  return (docsToObjects<SessionRecord>(snap.docs) as SessionRecord[]).map((row) => ({
+    ...row,
+    authAt: row.authAt ?? row.createdAt,
+  }));
+}
+
+/** Revokes one of the account's own sessions; false when it is not theirs or already gone. */
+export async function revokeOwnSession(userId: string, sessionId: string): Promise<boolean> {
+  const ref = sessions().doc(sessionId);
+  return adminDb().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.get('userId') !== userId || snap.get('revokedAt')) return false;
+    tx.update(ref, forFirestore({ revokedAt: new Date() }));
+    return true;
+  });
+}
+
 export async function touchSession(id: string, at: Date): Promise<void> {
   await sessions().doc(id).update(forFirestore({ lastSeenAt: at }));
 }

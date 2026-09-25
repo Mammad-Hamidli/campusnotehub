@@ -28,7 +28,6 @@
     "feed": "Feed",
     "notes": "UniNotes",
     "mentors": "PocketMentor",
-    "wallet": "Wallet",
     "notifications": "Notifications",
     "profile": "Profile",
     "settings": "Settings",
@@ -66,7 +65,7 @@
       "createAccount": "Create account",
       "haveAccount": "Already have an account?",
       "phone": "Phone number",
-      "phoneHint": "Used to recover your account and confirm payouts",
+      "phoneHint": "Used to recover your account",
       "nickname": "Nickname",
       "nicknameHint": "This is what people see across the platform. Letters, numbers and underscore, 3-24 characters.",
       "graduationDate": "Graduation date",
@@ -113,7 +112,6 @@
         "student": {
           "title": "Student",
           "body": "For university students studying now.",
-          "point1": "Sell notes and book mentors once verified",
           "point2": "Verify later with your national ID and student card"
         },
         "teacher": {
@@ -142,7 +140,7 @@
       },
       "graduatedDate": "Graduation date",
       "expectedGraduationDate": "Expected graduation date",
-      "verifyLater": "No documents are needed to sign up. Your account is ready immediately — verify your identity in Settings whenever it suits you to buy and sell class notes, top up your wallet and book mentors.",
+      "verifyLater": "No documents are needed to sign up. Your account is ready immediately — verify your identity in Settings whenever it suits you to get your verified badge and book mentors.",
       "schedule": {
         "title": "Your availability",
         "subtitle": "Choose the times students can book sessions with you each week.",
@@ -377,9 +375,8 @@
     },
     "restricted": {
       "title": "This feature requires verification",
-      "body": "Unverified accounts cannot buy or sell notes, top up or withdraw, or book mentors.",
       "allowed": "You can still: read the feed, post, and browse notes and mentors.",
-      "action": "Verify your identity to buy notes and top up your wallet."
+      "action": "Verify your identity to book mentoring sessions."
     },
     "graduation": {
       "promptTitle": "Have you graduated?",
@@ -397,11 +394,12 @@
     },
     "prompt": {
       "title": "Verify your identity",
-      "body": "Upload your documents to buy and sell notes, top up your wallet, book mentors and withdraw money. It takes a couple of minutes.",
+      "body": "Upload your documents to get your verified badge and to book or offer mentoring sessions. It takes a couple of minutes.",
       "rejectedBody": "Your last check did not pass. Upload clearer photos to try again.",
       "cta": "Verify now",
       "reviewTitle": "Your documents are being reviewed",
-      "reviewBody": "We will notify you as soon as the result is ready."
+      "reviewBody": "We will notify you as soon as the result is ready.",
+      "dismiss": "Dismiss"
     }
   },
   "feed": {
@@ -474,40 +472,49 @@
       "attribution": "Machine translation into {language}. It may not be exact.",
       "errors": {
         "failed": "This post could not be translated. Try again.",
-        "unavailable": "Translation is unavailable right now.",
-        "unsupported": "That language is not supported.",
-        "empty": "There is nothing to translate."
+        "unavailable": "Translation is unavailable right now. Check your connection and try again.",
+        "empty": "There is nothing to translate.",
+        "quota": "Today's free translation limit is used up. Try again tomorrow.",
+        "sameLanguage": "This post is already in that language."
       }
     },
     "posted": "Your post was published.",
-    "commentPosted": "Your comment was added."
+    "commentPosted": "Your comment was added.",
+    "templates": {
+      "prompt": "Save this hashtag as a template?",
+      "save": "Save",
+      "dismiss": "No thanks",
+      "label": "Hashtag templates",
+      "insert": "Add {tag}",
+      "remove": "Remove template {tag}",
+      "saved": "{tag} saved as a template",
+      "errors": {
+        "invalid": "That is not a valid hashtag.",
+        "full": "You can keep up to {max} templates. Remove one first.",
+        "failed": "The template could not be saved. Try again."
+      }
+    }
   },
   "notes": {
     "title": "UniNotes",
     "subtitle": "Student-to-student study material marketplace",
     "browse": "Browse notes",
-    "sell": "Sell notes",
-    "myPurchases": "My purchases",
     "myListings": "My listings",
     "filters": {
       "university": "University",
       "subject": "Subject",
       "courseCode": "Course code",
       "language": "Language",
-      "priceRange": "Price range",
       "rating": "Rating",
       "freeOnly": "Free only"
     },
     "card": {
       "pages": "{count} pages",
       "sales": "{count} sales",
-      "byAuthor": "by {name}",
-      "free": "Free"
+      "byAuthor": "by {name}"
     },
     "detail": {
       "preview": "First page preview",
-      "previewNote": "The full document unlocks after purchase",
-      "buy": "Buy for {price}",
       "download": "Download",
       "alreadyOwned": "You own this note",
       "reviews": "Reviews ({count})",
@@ -521,8 +528,6 @@
       "noteTitle": "Title",
       "description": "Description",
       "subject": "Subject",
-      "price": "Price (AZN)",
-      "priceHint": "Enter 0 to publish it for free. Maximum 50 AZN.",
       "processing": "Processing file: generating preview...",
       "pendingReview": "Your note is in moderation and will be published once approved.",
       "subtitle": "PDF or Word (.pdf, .doc, .docx). Max 10 MB.",
@@ -537,7 +542,6 @@
         "subject": "Subject",
         "courseCode": "Course code",
         "university": "University",
-        "price": "Price (qepik, 0 = free)",
         "universities": "Universities"
       },
       "errors": {
@@ -562,50 +566,30 @@
       "retry": "Try again",
       "success": "Note uploaded",
       "maxSize": "Up to {mb} MB. PDF or Word (.pdf, .doc, .docx).",
-      "verifyFirstTitle": "Verify your identity first",
-      "verifyFirstBody": "Selling notes requires a verified identity. Once your verification is complete you can upload notes.",
       "selected": "{name} ({size})",
       "universitiesHint": "Select every university this note is relevant to (up to 10).",
-      "titleFromFile": "Filled in from the file name — edit freely."
+      "titleFromFile": "Filled in from the file name — edit freely.",
+      "blockedTitle": "You cannot share notes yet"
     },
     "errors": {
-      "notVerified": "Your account must be verified before you can sell notes",
-      "insufficientFunds": "Your balance is not enough",
       "duplicate": "This exact file is already on the platform",
-      "encrypted": "Password-protected PDFs are not accepted",
-      "notForSale": "That note is not available for sale.",
-      "cannotBuyOwn": "You cannot buy your own note.",
-      "alreadyOwned": "You already own this note."
+      "encrypted": "Password-protected PDFs are not accepted"
     },
-    "free": "Free",
     "download": "Download",
     "stats": {
-      "purchases": "{n} purchases"
+      "downloads": "{n} downloads"
     },
     "empty": "No notes have been uploaded yet.",
     "addNote": "Add note",
-    "purchases": {
-      "subtitle": "Notes you have bought",
-      "empty": "No purchases yet",
-      "emptyHint": "Notes you buy will appear here, ready to download.",
-      "browse": "Browse UniNotes",
-      "download": "Download",
-      "refunded": "Refunded"
-    },
-    "buy": "Buy",
-    "buyFree": "Get for free",
-    "buying": "Purchasing…",
     "owned": "Owned",
-    "bought": "Purchase complete",
     "creatorStats": "{avg}⭐ ({files} files for {reviews} total reviews)",
-    "lockedUntilPurchase": "Unlocks after purchase",
     "reviews": {
       "rate": "Rate this note",
       "yourRating": "Your rating",
       "stars": "{n} stars",
       "summary": "{avg} ({count} reviewers)",
       "errors": {
-        "purchaseRequired": "Only buyers of this note can rate it."
+        "ownNote": "You cannot rate your own note."
       },
       "saved": "Thanks - your rating was saved."
     },
@@ -619,7 +603,7 @@
       "removed": "Removed from saved items.",
       "failed": "Your saved items could not be updated. Try again."
     },
-    "purchased": "Purchase complete - the note is ready to download."
+    "signInToDownload": "Sign in to download"
   },
   "mentors": {
     "title": "PocketMentor",
@@ -639,7 +623,6 @@
     "profile": {
       "sessions": "{count} sessions",
       "experience": "{years} years of experience",
-      "rate": "{price} / {minutes} min",
       "languages": "Languages",
       "about": "About",
       "bookSession": "Book a session",
@@ -654,8 +637,6 @@
       "topicPlaceholder": "What would you like to talk about?",
       "confirm": "Confirm and pay",
       "summary": "{date} at {time} - {duration} minutes",
-      "total": "Total: {price}",
-      "escrowNote": "The amount is held until the session is completed",
       "confirmed": {
         "title": "Session confirmed",
         "body": "The video call link becomes active 30 minutes before the session.",
@@ -663,7 +644,6 @@
         "joinCall": "Join call"
       },
       "cancel": "Cancel session",
-      "cancelPolicy": "Cancel more than 24 hours ahead for a full refund",
       "menteeNote": "Anything else to share (optional)",
       "menteeNotePlaceholder": "Context that helps your mentor prepare"
     },
@@ -799,42 +779,6 @@
       }
     }
   },
-  "wallet": {
-    "title": "Wallet",
-    "available": "Available",
-    "pending": "Pending",
-    "topUp": "Add funds",
-    "withdraw": "Withdraw",
-    "history": "Transaction history",
-    "pendingNote": "Sales become available {hours} hours after purchase",
-    "txn": {
-      "TOPUP": "Top-up",
-      "NOTE_PURCHASE": "Note purchase",
-      "NOTE_PAYOUT_RELEASE": "Note sale",
-      "BOOKING_ESCROW_HOLD": "Session payment",
-      "BOOKING_ESCROW_RELEASE": "Mentoring income",
-      "BOOKING_REFUND": "Session refund",
-      "WITHDRAWAL": "Withdrawal",
-      "PLATFORM_FEE": "Platform fee",
-      "ADJUSTMENT": "Adjustment"
-    },
-    "empty": "No transactions yet",
-    "subtitle": "Your balance and recent activity",
-    "availableHint": "Ready to spend on notes and sessions",
-    "frozen": "This wallet is frozen. Contact support.",
-    "topUpForm": {
-      "title": "Add balance",
-      "hint": "Top up between {min} and {max} AZN.",
-      "amount": "Amount (AZN)",
-      "submit": "Add balance",
-      "success": "{amount} AZN was added to your balance.",
-      "providerNote": "Test payment mode: no card is charged until a payment provider is connected.",
-      "errors": {
-        "amount": "Enter an amount between {min} and {max} AZN.",
-        "declined": "The payment was declined."
-      }
-    }
-  },
   "notifications": {
     "title": "Notifications",
     "markAllRead": "Mark all as read",
@@ -844,7 +788,6 @@
       "VERIFICATION_APPROVED": "Your account is verified",
       "VERIFICATION_REJECTED": "Verification did not pass",
       "GRADUATION_TRANSITION_PROMPT": "Update your alumni status",
-      "NOTE_SOLD": "Your note sold: {title}",
       "NOTE_REVIEWED": "New review on your note",
       "BOOKING_REQUESTED": "New session request",
       "BOOKING_CONFIRMED": "Session confirmed",
@@ -854,9 +797,10 @@
       "POST_REPLY": "{name} replied to your post",
       "POST_LIKE": "{name} liked your post",
       "NEW_FOLLOWER": "{name} started following you",
-      "WALLET_CREDIT": "{amount} was added to your balance",
       "VERIFICATION_NEEDS_REVIEW": "Your documents need a closer look",
-      "VERIFICATION_RESUBMIT_REQUIRED": "Please upload your documents again"
+      "VERIFICATION_RESUBMIT_REQUIRED": "Please upload your documents again",
+      "FOLLOW_REQUEST": "{name} wants to follow you",
+      "FOLLOW_ACCEPTED": "{name} accepted your follow request"
     },
     "subtitle": "Everything that happened on your account",
     "loading": "Loading notifications…",
@@ -885,9 +829,6 @@
       "title": "Account restored",
       "body": "The freeze on your account was lifted"
     },
-    "noteSold": {
-      "body": "Someone bought \"{title}\""
-    },
     "mentor": {
       "approvedTitle": "Mentor application approved",
       "approvedBody": "You are now listed in PocketMentor.",
@@ -900,10 +841,6 @@
       "rejectedTitle": "Note not approved",
       "rejectedBody": "\"{title}\" was not approved."
     },
-    "wallet": {
-      "topUpTitle": "Balance topped up",
-      "topUpBody": "{amount} was added to your wallet."
-    },
     "deletionRequest": {
       "title": "Account deletion requested",
       "body": "@{nickname} asked to delete their account. Review it in the admin panel.",
@@ -915,6 +852,14 @@
     "newFollower": {
       "title": "New follower",
       "body": "@{nickname} started following you"
+    },
+    "followRequest": {
+      "title": "New follow request",
+      "body": "@{nickname} wants to follow you"
+    },
+    "followAccepted": {
+      "title": "Follow request accepted",
+      "body": "@{nickname} accepted your follow request"
     }
   },
   "errors": {
@@ -933,7 +878,7 @@
     "methodNotAllowed": "That request method is not supported",
     "unsupportedMediaType": "That request format is not supported",
     "credentialsInQueryString": "Request blocked for your security. Reload the page and try again.",
-    "verificationRequired": "Verify your identity before selling notes."
+    "verificationRequired": "Verify your identity before booking a mentor."
   },
   "a11y": {
     "openMenu": "Open menu",
@@ -952,9 +897,9 @@
     },
     "hero": {
       "badge": "The social space for students",
-      "titleLead": "Buy and sell class notes,",
+      "titleLead": "Share class notes for free,",
       "titleAccent": "and join the liveliest crowd on campus",
-      "subtitle": "Follow classmates, post to the feed, ask and answer, buy and sell class notes, meet mentors — all in one place, with verified students only.",
+      "subtitle": "Follow classmates, post to the feed, ask and answer, share class notes, meet mentors — all in one place, with verified students only.",
       "ctaNotes": "Browse class notes",
       "trust": "No fake profiles — every account is verified",
       "ctaJoin": "Join for free"
@@ -969,13 +914,13 @@
     "features": {
       "eyebrow": "One account, three worlds",
       "title": "Classes, friends and careers — together",
-      "subtitle": "Chat in the feed, buy and sell class notes, find a mentor. Join once, use it everywhere.",
+      "subtitle": "Chat in the feed, share class notes, find a mentor. Join once, use it everywhere.",
       "notes": {
         "title": "UniNotes",
-        "body": "Buy and sell class notes. Upload and earn, or find what you need before the exam.",
+        "body": "Class notes, free for everyone. Upload yours, or find what you need before the exam.",
         "p1": "First-page preview generated automatically",
-        "p2": "Secure payment through your internal balance",
-        "p3": "Only verified buyers can leave reviews",
+        "p2": "Free to read and download",
+        "p3": "Rate the notes that helped you",
         "cta": "Browse class notes"
       },
       "mentor": {
@@ -983,7 +928,7 @@
         "body": "One-on-one career guidance from people actually doing the job.",
         "p1": "IT, marketing, law, engineering and more",
         "p2": "Pick an open slot, confirm instantly",
-        "p3": "Payment held until the session is done",
+        "p3": "Verified mentors only",
         "cta": "Find a mentor"
       },
       "feed": {
@@ -1005,7 +950,7 @@
     },
     "cta": {
       "title": "Campus is waiting for you 🎉",
-      "body": "Signing up takes a minute. Join, follow, post, buy and sell class notes.",
+      "body": "Signing up takes a minute. Join, follow, post, share class notes.",
       "button": "Create a free account",
       "secondary": "Browse class notes first"
     },
@@ -1026,7 +971,7 @@
         "follow": "Follow your classmates",
         "feed": "Post to the campus feed",
         "comment": "Comment, like, discuss",
-        "notes": "Buy & sell class notes",
+        "notes": "Share class notes",
         "mentor": "Meet mentors",
         "campus": "Explore by university"
       }
@@ -1053,7 +998,7 @@
       "title": "Sign up now, verify later",
       "b1": "No documents to find right now — the account is created from this form alone",
       "b2": "Verification, when you choose to do it, keeps fake profiles and stolen notes off the platform",
-      "b3": "It unlocks buying and selling class notes, your wallet and mentor bookings",
+      "b3": "It unlocks your verified badge and mentor bookings",
       "privacy": "When you do verify, the images are processed at that moment and destroyed immediately. They are never kept on our servers."
     },
     "scanner": {
@@ -1109,7 +1054,6 @@
       "viewAll": "View all"
     },
     "quickActions": "Quick actions",
-    "sellNote": "Sell a note",
     "findMentor": "Find a mentor"
   },
   "admin": {
@@ -1269,7 +1213,7 @@
         "confirmRevokeTitle": "Force logout?",
         "confirmRevokeBody": "Every session is revoked immediately. Access tokens are checked against the session record on each request, so this takes effect at once.",
         "confirmDeleteTitle": "Delete this user?",
-        "confirmDeleteBody": "This is a soft delete: the account is excluded from listings and can no longer sign in, but the row, its audit trail and its wallet history are kept."
+        "confirmDeleteBody": "This is a soft delete: the account is excluded from listings and can no longer sign in, but the row and its audit trail are kept."
       },
       "errors": {
         "bannedImmutable": "A banned account cannot be reactivated here. Blocklist entries must be lifted first.",
@@ -1287,7 +1231,7 @@
       "frozenUntil": "Frozen until {date}",
       "frozenIndefinitely": "Frozen indefinitely",
       "freezeTitle": "Temporarily freeze this account",
-      "freezeBody": "The account keeps read-only access and is signed out everywhere. Posting, buying, selling and messaging are paused.",
+      "freezeBody": "The account keeps read-only access and is signed out everywhere. Posting, sharing and messaging are paused.",
       "freezeDuration": "Duration",
       "freezeReason": "Reason (shown to the user)",
       "freezeConfirm": "Freeze account",
@@ -1466,9 +1410,7 @@
       "approved": "Account deleted.",
       "alreadyDeleted": "Already deleted",
       "memberSince": "Member since",
-      "balance": "Wallet",
       "noReason": "No reason given.",
-      "balanceWarning": "This account still holds {amount}. Deleting it strands that money - settle it first.",
       "rejectHint": "Reason for declining (emailed to the user)",
       "confirmTitle": "Delete this account?",
       "confirmBody": "This soft-deletes @{nickname}, signs them out everywhere and emails them. Type the nickname to confirm."
@@ -1499,12 +1441,13 @@
     "academic": {
       "title": "Academic details",
       "description": "University and graduation date",
-      "universityLocked": "Your account is verified at this university. Changing it needs a new verification - contact support."
+      "universityLocked": "Your account is verified at this university. Changing it needs a new verification - contact support.",
+      "universityMissing": "You have not added a university yet — pick yours to see your campus feed."
     },
     "privacy": {
       "title": "Privacy",
       "description": "Choose who can see each piece of information",
-      "note": "Your nickname and picture are always public — the platform does not work without them.",
+      "note": "Your nickname is always public — the platform does not work without it.",
       "realName": "Full name",
       "realNameHint": "The name on your ID document",
       "email": "Email",
@@ -1519,7 +1462,9 @@
         "VERIFIED_ONLY_hint": "Only document-verified users",
         "PRIVATE": "Only me",
         "PRIVATE_hint": "Nobody else can see it"
-      }
+      },
+      "avatar": "Profile picture",
+      "avatarHint": "Everyone else sees your initials instead"
     },
     "theme": {
       "label": "Theme",
@@ -1536,8 +1481,6 @@
       "title": "Account",
       "description": "Security and account management",
       "changePassword": "Change password",
-      "devices": "Devices",
-      "devicesHint": "Devices that have signed in to your account",
       "exportData": "Download my data",
       "exportHint": "A JSON copy of everything we hold",
       "deleteAccount": "Delete account",
@@ -1559,11 +1502,9 @@
       "unlockedTitle": "Unlocked for you",
       "unlocksTitle": "Verification unlocks",
       "unlocks": {
-        "buy": "Buying notes",
-        "topup": "Topping up your wallet",
-        "sell": "Selling your notes",
         "book": "Booking mentor sessions",
-        "withdraw": "Withdrawing earnings"
+        "offer": "Offering mentoring sessions",
+        "badge": "The verified badge next to your name"
       },
       "needTitle": "Documents we need from you",
       "need": {
@@ -1581,8 +1522,7 @@
       "request": "Request account deletion",
       "what": {
         "review": "An administrator reviews your request; you will get an email with the outcome.",
-        "signOut": "Once approved, your account is deleted and you are signed out everywhere.",
-        "wallet": "Withdraw any wallet balance first - it cannot be recovered after deletion."
+        "signOut": "Once approved, your account is deleted and you are signed out everywhere."
       },
       "reason": "Why are you leaving?",
       "password": "Confirm with your password",
@@ -1635,6 +1575,36 @@
       "disabledToast": "Two-factor authentication is off",
       "verifiedToast": "Session verified",
       "loadFailed": "Could not load your security settings."
+    },
+    "email": {
+      "change": "Change email",
+      "newLabel": "New email address",
+      "currentPassword": "Current password",
+      "changeHint": "We will send a confirmation link to the new address. Open it while signed in here to finish — until then your current address stays in use.",
+      "sendLink": "Send confirmation link",
+      "pending": "Check {email} and open the link while signed in to finish the change.",
+      "confirmTitle": "Confirm your new email",
+      "changed": "Your email address has been changed. Other devices were signed out.",
+      "errors": {
+        "same": "That is already your email address.",
+        "taken": "That address cannot be used. Try another one.",
+        "linkInvalid": "This link is invalid or has expired. Start the change again from Settings."
+      }
+    },
+    "devices": {
+      "title": "Devices",
+      "description": "Browsers signed in to your account. Sign out any you do not recognise.",
+      "thisDevice": "This device",
+      "signedIn": "Signed in {when}",
+      "lastActive": "Last active {when}",
+      "revoke": "Sign out",
+      "revokeOthers": "Sign out all other devices",
+      "revoked": "That device has been signed out.",
+      "revokedOthers": "All other devices have been signed out.",
+      "unknown": "Unknown device",
+      "errors": {
+        "current": "Use Sign out to end this device's session."
+      }
     }
   },
   "stub": {
@@ -1714,6 +1684,19 @@
     "posts": "Posts",
     "noPosts": "No posts yet.",
     "follow": "Follow",
-    "following": "Following"
+    "following": "Following",
+    "requested": "Requested",
+    "requestedHint": "Tap to withdraw your request",
+    "requestSent": "Follow request sent to @{nickname}"
+  },
+  "social": {
+    "requests": {
+      "title": "Follow requests",
+      "accept": "Accept",
+      "reject": "Decline",
+      "accepted": "@{nickname} now follows you",
+      "rejected": "Request from @{nickname} declined",
+      "gone": "That request was already answered or withdrawn."
+    }
   }
 }

@@ -1067,110 +1067,49 @@ GROUPS.notifications = async (browser) => {
 
 
 // ---------------------------------------------------------------------------
-GROUPS.commerce = async (browser) => {
-  const seller = await browser.newContext();
-  const buyer = await browser.newContext();
-  const ps = await seller.newPage();
-  const pb = await buyer.newPage();
+GROUPS.notes = async (browser) => {
+  const author = await browser.newContext();
+  const reader = await browser.newContext();
+  const pr = await reader.newPage();
 
-  await login(ps, 'student');     // owns the seeded purchasable note
-  await login(pb, 'unverified');  // has wallet funds
+  await login(await author.newPage(), 'student'); // owns the seeded shared note
+  await login(pr, 'unverified');                 // notes are free: no verification needed
 
   let noteId = null;
 
-  await check('a priced note is listed with a Buy control', async () => {
-    await pb.goto(`${BASE}/notes`, { waitUntil: 'networkidle' });
-    await pb.waitForTimeout(1200);
-    const buy = pb.locator('button:has-text("Buy"), button:has-text("Get for free")');
-    assert((await buy.count()) > 0, 'no buy button rendered');
-    const res = await buyer.request.get(`${BASE}/api/notes?limit=50`);
+  await check('a shared note is listed with a download, not a price', async () => {
+    const res = await reader.request.get(`${BASE}/api/notes?limit=50`);
     const { notes } = await res.json();
     const target = notes
-      .filter((n) => n.title.startsWith('E2E purchasable note'))
+      .filter((n) => n.title.startsWith('E2E shared note'))
       .sort((a, b) => (a.title < b.title ? 1 : -1))[0];
     assert(target, 'no seeded note in the listing - run: npx tsx scripts/seed-e2e.mts');
+    assert(!('priceMinor' in target), 'the listing still carries a price');
+    assert(target.viewerCanDownload === true, 'reader cannot download');
     noteId = target.id;
-    return `${await buy.count()} buy buttons, note ${noteId}`;
+    return `note ${noteId}`;
   });
 
-  await check('wallet shows a real balance', async () => {
-    await pb.goto(`${BASE}/wallet`, { waitUntil: 'networkidle' });
-    await pb.waitForTimeout(1200);
-    const text = await pb.locator('main').innerText();
-    assert(!/not built yet/i.test(text), 'still a stub page');
-    assert(/AZN|₼/.test(text), `no currency rendered: ${text.slice(0, 100)}`);
-    return text.split('\n').slice(0, 3).join(' / ');
-  });
-
-  await check('purchase debits the buyer and escrows the seller net', async () => {
-    const before = await (await buyer.request.get(`${BASE}/api/wallet`)).json();
-
-    const res = await buyer.request.post(`${BASE}/api/notes/${noteId}/purchase`);
-    assert(res.status() === 201, `expected 201, got ${res.status()} ${await res.text()}`);
-
-    const after = await (await buyer.request.get(`${BASE}/api/wallet`)).json();
-    const spent = before.wallet.availableMinor - after.wallet.availableMinor;
-    assert(spent === 500, `buyer debited ${spent}, expected 500`);
-
-    const sellerWallet = await (await seller.request.get(`${BASE}/api/wallet`)).json();
-    // 15% platform fee on 500 => 425 net, held pending until the clearing window.
-    assert(sellerWallet.wallet.pendingMinor >= 425, `seller pending ${sellerWallet.wallet.pendingMinor}`);
-    return `buyer -500, seller pending ${sellerWallet.wallet.pendingMinor}`;
-  });
-
-  await check('a second purchase is refused (idempotent, not double-charged)', async () => {
-    const res = await buyer.request.post(`${BASE}/api/notes/${noteId}/purchase`);
-    assert(res.status() === 409, `expected 409, got ${res.status()}`);
-    return `status ${res.status()}`;
-  });
-
-  await check('the seller cannot buy their own note', async () => {
-    const res = await seller.request.post(`${BASE}/api/notes/${noteId}/purchase`);
-    assert(res.status() === 400, `expected 400, got ${res.status()}`);
-    return `status ${res.status()}`;
-  });
-
-  await check('purchases page lists it with a working download', async () => {
-    await pb.goto(`${BASE}/notes/purchases`, { waitUntil: 'networkidle' });
-    await pb.waitForTimeout(1200);
-    const text = await pb.locator('main').innerText();
-    assert(!/not built yet/i.test(text), 'still a stub page');
-    assert(/E2E purchasable note/.test(text), 'purchase not listed');
-
-    const link = pb.locator(`a[href="/api/notes/${noteId}/file"]`).first();
-    assert((await link.count()) > 0, 'no download link');
-    const dl = await buyer.request.get(`${BASE}/api/notes/${noteId}/file`);
+  await check('any signed-in reader downloads it', async () => {
+    const dl = await reader.request.get(`${BASE}/api/notes/${noteId}/file`);
     assert(dl.ok(), `download returned ${dl.status()}`);
     return `download ${dl.status()}, ${(await dl.body()).length} bytes`;
   });
 
-  await check('the seller sees a NOTE_SOLD notification', async () => {
-    const res = await seller.request.get(`${BASE}/api/notifications`);
-    const { notifications } = await res.json();
-    assert(notifications.some((n) => n.type === 'NOTE_SOLD'), 'no NOTE_SOLD row');
-    return 'NOTE_SOLD present';
+  await check('the author cannot rate their own note', async () => {
+    const res = await author.request.put(`${BASE}/api/notes/${noteId}/reviews`, { data: { rating: 5 } });
+    assert(res.status() === 403, `expected 403, got ${res.status()}`);
+    return `status ${res.status()}`;
   });
 
-  await check('wallet activity shows the ledger entry', async () => {
-    await pb.goto(`${BASE}/wallet`, { waitUntil: 'networkidle' });
-    await pb.waitForTimeout(1200);
-    const text = await pb.locator('main').innerText();
-    assert(/note purchase/i.test(text), `activity missing: ${text.slice(-200)}`);
-    return 'purchase visible in activity';
+  await check('the wallet is gone', async () => {
+    const res = await reader.request.get(`${BASE}/api/wallet`);
+    assert(res.status() === 404, `expected 404, got ${res.status()}`);
+    return `status ${res.status()}`;
   });
 
-  await check('an account with no funds is refused with 402, not 500', async () => {
-    const broke = await browser.newContext();
-    const pg = await broke.newPage();
-    await login(pg, 'moderator'); // moderator account has an empty wallet
-    const res = await broke.request.post(`${BASE}/api/notes/${noteId}/purchase`);
-    await broke.close();
-    assert(res.status() === 402, `expected 402, got ${res.status()}`);
-    return `status ${res.status()} (insufficient funds)`;
-  });
-
-  await seller.close();
-  await buyer.close();
+  await author.close();
+  await reader.close();
 };
 
 // ---------------------------------------------------------------------------
@@ -1226,8 +1165,8 @@ GROUPS.deadlinks = async (browser) => {
    * mentor profile's Book button pointing at a stub.
    */
   const FEATURE_ROUTES = [
-    '/dashboard', '/notes', '/notes/new', '/notes/purchases',
-    '/mentors', '/notifications', '/profile', '/settings', '/wallet',
+    '/dashboard', '/notes', '/notes/new',
+    '/mentors', '/notifications', '/profile', '/settings',
   ];
 
   for (const route of FEATURE_ROUTES) {

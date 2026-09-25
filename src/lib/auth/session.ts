@@ -86,6 +86,18 @@ function isIdle(lastSeenAt: Date, now: Date): boolean {
   return IDLE_TIMEOUT_MS > 0 && now.getTime() - lastSeenAt.getTime() > IDLE_TIMEOUT_MS;
 }
 
+/**
+ * Would requireSession() still accept this row? Not revoked, not expired, not
+ * idle. The Devices list uses it so a row that is only waiting for its next
+ * request to be revoked is not shown as a signed-in device.
+ */
+export function sessionIsLive(
+  row: { revokedAt: Date | null; expiresAt: Date; lastSeenAt: Date },
+  now = new Date(),
+): boolean {
+  return !row.revokedAt && row.expiresAt > now && !isIdle(row.lastSeenAt, now);
+}
+
 const STAFF_ROLES: ReadonlySet<UserRole> = new Set([UserRole.ADMIN, UserRole.MODERATOR]);
 
 /** Chooses the TTL from the role. Exported for the tests and for /api/me. */
@@ -353,11 +365,20 @@ const cachedCookieSession = cache(
   async (): Promise<SessionResult> => loadSession(undefined),
 );
 
-export async function requireSession(request?: NextRequest): Promise<SessionResult> {
-  return request ? loadSession(request) : cachedCookieSession();
+/**
+ * `passive`: a background request (the live notification poll) that must not
+ * count as activity. It is authenticated like any other, but does NOT move
+ * `lastSeenAt` - otherwise an unattended open tab would never reach the idle
+ * timeout. SessionKeeper likewise never refreshes tokens for such a request.
+ */
+export async function requireSession(
+  request?: NextRequest,
+  options: { passive?: boolean } = {},
+): Promise<SessionResult> {
+  return request ? loadSession(request, options.passive === true) : cachedCookieSession();
 }
 
-async function loadSession(request?: NextRequest): Promise<SessionResult> {
+async function loadSession(request?: NextRequest, passive = false): Promise<SessionResult> {
   const jar = request ? request.cookies : await cookies();
   const token = jar.get(COOKIE_ACCESS)?.value;
   if (!token) throw new UnauthorizedError();
@@ -443,7 +464,7 @@ async function loadSession(request?: NextRequest): Promise<SessionResult> {
 
   // Cheap liveness signal for the admin "active sessions" list. Not awaited:
   // it must never add latency to an authenticated request.
-  void touchSession(session.id, now).catch(() => {});
+  if (!passive) void touchSession(session.id, now).catch(() => {});
 
   /**
    * ---------------------------------------------------------------------------

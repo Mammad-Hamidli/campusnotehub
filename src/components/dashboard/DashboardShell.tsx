@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, UserRoundSearch, Wallet } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 import { Sidebar, type DashboardTab } from './Sidebar';
@@ -50,15 +49,16 @@ type Viewer = {
   isMentor: boolean;
   /** Quick-login account still on its temporary handle: view-only. */
   profileIncomplete: boolean;
+  /** Composer quick-tags; see Composer. */
+  hashtagTemplates: string[];
 };
 
 type ApiNote = {
   id: string;
   title: string;
   subject: string;
-  priceMinor: number;
   ratingAvg: number;
-  purchaseCount: number;
+  downloadCount: number;
   university: { code: string } | null;
 };
 
@@ -141,6 +141,7 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
             graduationMonth: user.graduationMonth ?? undefined,
             isMentor: Boolean(user.isMentor),
             profileIncomplete: Boolean(user.profileIncomplete),
+            hashtagTemplates: Array.isArray(user.hashtagTemplates) ? user.hashtagTemplates : [],
           });
         }
 
@@ -157,9 +158,8 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
               title: n.title,
               subject: n.subject,
               university: n.university?.code ?? '—',
-              priceMinor: n.priceMinor,
               rating: n.ratingAvg,
-              purchases: n.purchaseCount,
+              downloads: n.downloadCount,
             })),
           );
         }
@@ -313,7 +313,7 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
   /**
    * Same capability table the server enforces, evaluated on the live /api/me
    * record. A UI hint only:
-   * POST /api/notes re-checks `notes:sell` on every upload.
+   * POST /api/notes re-checks `notes:share` on every upload.
    */
   const canUploadNotes = can(
     {
@@ -323,7 +323,7 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
       verificationStatus: viewer.verificationStatus as PermissionViewer['verificationStatus'],
       profileIncomplete: viewer.profileIncomplete,
     },
-    'notes:sell',
+    'notes:share',
   );
 
   return (
@@ -377,7 +377,7 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
               <div className="space-y-4">
                 {/* View-only until the profile is finished - the server refuses
                     the post anyway (permissions.can), so do not offer it. */}
-                {!viewer.profileIncomplete && <Composer author={viewer} onPost={handleNewPost} />}
+                {!viewer.profileIncomplete && <Composer author={viewer} initialTemplates={viewer.hashtagTemplates} onPost={handleNewPost} />}
 
                 {/* Filter pills. Horizontally scrollable rather than wrapping:
                     with 18 universities seeded this list grows, and a wrapping
@@ -440,10 +440,8 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
               <NotesList embedded canUpload={canUploadNotes} />
             ) : tab === 'saved' ? (
               <NotesList embedded source="saved" />
-            ) : tab === 'mentors' ? (
-              <MentorsList embedded />
             ) : (
-              <ModulePlaceholder tab={tab} />
+              <MentorsList embedded />
             )}
           </div>
 
@@ -459,31 +457,6 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
           </aside>
         </div>
       </main>
-    </div>
-  );
-}
-
-/** The other three tabs are specified in docs/ARCHITECTURE.md but not yet built. */
-function ModulePlaceholder({ tab }: { tab: DashboardTab }) {
-  const t = useT();
-
-  const config = {
-    notes: { icon: BookOpen, titleKey: 'notes.title', bodyKey: 'notes.subtitle' },
-    saved: { icon: BookOpen, titleKey: 'notes.saved.title', bodyKey: 'notes.saved.empty' },
-    mentors: { icon: UserRoundSearch, titleKey: 'mentors.title', bodyKey: 'mentors.subtitle' },
-    wallet: { icon: Wallet, titleKey: 'wallet.title', bodyKey: 'wallet.empty' },
-    feed: { icon: BookOpen, titleKey: 'feed.title', bodyKey: 'feed.empty' },
-  }[tab];
-
-  const Icon = config.icon;
-
-  return (
-    <div className="card animate-rise flex flex-col items-center justify-center px-6 py-16 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent-soft">
-        <Icon className="h-6 w-6 text-accent" aria-hidden="true" />
-      </span>
-      <h2 className="mt-4 text-lg font-semibold text-fg">{t(config.titleKey)}</h2>
-      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-fg-muted">{t(config.bodyKey)}</p>
     </div>
   );
 }

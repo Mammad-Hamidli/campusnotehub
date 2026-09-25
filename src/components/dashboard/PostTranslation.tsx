@@ -10,6 +10,7 @@ import {
   normalizeTargetLang,
   type TargetLang,
 } from '@/lib/i18n/translatable';
+import { TranslationError, translateText } from '@/lib/translate/mymemory';
 
 /**
  * "Translate this post", on the card.
@@ -28,22 +29,19 @@ import {
  * ONE REQUEST PER LANGUAGE, PER CARD
  * ---------------------------------------------------------------------------
  * Results are kept in a per-card map, so switching back to a language already
- * fetched is instant and costs nothing. The server caches across viewers; this
- * caches across clicks. Both are needed - without the local map, toggling
- * between two languages spends a rate-limit token per toggle.
+ * fetched is instant; src/lib/translate/mymemory.ts also caches per tab. Both
+ * matter, because MyMemory's free quota is counted per reader.
  *
  * The component renders NOTHING until pressed beyond its own button, so a feed
  * page of twenty cards issues zero translation requests on load. Machine
- * translation is opt-in per post by design: pre-translating the page would
- * bill for every post nobody reads.
+ * translation is opt-in per post by design.
  *
- * There is no `readOnly` prop, unlike the like button. Translating is READING,
- * and a view-only quick-login account may read the feed - the route agrees,
- * taking getViewer() rather than requireSession(). Gating it here would be a
- * restriction the server does not enforce, which is the wrong direction for
- * the two to disagree in.
+ * The text is translated in the browser, straight from MyMemory - there is no
+ * server route. Only a body the reader can already see is ever sent. There is
+ * no `readOnly` prop, unlike the like button: translating is READING, which a
+ * view-only quick-login account may do.
  */
-export function PostTranslation({ postId }: { postId: string }) {
+export function PostTranslation({ text }: { text: string }) {
   const t = useT();
   const { locale } = useLocale();
 
@@ -71,29 +69,17 @@ export function PostTranslation({ postId }: { postId: string }) {
 
       setPending(lang);
       try {
-        const response = await fetch(`/api/feed/${postId}/translate`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ lang }),
-        });
-        const payload = await response.json().catch(() => null);
-
-        if (!response.ok || typeof payload?.text !== 'string') {
-          // The server answers with a message KEY, never a sentence, so the
-          // failure is shown in the reader's own language.
-          setError(typeof payload?.error === 'string' ? payload.error : 'feed.translate.errors.failed');
-          setActive(null);
-          return;
-        }
-        setResults((prev) => ({ ...prev, [lang]: payload.text as string }));
-      } catch {
-        setError('feed.translate.errors.failed');
+        const translated = await translateText(text, lang);
+        setResults((prev) => ({ ...prev, [lang]: translated }));
+      } catch (cause) {
+        // Always a locale KEY, so the failure reads in the reader's language.
+        setError(cause instanceof TranslationError ? cause.messageKey : 'feed.translate.errors.failed');
         setActive(null);
       } finally {
         setPending(null);
       }
     },
-    [postId, results],
+    [text, results],
   );
 
   const shown = active ? results[active] : undefined;
@@ -168,7 +154,10 @@ export function PostTranslation({ postId }: { postId: string }) {
       </div>
 
       {error && (
-        <p role="status" className="mt-1.5 text-xs text-danger">
+        <p
+          role="status"
+          className={`mt-1.5 text-xs ${error === 'feed.translate.errors.sameLanguage' ? 'text-fg-muted' : 'text-danger'}`}
+        >
           {t(error)}
         </p>
       )}

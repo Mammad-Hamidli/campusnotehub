@@ -7,6 +7,7 @@ import {
   markRead,
 } from '@/lib/firebase/repositories/notifications';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
+import { serializeNotification } from '@/lib/notifications/serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,31 +41,6 @@ const listSchema = z.object({
   /** `unread` narrows to the badge's contents. */
   filter: z.enum(['all', 'unread']).default('all'),
 });
-
-function serialize(row: {
-  id: string;
-  type: string;
-  titleKey: string;
-  bodyKey: string;
-  params: unknown;
-  linkUrl: string | null;
-  readAt: Date | null;
-  createdAt: Date;
-}) {
-  return {
-    id: row.id,
-    type: row.type,
-    titleKey: row.titleKey,
-    bodyKey: row.bodyKey,
-    // Always an object, never null: the client interpolates into it, and a
-    // null here would mean every consumer needs its own guard.
-    params: (row.params ?? {}) as Record<string, string | number>,
-    linkUrl: row.linkUrl,
-    read: row.readAt !== null,
-    readAt: row.readAt ? row.readAt.toISOString() : null,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
 
 /** GET /api/notifications */
 export async function GET(request: NextRequest) {
@@ -113,7 +89,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     {
-      notifications: page.map(serialize),
+      notifications: page.map(serializeNotification),
       unreadCount,
       nextCursor: hasMore && last ? `${last.createdAt.toISOString()}_${last.id}` : null,
     },

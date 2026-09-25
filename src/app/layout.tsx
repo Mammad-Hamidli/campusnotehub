@@ -8,6 +8,7 @@ import { SessionKeeper } from '@/components/auth/SessionKeeper';
 import { IdentityPromptSlot } from '@/components/account/IdentityPromptSlot';
 import { FeedbackProvider } from '@/components/ui/Feedback';
 import { FollowingProvider } from '@/components/social/Following';
+import { LiveNotificationsProvider } from '@/components/notifications/LiveNotifications';
 import { getViewer } from '@/lib/auth/session';
 import { WarmBackdrop } from '@/components/ui/WarmBackdrop';
 // Imported from constants.ts, NOT from the 'use client' provider: a plain
@@ -152,14 +153,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
                 It lives here because the state it reports follows the account,
                 not the route: an unverified user is unverified on the feed, in
-                the notes listing, in their wallet and on their profile, and a
+                the notes listing and on their profile, and a
                 banner that only appears on /dashboard is one a person can spend
                 a week never seeing. The slot decides whether anything renders
                 at all; see IdentityPromptSlot for why the session read is free.
               */}
               <IdentityPromptSlot />
-              {/* "Following" badges next to names, on every route. */}
-              <FollowingProvider viewerId={viewer?.id ?? null}>{children}</FollowingProvider>
+              {/* "Following" badges next to names, and the live notification
+                  bell (likes, comments, follow requests), on every route. */}
+              <FollowingProvider viewerId={viewer?.id ?? null}>
+                <LiveNotificationsProvider enabled={Boolean(viewer)}>{children}</LiveNotificationsProvider>
+              </FollowingProvider>
             </FeedbackProvider>
           </LocaleProvider>
         </ThemeProvider>

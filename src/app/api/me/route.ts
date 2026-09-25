@@ -98,6 +98,8 @@ function selfProjection(user: UserRecord) {
     showUniversity: user.showUniversity,
     showFaculty: user.showFaculty,
     showGraduationYear: user.showGraduationYear,
+    showAvatar: user.showAvatar ?? 'PUBLIC',
+    hashtagTemplates: user.hashtagTemplates ?? [],
   };
 }
 
@@ -208,7 +210,9 @@ export async function GET(request: NextRequest) {
  *
  * `universityId` (a CODE, like registration) is editable until the account is
  * VERIFIED: verification was done against that university's student card, so
- * a verified account moving elsewhere would keep a badge it never earned.
+ * a verified account moving elsewhere would keep a badge it never earned. An
+ * account with NO university yet may always add one - there is nothing to
+ * move away from.
  *
  * `email` and `phone` are excluded for a different reason: both have HMAC
  * companion columns (emailHash, phoneHash) that are unique and are documented
@@ -252,6 +256,7 @@ const patchSchema = z
     showUniversity: z.nativeEnum(FieldVisibility).optional(),
     showFaculty: z.nativeEnum(FieldVisibility).optional(),
     showGraduationYear: z.nativeEnum(FieldVisibility).optional(),
+    showAvatar: z.nativeEnum(FieldVisibility).optional(),
   })
   .refine(
     (d) => d.facultySlug !== FACULTY_OTHER || Boolean(d.facultyOther?.trim()),
@@ -307,6 +312,7 @@ export async function PATCH(request: NextRequest) {
     'showUniversity',
     'showFaculty',
     'showGraduationYear',
+    'showAvatar',
   ] as const) {
     if (input[key] !== undefined) data[key] = input[key];
   }
@@ -324,7 +330,7 @@ export async function PATCH(request: NextRequest) {
     }
     const current = await findUserById(userId);
     if (current?.universityId !== university.id) {
-      if (isVerified) {
+      if (isVerified && current?.universityId) {
         return NextResponse.json(
           { error: 'settings.academic.universityLocked', fields: { universityId: ['settings.academic.universityLocked'] } },
           { status: 409 },
@@ -408,6 +414,7 @@ export async function PATCH(request: NextRequest) {
         showUniversity: user.showUniversity,
         showFaculty: user.showFaculty,
         showGraduationYear: user.showGraduationYear,
+        showAvatar: user.showAvatar ?? 'PUBLIC',
         facultyLabel: facultyLabel(user.facultySlug, user.facultyOther),
       },
     },

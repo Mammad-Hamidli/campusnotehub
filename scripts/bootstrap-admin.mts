@@ -243,18 +243,6 @@ batch.set(
 // create(): the commit fails as a whole if the claim appeared since the check.
 batch.create(usernameClaim, forFirestore({ userId: ref.id, createdAt: now }));
 batch.set(
-  db.collection(COLLECTIONS.wallets).doc(ref.id),
-  forFirestore({
-    userId: ref.id,
-    currency: 'AZN',
-    availableMinor: 0,
-    pendingMinor: 0,
-    version: 0,
-    isFrozen: false,
-    createdAt: now,
-  }),
-);
-batch.set(
   db.collection(COLLECTIONS.auditLogs).doc(),
   forFirestore({
     actorId: ref.id,

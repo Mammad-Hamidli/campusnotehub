@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 // Local on purpose: a value imported from a 'use client' module is a client
 // reference in a Server Component, not the array.
-const TABS: DashboardTab[] = ['feed', 'notes', 'saved', 'mentors', 'wallet'];
+const TABS: DashboardTab[] = ['feed', 'notes', 'saved', 'mentors'];
 
 /** Session state is per-request; this page must never be prerendered or cached. */
 export const dynamic = 'force-dynamic';

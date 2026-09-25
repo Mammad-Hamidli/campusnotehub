@@ -14,6 +14,7 @@ import {
 } from '@/lib/firebase/repositories/posts';
 import { findUserById, findUsersByIds } from '@/lib/firebase/repositories/users';
 import { createNotification } from '@/lib/firebase/repositories/notifications';
+import { visibleAvatar } from '@/lib/profile/visibility';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -164,7 +165,7 @@ export async function GET(
             ? {
                 id: author.id,
                 nickname: author.nickname,
-                avatarUrl: author.avatarUrl,
+                avatarUrl: visibleAvatar(author, viewer),
                 isVerified: author.isVerified,
                 headline: author.headline,
               }
@@ -289,7 +290,7 @@ export async function POST(
           ? {
               id: author.id,
               nickname: author.nickname,
-              avatarUrl: author.avatarUrl,
+              avatarUrl: visibleAvatar(author, viewer),
               isVerified: author.isVerified,
               headline: author.headline,
             }

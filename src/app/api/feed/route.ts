@@ -13,6 +13,7 @@ import { findUniversitiesByIds } from '@/lib/firebase/repositories/reference';
 import { followingIds } from '@/lib/firebase/repositories/follows';
 import { claimMediaAssets } from '@/lib/firebase/repositories/media';
 import { upsertTags } from '@/lib/firebase/repositories/tags';
+import { MAX_POST_TAGS, TAG_PATTERN } from '@/lib/feed/hashtags';
 import { mediaIdFromKey } from '@/lib/media/images';
 
 export const runtime = 'nodejs';
@@ -140,6 +141,7 @@ export async function GET(request: NextRequest) {
             ? universities.get(author.universityId) ?? null
             : null,
           viewerId: viewer?.id,
+          viewer,
           likedByViewer: liked.has(post.id),
         });
       }),
@@ -158,7 +160,7 @@ const createSchema = z.object({
   body: z.string().max(4000).transform(toPlainText).pipe(z.string().min(1).max(2000)),
   visibility: z.nativeEnum(PostVisibility).default(PostVisibility.PUBLIC),
   universityId: z.string().min(1).max(64).optional(),
-  tags: z.array(z.string().regex(/^[\p{L}\p{N}_]{2,40}$/u)).max(5).default([]),
+  tags: z.array(z.string().regex(TAG_PATTERN)).max(MAX_POST_TAGS).default([]),
   /**
    * Images, as keys returned by POST /api/media.
    *
@@ -336,6 +338,7 @@ export async function POST(request: NextRequest) {
         author,
         university,
         viewerId: userId,
+        viewer,
         // A brand-new post has no reposts and cannot already be liked.
         shareCount: 0,
         likedByViewer: false,

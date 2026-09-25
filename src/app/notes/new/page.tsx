@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { listUniversities } from '@/lib/firebase/repositories/reference';
 import { requirePageSession } from '@/lib/auth/page-guard';
-import { can } from '@/lib/permissions';
+import { can, denialKey } from '@/lib/permissions';
 import { NoteUploadForm } from '@/components/notes/NoteUploadForm';
 import {
   DEFAULT_LOCALE,
@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic';
  *
  * The university list is loaded server-side because it is reference data every
  * visitor may see. The upload itself is authorized in POST /api/notes, which
- * re-checks the session and the `notes:sell` capability - this page's redirect
+ * re-checks the session and the `notes:share` capability - this page's redirect
  * is convenience, not the control.
  */
 export default async function NewNotePage() {
@@ -35,24 +35,15 @@ export default async function NewNotePage() {
   const viewer = await requirePageSession('/notes/new');
 
   /**
-   * The verification gate, stated BEFORE the form rather than after the upload.
+   * The capability gate, stated BEFORE the form rather than after the upload.
    *
-   * POST /api/notes requires the `notes:sell` capability, which requires a
-   * VERIFIED identity (see REQUIRES_VERIFICATION in src/lib/permissions.ts -
-   * earning money is gated where spending it is not). That check is the
-   * control and it stays exactly where it is.
-   *
-   * What was wrong was the ORDER the user met it in: this page rendered the
-   * full upload form to anyone signed in, so an unverified student chose a
-   * file, typed a title, a description and a subject, waited out the upload,
-   * and only then received a 403 rendered as a one-line message. The work was
-   * lost and nothing said what to do about it - which is why "adding a note
-   * does not work" was the reported symptom rather than "I need to verify".
-   *
-   * Showing the requirement up front costs one capability check and turns a
-   * dead end into a link to /verify.
+   * POST /api/notes requires `notes:share`, which every active, finished
+   * account holds - notes are free and sharing one needs no verification. What
+   * still refuses it is an unfinished quick-login profile or a suspended
+   * account, and the reason (denialKey) is shown up front so nobody fills in
+   * the form and uploads a file only to meet a 403.
    */
-  if (!can(viewer, 'notes:sell')) {
+  if (!can(viewer, 'notes:share')) {
     const raw = (await cookies()).get(LOCALE_COOKIE)?.value;
     const dict = DICTIONARIES[isLocale(raw) ? raw : DEFAULT_LOCALE];
     const t = (key: string) => translate(dict, key);
@@ -64,15 +55,13 @@ export default async function NewNotePage() {
           <p className="mt-1 text-sm text-fg-muted">{t('notes.upload.subtitle')}</p>
 
           <div className="card mt-5 border-warn/30 bg-warn-soft p-6">
-            <h2 className="text-sm font-semibold text-warn-fg">
-              {t('notes.upload.verifyFirstTitle')}
-            </h2>
-            <p className="mt-1.5 text-sm leading-relaxed text-warn-fg">
-              {t('notes.upload.verifyFirstBody')}
-            </p>
-            <Link href="/verify" className="btn-primary mt-4 px-4 py-2 text-sm">
-              {t('verification.banner.unverifiedCta')}
-            </Link>
+            <h2 className="text-sm font-semibold text-warn-fg">{t('notes.upload.blockedTitle')}</h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-warn-fg">{t(denialKey(viewer, 'notes:share'))}</p>
+            {viewer?.profileIncomplete && (
+              <Link href="/onboarding" className="btn-primary mt-4 px-4 py-2 text-sm">
+                {t('onboarding.banner.cta')}
+              </Link>
+            )}
           </div>
         </div>
       </main>

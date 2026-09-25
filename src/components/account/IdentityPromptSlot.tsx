@@ -1,11 +1,13 @@
+import { cookies } from 'next/headers';
 import { VerificationStatus } from '@/lib/enums';
 import { getViewer } from '@/lib/auth/session';
 import { IdentityPrompt, type PromptState } from './IdentityPrompt';
+import { REVIEW_DISMISS_COOKIE } from './reviewNotice';
 
 /**
- * Account verification status -> banner state. VERIFIED maps to nothing,
- * which is the ONLY way the banner goes away. BANNED renders nothing either:
- * that is not a conversation a banner should be having.
+ * Account verification status -> banner state. VERIFIED maps to nothing, and
+ * BANNED renders nothing either: that is not a conversation a banner should be
+ * having. The IN_REVIEW notice can also be closed by its owner.
  */
 const PROMPT_STATE: Partial<Record<VerificationStatus, PromptState>> = {
   [VerificationStatus.UNVERIFIED]: 'UNVERIFIED',
@@ -36,5 +38,7 @@ export async function IdentityPromptSlot() {
   if (!viewer) return null;
 
   const state = PROMPT_STATE[viewer.verificationStatus];
-  return state ? <IdentityPrompt state={state} /> : null;
+  if (!state) return null;
+  if (state === 'IN_REVIEW' && (await cookies()).get(REVIEW_DISMISS_COOKIE)?.value === viewer.id) return null;
+  return <IdentityPrompt state={state} accountId={viewer.id} />;
 }

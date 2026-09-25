@@ -114,7 +114,7 @@ export function enqueueNotificationTx(
  *
  *   - security notices (verification outcome, new device login) always send
  *   - a session reminder inside the last hour always sends, because a missed
- *     paid session is a refund and a support ticket
+ *     session is a no-show and a support ticket
  */
 export function channelsFor(
   type: NotificationType,
@@ -133,7 +133,7 @@ export function channelsFor(
   const out: ('WEB_PUSH' | 'EMAIL')[] = [];
   if (enabled('WEB_PUSH')) out.push('WEB_PUSH');
   // Email is opt-in for social noise; nobody wants mail for every like.
-  const SOCIAL: NotificationType[] = ['POST_LIKE', 'POST_REPLY', 'NEW_FOLLOWER'];
+  const SOCIAL: NotificationType[] = ['POST_LIKE', 'POST_REPLY', 'NEW_FOLLOWER', 'FOLLOW_ACCEPTED'];
   if (enabled('EMAIL') && !SOCIAL.includes(type)) out.push('EMAIL');
   return out;
 }
@@ -147,11 +147,10 @@ const DEDICATED_EMAIL: ReadonlySet<string> = new Set([
   'VERIFICATION_APPROVED',
   'VERIFICATION_REJECTED',
   'VERIFICATION_NEEDS_REVIEW',
-  'NOTE_SOLD',
   'NOTE_MODERATION',
-  'WALLET_CREDIT',
+  'FOLLOW_REQUEST',
 ]);
-const SOCIAL: ReadonlySet<string> = new Set(['POST_LIKE', 'POST_REPLY', 'NEW_FOLLOWER']);
+const SOCIAL: ReadonlySet<string> = new Set(['POST_LIKE', 'POST_REPLY', 'NEW_FOLLOWER', 'FOLLOW_ACCEPTED']);
 
 /** Fire-and-forget: a mail problem never fails the notification. */
 function emailNotification(input: NotificationInput): void {

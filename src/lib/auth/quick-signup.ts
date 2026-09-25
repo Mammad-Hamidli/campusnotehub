@@ -8,7 +8,6 @@ import {
   DuplicateUserError,
   type UserRecord,
 } from '@/lib/firebase/repositories/users';
-import { ensureWallet } from '@/lib/firebase/repositories/wallets';
 import { identityData, identityKey, identityRef } from '@/lib/firebase/repositories/identities';
 import { checkSignupBlocked } from '@/lib/security/blocklist';
 import { PLACEHOLDER_EMAIL_DOMAIN, temporaryHandle } from './username';
@@ -75,8 +74,6 @@ export async function createQuickAccount(
           data: identityData(profile),
         },
       });
-      // Idempotent and recoverable - see the note in the register route.
-      await ensureWallet(user.id);
       return { ok: true, user };
     } catch (error) {
       if (!(error instanceof DuplicateUserError)) throw error;

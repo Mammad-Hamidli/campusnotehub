@@ -8,7 +8,6 @@ import {
   type ConflictField,
 } from '@/lib/firebase/repositories/users';
 import { findUniversityByCode } from '@/lib/firebase/repositories/reference';
-import { ensureWallet } from '@/lib/firebase/repositories/wallets';
 import { writeAuditLog } from '@/lib/firebase/repositories/audit';
 import { registerSchema, splitFullName } from '@/server/validators/auth';
 import { hashPassword, hashEmail, hashPhone } from '@/lib/crypto/hash';
@@ -217,8 +216,8 @@ export async function POST(request: NextRequest) {
 
   try {
     /**
-     * The id is reserved BEFORE the write, so the wallet and the audit entry
-     * below can reference it without a second round trip.
+     * The id is reserved BEFORE the write, so the audit entry below can
+     * reference it without a second round trip.
      */
     const userId = newUserId();
 
@@ -271,27 +270,12 @@ export async function POST(request: NextRequest) {
     });
 
     /**
-     * The wallet and the audit entry are written AFTER the transaction, not
-     * inside it, and that is a deliberate change from the SQL version.
-     *
-     * A Firestore transaction must do all its reads before any write, and
-     * createUser's uniqueness checks are reads. Folding two more writes in
-     * would mean either passing the transaction handle across three module
-     * boundaries - so those repositories could no longer be called normally -
-     * or re-implementing them inline.
-     *
-     * The trade is acceptable because BOTH are recoverable and neither is a
-     * credential:
-     *   - ensureWallet() is idempotent and creates a zero-balance wallet, so a
-     *     crash between the two leaves an account whose next wallet read can
-     *     safely create it. No money can be lost, because there is none yet.
-     *   - a missing audit row for a registration is visible in the record the
-     *     registration itself creates.
-     * What must NOT be split is profile-and-credentials, and that is exactly
-     * what stayed inside the transaction.
+     * The audit entry is written AFTER the transaction, not inside it: a
+     * Firestore transaction must do all its reads before any write, and
+     * createUser's uniqueness checks are reads. A missing audit row for a
+     * registration is visible in the record the registration itself creates;
+     * profile-and-credentials, which must not be split, stayed inside.
      */
-    await ensureWallet(user.id);
-
     await writeAuditLog({
       actorId: user.id,
       action: 'USER_REGISTERED',

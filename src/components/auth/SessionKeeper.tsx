@@ -18,6 +18,9 @@ import { useEffect } from 'react';
  */
 type MarkedFetch = typeof fetch & { __sessionKeeper?: true };
 
+/** Marks a background request that must not renew the session. */
+export const PASSIVE_HEADER = 'x-session-passive';
+
 let refreshing: Promise<boolean> | null = null;
 
 function refreshOnce(originalFetch: typeof fetch): Promise<boolean> {
@@ -52,6 +55,9 @@ export function SessionKeeper() {
       ) {
         return response;
       }
+      // Background requests never refresh: a poll that renewed tokens would
+      // keep an unattended tab signed in forever (see requireSession passive).
+      if (new Headers(init?.headers).has(PASSIVE_HEADER)) return response;
       // Only replay requests whose body can be sent twice.
       if (init?.body instanceof ReadableStream || (input instanceof Request && input.body)) {
         return response;

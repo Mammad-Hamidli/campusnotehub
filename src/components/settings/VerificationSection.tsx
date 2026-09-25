@@ -33,7 +33,7 @@ const CAN_SUBMIT = new Set(['UNVERIFIED', 'REJECTED']);
 const IN_REVIEW = new Set(['PROCESSING', 'NEEDS_REVIEW']);
 
 /** What verification unlocks - the REQUIRES_VERIFICATION set in src/lib/permissions.ts, in words. */
-const UNLOCKS = ['buy', 'topup', 'sell', 'book', 'withdraw'] as const;
+const UNLOCKS = ['book', 'offer', 'badge'] as const;
 
 /**
  * Settings -> Verification. THE place identity documents are submitted.

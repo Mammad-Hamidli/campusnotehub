@@ -8,13 +8,11 @@ export type Capability =
   | 'feed:react'
   | 'users:follow'
   | 'notes:browse'
-  | 'notes:buy'
-  | 'notes:sell'
+  | 'notes:review'
+  | 'notes:share'
   | 'mentors:browse'
   | 'mentors:book'
   | 'mentors:offer'
-  | 'wallet:topup'
-  | 'wallet:withdraw'
   | 'moderation:review';
 
 export type Viewer = {
@@ -55,23 +53,12 @@ export type Viewer = {
  * The gate behind the "Verify your identity" banner, in one table.
  *
  * The product decision: an unverified account gets the full SOCIAL product
- * (read, post, comment, browse notes and mentors), and verification unlocks
- * everything that moves money or puts two strangers in a room - buying and
- * selling notes, topping up and withdrawing, booking or offering mentorship.
- *
- * Spending used to be open on day one. It moved behind verification so that
- * every transaction on the platform has a verified person on both sides.
- * `wallet:topup` moved with `notes:buy`: an account that can load money but
- * cannot spend or withdraw it would just have money stuck in the wallet.
+ * (read, post, comment, follow, share and rate notes), and verification
+ * unlocks only what puts two strangers in a room - booking or offering
+ * mentorship. Notes are free, so sharing one is a social act like posting;
+ * uploads are still moderated before they are listed.
  */
-const REQUIRES_VERIFICATION: ReadonlySet<Capability> = new Set([
-  'notes:buy',
-  'notes:sell',
-  'mentors:book',
-  'mentors:offer',
-  'wallet:topup',
-  'wallet:withdraw',
-]);
+const REQUIRES_VERIFICATION: ReadonlySet<Capability> = new Set(['mentors:book', 'mentors:offer']);
 
 /**
  * Capabilities that survive even a suspended (frozen) account.
@@ -112,10 +99,6 @@ export function can(viewer: Viewer | null, capability: Capability): boolean {
       (viewer.role === UserRole.MENTOR || viewer.role === UserRole.ALUMNI || viewer.role === UserRole.TEACHER)
     );
   }
-  if (capability === 'wallet:withdraw' && viewer.accountStatus === AccountStatus.RESTRICTED) {
-    return false;
-  }
-
   if (REQUIRES_VERIFICATION.has(capability)) {
     return viewer.verificationStatus === VerificationStatus.VERIFIED;
   }

@@ -210,7 +210,8 @@ const UNAMBIGUOUS_USER_FIELDS = [
  */
 const USER_KEYED = [
   'credentials',
-  COLLECTIONS.wallets,
+  // Retired with the marketplace; kept so a purge still clears legacy rows.
+  'wallets',
   COLLECTIONS.mfa,
   COLLECTIONS.mentorApplications,
   COLLECTIONS.accountDeletionRequests,

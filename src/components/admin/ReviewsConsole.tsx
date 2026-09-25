@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, Check, Download, Loader2, Trash2, X } from 'lucide-react';
+import { Check, Download, Loader2, Trash2, X } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { PageHeader } from './AdminShell';
 import {
@@ -49,7 +49,6 @@ type PendingNote = {
   title: string;
   description: string;
   subject: string;
-  priceMinor: number;
   createdAt: string;
   university: string | null;
   seller: { nickname: string; email: string } | null;
@@ -61,7 +60,6 @@ type DeletionRequest = {
   reason: string | null;
   requestedAt: string;
   /** Available + escrowed, minor units. Deleting strands whatever is here. */
-  balanceMinor: number | null;
   user: {
     nickname: string;
     fullName: string;
@@ -302,7 +300,7 @@ function PendingNotes() {
           <p className="mt-1 whitespace-pre-wrap text-sm text-fg-muted">{n.description}</p>
           <p className="mt-2 text-2xs text-fg-muted">
             @{n.seller?.nickname ?? '—'}
-            {n.seller?.email && ` · ${n.seller.email}`} · {t('admin.reviews.rate')}: {azn(n.priceMinor)}
+            {n.seller?.email && ` · ${n.seller.email}`}
             {n.attachment && ` · ${n.attachment.fileName} (${(n.attachment.sizeBytes / 1024 / 1024).toFixed(1)} MB)`}
           </p>
           {n.attachment && (
@@ -358,7 +356,6 @@ function DeletionRequests() {
       <ul className="space-y-3">
         {data.requests.map((r) => {
           const reason = rejectReasons[r.userId] ?? '';
-          const holdsMoney = (r.balanceMinor ?? 0) > 0;
           return (
             <li key={r.userId} className="card p-4">
               <div className="flex flex-wrap items-center gap-2">
@@ -374,21 +371,11 @@ function DeletionRequests() {
               <p className="mt-2 text-2xs text-fg-muted">
                 {r.user?.email}
                 {r.user && ` · ${t('admin.deletions.memberSince')}: ${formatDateTime(r.user.createdAt)}`}
-                {` · ${t('admin.deletions.balance')}: ${azn(r.balanceMinor ?? 0)}`}
               </p>
 
               <blockquote className="mt-2 border-l-2 border-edge pl-3 text-sm text-fg-muted">
                 {r.reason ? <span className="whitespace-pre-wrap">{r.reason}</span> : <em>{t('admin.deletions.noReason')}</em>}
               </blockquote>
-
-              {/* Deletion strands wallet funds. Stated, not blocked: the admin
-                  may have settled it out of band. */}
-              {holdsMoney && (
-                <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-warn-soft px-3 py-2 text-xs text-warn-fg">
-                  <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  {t('admin.deletions.balanceWarning', { amount: azn(r.balanceMinor ?? 0) })}
-                </p>
-              )}
 
               <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-edge pt-3">
                 <label className="flex w-full min-w-0 flex-1 basis-56 flex-col gap-1">
