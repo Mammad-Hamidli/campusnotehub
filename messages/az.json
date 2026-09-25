@@ -504,6 +504,10 @@
         "full": "Ən çox {max} şablon saxlaya bilərsiniz. Əvvəlcə birini silin.",
         "failed": "Şablon saxlanılmadı. Yenidən cəhd edin."
       }
+    },
+    "focus": {
+      "back": "Lentə qayıt",
+      "missing": "Bu paylaşım artıq mövcud deyil və ya ona baxmaq icazəniz yoxdur."
     }
   },
   "notes": {
@@ -1631,6 +1635,28 @@
         "expired": "Bu kodun müddəti bitib.",
         "again": "Yeni QR kod"
       }
+    },
+    "export": {
+      "back": "Parametrlər",
+      "title": "Məlumatlarınızı yükləyin",
+      "intro": "Hesabınız haqqında campusnotehub-da saxlanılan məlumatların surətini istənilən mətn redaktorunda aça biləcəyiniz tək JSON faylı şəklində əldə edin.",
+      "includedTitle": "Faylda nələr var",
+      "included": {
+        "account": "Hesab və profil məlumatlarınız, məxfilik tənzimləmələriniz",
+        "security": "Giriş üsulları, iki mərhələli doğrulamanın vəziyyəti, sessiyalar və tanınmış cihazlar",
+        "content": "Paylaşımlarınız və şərhləriniz",
+        "social": "İzlədikləriniz, izləyiciləriniz və izləmə sorğuları",
+        "notes": "Yüklədiyiniz, qiymətləndirdiyiniz və yadda saxladığınız konspektlər",
+        "mentoring": "Mentor profiliniz və ya müraciətiniz, sifarişlər və rəylər",
+        "notifications": "Bildirişləriniz və bildiriş tənzimləmələri",
+        "verification": "Hər şəxsiyyət doğrulamasının nəticəsi və hesabın silinməsi sorğusu (varsa)"
+      },
+      "excluded": "Daxil edilmir: şifrəniz və iki mərhələli doğrulama açarları (onları yalnız geri oxuna bilməyən formada saxlayırıq), şəxsiyyət sənədlərinin şəkilləri (yoxlamadan sonra silinir), verdiyiniz bəyənmələr və konspekt fayllarının özü — onları UniNotes-dan endirin.",
+      "confirmHint": "Məlumatlarınızı qorumaq üçün əvvəlcə bunun siz olduğunuzu təsdiqləyin.",
+      "submit": "Yüklə (.json)",
+      "preparing": "Fayl hazırlanır…",
+      "started": "Yükləmə başladı",
+      "done": "Hazırdır. Faylı etibarlı yerdə saxlayın — orada şəxsi məlumatlarınız var."
     }
   },
   "stub": {
@@ -1723,6 +1749,12 @@
       "accepted": "@{nickname} artıq sizi izləyir",
       "rejected": "@{nickname} sorğusu rədd edildi",
       "gone": "Bu sorğu artıq cavablandırılıb və ya geri götürülüb."
+    }
+  },
+  "site": {
+    "contactCta": {
+      "title": "Hələ də sualınız var?",
+      "body": "Bizə yazın — hər mesajı oxuyuruq."
     }
   }
 }

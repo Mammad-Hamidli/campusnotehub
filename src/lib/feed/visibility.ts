@@ -1,7 +1,7 @@
 import { VerificationStatus } from '@/lib/enums';
-import { findUserById } from '@/lib/firebase/repositories/users';
+import { findUserById, type UserRecord } from '@/lib/firebase/repositories/users';
 import { followingIds } from '@/lib/firebase/repositories/follows';
-import { findPostById } from '@/lib/firebase/repositories/posts';
+import { findPostById, type PostRecord } from '@/lib/firebase/repositories/posts';
 import { viewerTokens } from '@/lib/feed/audience';
 import type { Viewer } from '@/lib/permissions';
 
@@ -100,6 +100,21 @@ export async function findVisiblePost(
   postId: string,
   viewer: Viewer | null,
 ): Promise<{ id: string; authorId: string; commentCount: number } | null> {
+  const found = await loadVisiblePost(postId, viewer);
+  if (!found) return null;
+  const { post } = found;
+  return { id: post.id, authorId: post.authorId, commentCount: post.commentCount ?? 0 };
+}
+
+/**
+ * The same check as findVisiblePost(), returning the full post and its author
+ * for a caller that renders the post (GET /api/feed/:postId) rather than
+ * acting on it. One rule, two shapes - never a second copy of the rule.
+ */
+export async function loadVisiblePost(
+  postId: string,
+  viewer: Viewer | null,
+): Promise<{ post: PostRecord; author: UserRecord } | null> {
   const post = await findPostById(postId);
   if (!post || post.isDeleted) return null;
 
@@ -116,5 +131,5 @@ export async function findVisiblePost(
   const granted = new Set(post.audience ?? []);
   if (!tokens.some((token) => granted.has(token))) return null;
 
-  return { id: post.id, authorId: post.authorId, commentCount: post.commentCount ?? 0 };
+  return { post, author };
 }

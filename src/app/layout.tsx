@@ -162,7 +162,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {/* "Following" badges next to names, and the live notification
                   bell (likes, comments, follow requests), on every route. */}
               <FollowingProvider viewerId={viewer?.id ?? null}>
-                <LiveNotificationsProvider enabled={Boolean(viewer)}>{children}</LiveNotificationsProvider>
+                <LiveNotificationsProvider viewerId={viewer?.id ?? null}>{children}</LiveNotificationsProvider>
               </FollowingProvider>
             </FeedbackProvider>
           </LocaleProvider>

@@ -1,15 +1,29 @@
 import type { Metadata } from 'next';
-import { StubPage } from '@/components/ui/UnderConstruction';
+import { SiteHeader } from '@/components/marketing/SiteHeader';
+import { SiteFooter } from '@/components/marketing/SiteFooter';
+import { SitePageView } from '@/components/marketing/SitePageView';
+import { SAFETY } from '@/content/site/safety';
 
-export const metadata: Metadata = { title: 'Security' };
+export const metadata: Metadata = {
+  title: 'Safety and security',
+  description:
+    'How campusnotehub protects accounts and personal data, and how to stay safe and report a problem.',
+  alternates: { canonical: '/legal/security' },
+};
 
 /**
- * Stub route. Returns 200 with an honest "not built yet" state.
- *
- * Every link in the navigation resolves to a real page, so a 404 in the logs
- * is always a genuine bug rather than a known gap. See
- * src/components/ui/UnderConstruction.tsx for the reasoning.
+ * /legal/security - "Security" in the footer's legal column. Not a legal
+ * document, so it uses the plain page view rather than LegalDocumentView.
+ * Copy: src/content/site/safety.ts.
  */
 export default function Page() {
-  return <StubPage titleKey="landing.footer.security" />;
+  return (
+    <>
+      <SiteHeader />
+      <main id="main">
+        <SitePageView page={SAFETY} />
+      </main>
+      <SiteFooter />
+    </>
+  );
 }

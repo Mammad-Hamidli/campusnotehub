@@ -202,6 +202,7 @@ export function AdminShell({
                     </MenuItem>
                     <MenuItem
                       href="/logout"
+                      reloadDocument
                       icon={<LogOut className="h-4 w-4" />}
                       onSelect={close}
                       tone="danger"

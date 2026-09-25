@@ -771,7 +771,7 @@ function AccountSection() {
   const actions = [
     { icon: ShieldCheck, labelKey: 'settings.account.security', hintKey: 'settings.account.securityHint', href: '/settings/security' },
     { icon: KeyRound, labelKey: 'settings.account.changePassword', href: '/settings/security#password' },
-    { icon: Download, labelKey: 'settings.account.exportData', hintKey: 'settings.account.exportHint', href: '/help' },
+    { icon: Download, labelKey: 'settings.account.exportData', hintKey: 'settings.account.exportHint', href: '/settings/data' },
   ] as const;
 
   return (

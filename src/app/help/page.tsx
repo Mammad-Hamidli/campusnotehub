@@ -1,15 +1,25 @@
 import type { Metadata } from 'next';
-import { StubPage } from '@/components/ui/UnderConstruction';
+import { SiteHeader } from '@/components/marketing/SiteHeader';
+import { SiteFooter } from '@/components/marketing/SiteFooter';
+import { SitePageView } from '@/components/marketing/SitePageView';
+import { HELP } from '@/content/site/help';
 
-export const metadata: Metadata = { title: 'Help' };
+export const metadata: Metadata = {
+  title: 'Help',
+  description:
+    'Answers about accounts, verification, the feed, UniNotes, PocketMentor and privacy on campusnotehub.',
+  alternates: { canonical: '/help' },
+};
 
-/**
- * Stub route. Returns 200 with an honest "not built yet" state.
- *
- * Every link in the navigation resolves to a real page, so a 404 in the logs
- * is always a genuine bug rather than a known gap. See
- * src/components/ui/UnderConstruction.tsx for the reasoning.
- */
+/** /help - linked from the landing footer. Copy: src/content/site/help.ts. */
 export default function Page() {
-  return <StubPage titleKey="nav.help" />;
+  return (
+    <>
+      <SiteHeader />
+      <main id="main">
+        <SitePageView page={HELP} />
+      </main>
+      <SiteFooter />
+    </>
+  );
 }

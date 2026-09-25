@@ -504,6 +504,10 @@
         "full": "You can keep up to {max} templates. Remove one first.",
         "failed": "The template could not be saved. Try again."
       }
+    },
+    "focus": {
+      "back": "Back to feed",
+      "missing": "This post is no longer available, or you don't have access to it."
     }
   },
   "notes": {
@@ -1631,6 +1635,28 @@
         "expired": "This code has expired.",
         "again": "New QR code"
       }
+    },
+    "export": {
+      "back": "Settings",
+      "title": "Download your data",
+      "intro": "Get a copy of the information campusnotehub holds about your account, as one JSON file you can open in any text editor.",
+      "includedTitle": "What the file contains",
+      "included": {
+        "account": "Your account and profile details, and your privacy settings",
+        "security": "Sign-in methods, two-factor status, sessions and recognised devices",
+        "content": "Your posts and comments",
+        "social": "Who you follow, your followers and follow requests",
+        "notes": "Notes you uploaded, rated or saved",
+        "mentoring": "Your mentor profile or application, bookings and reviews",
+        "notifications": "Your notifications and notification settings",
+        "verification": "The outcome of each identity verification, and any account deletion request"
+      },
+      "excluded": "Not included: your password and two-factor secrets (we store them only in a form that cannot be read back), identity document images (deleted after review), the likes you have given, and the note files themselves — download those from UniNotes.",
+      "confirmHint": "To protect your data, confirm it's you first.",
+      "submit": "Download (.json)",
+      "preparing": "Preparing your file…",
+      "started": "Your download has started",
+      "done": "Done. Keep the file somewhere safe — it contains your personal details."
     }
   },
   "stub": {
@@ -1723,6 +1749,12 @@
       "accepted": "@{nickname} now follows you",
       "rejected": "Request from @{nickname} declined",
       "gone": "That request was already answered or withdrawn."
+    }
+  },
+  "site": {
+    "contactCta": {
+      "title": "Still have a question?",
+      "body": "Write to us — we read every message."
     }
   }
 }

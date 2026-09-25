@@ -51,6 +51,7 @@ export function PostCard({
   index = 0,
   viewerId = null,
   readOnly = false,
+  defaultShowComments = false,
   onDeleted,
 }: {
   post: Post;
@@ -58,6 +59,8 @@ export function PostCard({
   viewerId?: string | null;
   /** View-only viewer (unfinished quick-login profile): no like, no comment box. */
   readOnly?: boolean;
+  /** Opens with the thread expanded - the single-post view a notification links to. */
+  defaultShowComments?: boolean;
   onDeleted?: (postId: string) => void;
 }) {
   const t = useT();
@@ -66,7 +69,7 @@ export function PostCard({
   const [liked, setLiked] = useState(post.likedByViewer);
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [commentCount, setCommentCount] = useState(post.commentCount);
-  const [showComments, setShowComments] = useState(false);
+  const [showComments, setShowComments] = useState(defaultShowComments);
   /** Set only when the clipboard refused the link, so it can be copied by hand. */
   const [manualLink, setManualLink] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -158,7 +161,9 @@ export function PostCard({
   }
 
   async function copyLink() {
-    const url = `${window.location.origin}/dashboard#post-${post.id}`;
+    // The single-post view, not a `#post-<id>` anchor: an anchor only lands
+    // if the post happens to be on the reader's first feed page.
+    const url = `${window.location.origin}/dashboard?post=${encodeURIComponent(post.id)}`;
     try {
       await navigator.clipboard.writeText(url);
       setManualLink(null);

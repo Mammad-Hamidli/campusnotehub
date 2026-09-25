@@ -256,6 +256,7 @@ export function Menu({
 export function MenuItem({
   onSelect,
   href,
+  reloadDocument = false,
   selected = false,
   icon,
   children,
@@ -265,6 +266,11 @@ export function MenuItem({
   onSelect?: () => void;
   /** Renders the row as a link. Mutually exclusive with a bare onSelect. */
   href?: string;
+  /**
+   * With `href`: a full page load instead of a client-side transition. Sign
+   * out needs it - see the comment where it is rendered.
+   */
+  reloadDocument?: boolean;
   selected?: boolean;
   icon?: ReactNode;
   children: ReactNode;
@@ -294,6 +300,25 @@ export function MenuItem({
       {trailing}
     </>
   );
+
+  if (href && reloadDocument) {
+    /**
+     * A plain <a>, so the browser loads a new document.
+     *
+     * Through <Link>, /logout ran as a client-side transition: the router
+     * fetched it, followed its redirect to "/" and swapped the page in place.
+     * The root layout is shared by every route, so it was never re-rendered -
+     * and everything it mounts from the signed-in session (the live
+     * notification poll and its bell badge, the "following" list) carried on
+     * as if nobody had signed out. A document load tears all of that down, and
+     * a plain <a> is never prefetched either.
+     */
+    return (
+      <a href={href} role="menuitem" data-menu-item onClick={onSelect} className={className}>
+        {inner}
+      </a>
+    );
+  }
 
   if (href) {
     return (

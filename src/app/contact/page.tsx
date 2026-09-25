@@ -1,15 +1,24 @@
 import type { Metadata } from 'next';
-import { StubPage } from '@/components/ui/UnderConstruction';
+import { SiteHeader } from '@/components/marketing/SiteHeader';
+import { SiteFooter } from '@/components/marketing/SiteFooter';
+import { SitePageView } from '@/components/marketing/SitePageView';
+import { CONTACT } from '@/content/site/contact';
 
-export const metadata: Metadata = { title: 'Contact' };
+export const metadata: Metadata = {
+  title: 'Contact',
+  description: 'How to reach the campusnotehub team for support, privacy, security and partnerships.',
+  alternates: { canonical: '/contact' },
+};
 
-/**
- * Stub route. Returns 200 with an honest "not built yet" state.
- *
- * Every link in the navigation resolves to a real page, so a 404 in the logs
- * is always a genuine bug rather than a known gap. See
- * src/components/ui/UnderConstruction.tsx for the reasoning.
- */
+/** /contact - linked from the landing footer. Copy: src/content/site/contact.ts. */
 export default function Page() {
-  return <StubPage titleKey="landing.footer.contact" />;
+  return (
+    <>
+      <SiteHeader />
+      <main id="main">
+        <SitePageView page={CONTACT} showContactCta={false} />
+      </main>
+      <SiteFooter />
+    </>
+  );
 }

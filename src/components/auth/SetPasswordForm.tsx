@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
@@ -122,16 +121,16 @@ export function SetPasswordForm() {
         </button>
       </form>
 
-      {/* prefetch={false}: /logout revokes the session, and this link is in the
-          viewport the moment the page paints - a prefetch signed the account
-          out before the form could be submitted (see Menu.tsx). */}
-      <Link
+      {/* A plain <a>, not <Link>. A <Link> here was prefetched the moment the
+          page painted and signed the account out before the form could be
+          submitted; a plain anchor is never prefetched, and the full page load
+          leaves no signed-in client state behind (see MenuItem in Menu.tsx). */}
+      <a
         href="/logout"
-        prefetch={false}
         className="mt-6 inline-block text-xs text-fg-muted underline-offset-2 hover:underline"
       >
         {t('auth.setPassword.signOut')}
-      </Link>
+      </a>
     </div>
   );
 }

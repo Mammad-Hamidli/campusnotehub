@@ -39,12 +39,22 @@ export const dynamic = 'force-dynamic';
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; post?: string }>;
 }) {
   await requirePageSession('/dashboard');
   const params = await searchParams;
 
   const tab = TABS.includes(params.tab as DashboardTab) ? (params.tab as DashboardTab) : 'feed';
 
-  return <DashboardShell initialTab={tab} />;
+  /**
+   * `?post=<id>` opens that one post instead of the feed. It is what every
+   * like and comment notification links to (/api/feed/[postId]/like and
+   * .../comments), and it used to be ignored here - the notification changed
+   * the URL and the page rendered the general feed. Validated as an id shape
+   * only; whether the viewer may SEE the post is GET /api/feed/:postId's call.
+   */
+  const focusPostId =
+    typeof params.post === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(params.post) ? params.post : null;
+
+  return <DashboardShell initialTab={tab} focusPostId={focusPostId} />;
 }

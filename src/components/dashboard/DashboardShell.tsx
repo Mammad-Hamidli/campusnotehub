@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 import { Sidebar, type DashboardTab } from './Sidebar';
 import { Composer } from './Composer';
 import { PostCard, type Post } from './PostCard';
+import { FocusedPost } from './FocusedPost';
 import { toPost, type ApiPost } from './postMapping';
 import { GraduationCountdown, TrendingNotes, type TrendingNote } from './RightPanel';
 import { NotesList } from '@/components/notes/NotesList';
@@ -62,9 +64,17 @@ type ApiNote = {
   university: { code: string } | null;
 };
 
-export function DashboardShell({ initialTab = 'feed' }: { initialTab?: DashboardTab }) {
+export function DashboardShell({
+  initialTab = 'feed',
+  focusPostId = null,
+}: {
+  initialTab?: DashboardTab;
+  /** From `?post=`: show this one post instead of the feed. See FocusedPost. */
+  focusPostId?: string | null;
+}) {
   const t = useT();
   const toast = useToast();
+  const router = useRouter();
   const [tab, setTab] = useState<DashboardTab>(initialTab);
   const [filter, setFilter] = useState<UniversityFilter>('all');
   const [posts, setPosts] = useState<Post[]>([]);
@@ -180,6 +190,34 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
     [posts, filter],
   );
 
+  /** Re-reads the first feed page; failures keep what is on screen. */
+  const refreshFeed = useCallback(async () => {
+    try {
+      const response = await fetch('/api/feed?limit=20');
+      if (!response.ok) return;
+      const { posts: rows } = await response.json();
+      setPosts((rows as ApiPost[]).map(toPost));
+    } catch {
+      // Offline: the feed already on screen is still a correct rendering.
+    }
+  }, []);
+
+  /**
+   * Leaving the single-post view - by its back button, the Feed tab, or the
+   * browser's Back - re-reads the feed. The feed's cards were rendered before
+   * the focused one was liked or commented on, and would otherwise show the
+   * old counts until a reload.
+   */
+  const previousFocus = useRef(focusPostId);
+  useEffect(() => {
+    if (previousFocus.current && !focusPostId) void refreshFeed();
+    previousFocus.current = focusPostId;
+  }, [focusPostId, refreshFeed]);
+
+  const closeFocus = useCallback(() => {
+    router.replace('/dashboard', { scroll: false });
+  }, [router]);
+
   /**
    * The remaining step for a freshly registered MENTOR.
    *
@@ -281,14 +319,10 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
 
       // Answered 2xx with a shape this client does not know. Re-reading the
       // feed is correct rather than inventing a card.
-      const refreshed = await fetch('/api/feed?limit=20');
-      if (refreshed.ok) {
-        const { posts: rows } = await refreshed.json();
-        setPosts((rows as ApiPost[]).map(toPost));
-      }
+      await refreshFeed();
       toast.success(t('feed.posted'));
     },
-    [t, toast],
+    [refreshFeed, t, toast],
   );
 
   /**
@@ -335,7 +369,15 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
       the sticky mobile bar and desktop rail.
     */
     <div className="flex min-h-dvh w-full max-w-full flex-col overflow-x-clip bg-surface-muted lg:flex-row">
-      <Sidebar active={tab} onSelect={setTab} user={viewer} />
+      <Sidebar
+        active={tab}
+        onSelect={(next) => {
+          setTab(next);
+          // Any tab choice, Feed included, means "not this one post any more".
+          if (focusPostId) closeFocus();
+        }}
+        user={viewer}
+      />
 
       <main id="main" className="w-full min-w-0 max-w-full flex-1">
         <div className="mx-auto flex w-full max-w-6xl gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
@@ -373,7 +415,19 @@ export function DashboardShell({ initialTab = 'feed' }: { initialTab?: Dashboard
               <p className="mt-0.5 text-sm text-fg-muted">{t('dashboard.subtitle')}</p>
             </header>
 
-            {tab === 'feed' ? (
+            {tab === 'feed' && focusPostId ? (
+              <FocusedPost
+                key={focusPostId}
+                postId={focusPostId}
+                viewerId={viewer.id}
+                readOnly={viewer.profileIncomplete}
+                onClose={closeFocus}
+                onDeleted={(id) => {
+                  setPosts((prev) => prev.filter((p) => p.id !== id));
+                  closeFocus();
+                }}
+              />
+            ) : tab === 'feed' ? (
               <div className="space-y-4">
                 {/* View-only until the profile is finished - the server refuses
                     the post anyway (permissions.can), so do not offer it. */}
