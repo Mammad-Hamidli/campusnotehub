@@ -13,7 +13,7 @@ import type { ProviderProfile } from './providers';
 
 process.env.GOOGLE_CLIENT_ID = 'g-id';
 process.env.GOOGLE_CLIENT_SECRET = 'g-secret';
-process.env.APP_URL = 'https://campushub.test';
+process.env.APP_URL = 'https://campusnotehub.test';
 
 type User = {
   id: string;
@@ -35,7 +35,7 @@ let profile: ProviderProfile;
 
 const updateUser = vi.fn(async (id: string, patch: Partial<User>) => void Object.assign(users.get(id)!, patch));
 const completeLogin = vi.fn(async (p: { user: User; redirectTo?: string; amr: string[] }) =>
-  NextResponse.redirect(`https://campushub.test/__session/${p.user.id}?amr=${p.amr.join(',')}`, 303),
+  NextResponse.redirect(`https://campusnotehub.test/__session/${p.user.id}?amr=${p.amr.join(',')}`, 303),
 );
 /**
  * Rule 3 creates the account on the spot. The fake mirrors createUser's
@@ -142,7 +142,7 @@ function loginState(returnTo = '') {
 }
 
 async function callback(provider = 'google') {
-  const request = new NextRequest(`https://campushub.test/api/auth/oauth/${provider}/callback?state=s&code=c`);
+  const request = new NextRequest(`https://campusnotehub.test/api/auth/oauth/${provider}/callback?state=s&code=c`);
   const response = await handleCallback(request, provider, request.nextUrl.searchParams);
   return { location: new URL(response.headers.get('location')!), response };
 }

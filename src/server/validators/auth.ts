@@ -18,7 +18,7 @@ const UNIVERSITY_CODES = new Set(UNIVERSITIES.map((uni) => uni.id));
 
 /** Handles that would let someone impersonate the platform or its staff. */
 const RESERVED_NICKNAMES = new Set([
-  'admin', 'administrator', 'moderator', 'mod', 'campushub', 'support', 'help',
+  'admin', 'administrator', 'moderator', 'mod', 'campusnotehub', 'support', 'help',
   'staff', 'official', 'system', 'root', 'security', 'team', 'api', 'null',
   'undefined', 'me', 'you', 'settings', 'login', 'register', 'dashboard',
   'onboarding', 'mentors', 'profile',

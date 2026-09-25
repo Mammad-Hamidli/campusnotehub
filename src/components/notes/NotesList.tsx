@@ -34,7 +34,7 @@ type Note = {
 };
 
 /** Cross-component bookmark sync (listing <-> Saved Items) within the tab. */
-export const SAVED_EVENT = 'campushub:note-saved';
+export const SAVED_EVENT = 'campusnotehub:note-saved';
 type SavedDetail = { noteId: string; saved: boolean };
 
 /**

@@ -53,8 +53,8 @@ import { expiredReviewCases, updateCase } from '@/lib/firebase/repositories/veri
 const MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 /** Every buffered asset's public ID starts with this, and nothing else's does. */
-const BUFFER_PREFIX = 'campushub/kyc-review';
-const BUFFER_TAG = 'campushub_kyc_review';
+const BUFFER_PREFIX = 'campusnotehub/kyc-review';
+const BUFFER_TAG = 'campusnotehub_kyc_review';
 const DELIVERY_TYPE = 'authenticated' as const;
 
 export type BufferedDocument = {

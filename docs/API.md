@@ -1,4 +1,4 @@
-# CampusHub — API Reference
+# campusnotehub — API Reference
 
 All routes are under `/api`. JSON in, JSON out. Errors return
 `{ "error": "<locale.key>", "params?": {...}, "fields?": {...} }` — the server

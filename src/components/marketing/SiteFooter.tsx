@@ -85,7 +85,7 @@ export function SiteFooter() {
 
         <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-edge pt-6 sm:flex-row sm:items-center">
           <p className="text-xs text-fg-subtle">
-            &copy; {new Date().getFullYear()} CampusHub. {t('landing.footer.rights')}
+            &copy; {new Date().getFullYear()} campusnotehub. {t('landing.footer.rights')}
           </p>
           <p className="text-xs text-fg-subtle">Bakı, Azərbaycan</p>
         </div>

@@ -489,7 +489,7 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
             const url = URL.createObjectURL(new Blob([text + '\n'], { type: 'text/plain' }));
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'campushub-recovery-codes.txt';
+            a.download = 'campusnotehub-recovery-codes.txt';
             a.click();
             URL.revokeObjectURL(url);
           }}

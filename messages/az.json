@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "CampusHub",
+    "appName": "campusnotehub",
     "save": "Yadda saxla",
     "cancel": "Ləğv et",
     "continue": "Davam et",
@@ -47,7 +47,7 @@
   },
   "auth": {
     "register": {
-      "title": "CampusHub-a qoşul 🎉",
+      "title": "campusnotehub-a qoşul 🎉",
       "subtitle": "Bir dəqiqə — və kampusun ən canlı icmasındasan.",
       "fullName": "Ad",
       "fullNameHint": "Şəxsiyyət vəsiqənizdəki kimi yazın",
@@ -251,7 +251,7 @@
         "failed": "Bu hesabla daxil olmaq mümkün olmadı. Yenidən cəhd edin.",
         "unavailable": "Bu giriş üsulu hazırda mövcud deyil.",
         "link_required": "Bu e-poçtla hesab artıq mövcuddur. Şifrənizlə daxil olun və Parametrlər → Təhlükəsizlik bölməsində e-poçtunuzu təsdiqləyin - bundan sonra {provider} avtomatik qoşulacaq - və ya {provider} hesabını orada birbaşa qoşun.",
-        "identity_in_use": "Bu hesab artıq başqa CampusHub hesabına qoşulub.",
+        "identity_in_use": "Bu hesab artıq başqa campusnotehub hesabına qoşulub.",
         "provider_already_linked": "Başqa {provider} hesabı artıq qoşulub. Əvvəlcə onu ayırın.",
         "rate_limited": "Çox sayda cəhd. Bir neçə dəqiqə gözləyib yenidən cəhd edin.",
         "signup_expired": "Qeydiyyat sessiyasının vaxtı bitdi. Giriş səhifəsindən yenidən başlayın.",
@@ -1073,7 +1073,7 @@
       "humanReview": "Şübhəli hallarda moderator baxa bilər",
       "window": "Belə hallarda şəkil ən çox 24 saat şifrələnmiş qalır"
     },
-    "created": "Hesabınız uğurla yaradıldı. CampusHub-a xoş gəlmisiniz!"
+    "created": "Hesabınız uğurla yaradıldı. campusnotehub-a xoş gəlmisiniz!"
   },
   "dashboard": {
     "greeting": "Salam, {name}",

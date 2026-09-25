@@ -8,7 +8,7 @@
  * ---------------------------------------------------------------------------
  * The company name used to be hardcoded in three places in layout.ts, and it
  * had already drifted: the layout signed every message "UniPath" while
- * EMAIL_FROM introduced them as "CampusHub", so a recipient saw two different
+ * EMAIL_FROM introduced them as "campusnotehub", so a recipient saw two different
  * brands in one email. One resolved object removes the possibility.
  *
  * Every value has a working default, so a deployment that sets none of these
@@ -47,7 +47,7 @@ const trim = (value: string | undefined) => value?.trim() || undefined;
  * environment happened to be when the first email module was imported.
  */
 export function emailBranding(): EmailBranding {
-  const companyName = trim(process.env.EMAIL_COMPANY_NAME) ?? 'CampusHub';
+  const companyName = trim(process.env.EMAIL_COMPANY_NAME) ?? 'campusnotehub';
 
   /**
    * Always the platform mailbox - resolved through ./identity.ts, which

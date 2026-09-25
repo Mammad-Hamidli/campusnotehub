@@ -40,7 +40,7 @@ function key(): Buffer {
   if (!secret) {
     throw new Error('Vault is not configured: set VAULT_KEY (or PII_HASH_PEPPER).');
   }
-  cachedKey = Buffer.from(hkdfSync('sha256', secret, 'campushub-vault', 'field-encryption:v1', 32));
+  cachedKey = Buffer.from(hkdfSync('sha256', secret, 'campusnotehub-vault', 'field-encryption:v1', 32));
   return cachedKey;
 }
 

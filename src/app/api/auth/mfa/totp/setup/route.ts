@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** What authenticator apps show above the code. Stable: changing it only relabels. */
-const ISSUER = process.env.TOTP_ISSUER?.trim() || 'CampusHub';
+const ISSUER = process.env.TOTP_ISSUER?.trim() || 'campusnotehub';
 
 /**
  * POST /api/auth/mfa/totp/setup - starts (or restarts) an enrollment.

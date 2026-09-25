@@ -1,5 +1,5 @@
 {
-  "name": "campushub",
+  "name": "campusnotehub",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -9,7 +9,7 @@
     "predev": "node scripts/clean-next.mjs",
     "dev": "next dev --turbopack",
     "dev:webpack": "node scripts/clean-next.mjs && next dev",
-    "dev:preview": "node scripts/clean-next.mjs && cross-env CAMPUSHUB_DEV_BYPASS_AUTH=1 next dev --turbopack",
+    "dev:preview": "node scripts/clean-next.mjs && cross-env campusnotehub_DEV_BYPASS_AUTH=1 next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -26,7 +26,7 @@
     "auth:backfill-usernames": "tsx scripts/backfill-usernames.mts",
     "db:purge-non-admin": "tsx scripts/purge-non-admin.mts",
     "verify:translation": "tsx scripts/verify-translation.mts",
-    "firebase:emulators": "firebase emulators:start --project campushub-local",
+    "firebase:emulators": "firebase emulators:start --project campusnotehub-local",
     "test:firebase-rules": "tsx scripts/test-firebase-rules.mts"
   },
   "dependencies": {

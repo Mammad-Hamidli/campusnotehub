@@ -1,8 +1,8 @@
 /**
- * Resets CampusHub to a clean state and creates exactly one administrator.
+ * Resets campusnotehub to a clean state and creates exactly one administrator.
  *
- *   npx tsx scripts/bootstrap-admin.mts --email admin@campushub.com            # admin only
- *   npx tsx scripts/bootstrap-admin.mts --email admin@campushub.com --wipe --yes
+ *   npx tsx scripts/bootstrap-admin.mts --email admin@campusnotehub.com            # admin only
+ *   npx tsx scripts/bootstrap-admin.mts --email admin@campusnotehub.com --wipe --yes
  *
  * --wipe deletes APPLICATION data only:
  *   - every Firestore collection the app owns (and their subcollections),
@@ -11,7 +11,7 @@
  *   - the app's Firebase Storage prefixes (notes/, media/, avatars/, kyc-review/)
  *   - leftover Firebase Auth accounts (the app authenticates against
  *     credentials/{userId}, never Firebase Auth)
- *   - Cloudinary verification images under campushub/kyc-review/
+ *   - Cloudinary verification images under campusnotehub/kyc-review/
  * Project configuration, rules, indexes and other resources are never touched.
  *
  * --wipe REFUSES to run while an ADMIN exists unless --replace-admin is also
@@ -128,11 +128,11 @@ if (wipe) {
 
   try {
     const { cloudinaryClient } = await import('../src/lib/cloudinary/server');
-    const result = await cloudinaryClient().api.delete_resources_by_prefix('campushub/kyc-review/', {
+    const result = await cloudinaryClient().api.delete_resources_by_prefix('campusnotehub/kyc-review/', {
       type: 'authenticated',
       resource_type: 'image',
     });
-    console.log(`    cloudinary campushub/kyc-review/ (${Object.keys(result.deleted ?? {}).length} assets)`);
+    console.log(`    cloudinary campusnotehub/kyc-review/ (${Object.keys(result.deleted ?? {}).length} assets)`);
   } catch (error) {
     console.log(`    cloudinary skipped: ${firstLine(error)}`);
   }
@@ -188,7 +188,7 @@ batch.set(
   ref,
   forFirestore({
     email,
-    fullName: 'CampusHub Admin',
+    fullName: 'campusnotehub Admin',
     firstName: null,
     lastName: null,
     dateOfBirth: null,

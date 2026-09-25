@@ -95,7 +95,7 @@ describe('POST /api/me/email/verify', () => {
     const token = await ev.issueEmailVerification('u1', 'u1@ada.edu.az');
     const { POST } = await import('@/app/api/me/email/verify/route');
     const res = await POST(
-      new NextRequest('https://campushub.test/api/me/email/verify', {
+      new NextRequest('https://campusnotehub.test/api/me/email/verify', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ token }),

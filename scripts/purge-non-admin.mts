@@ -665,11 +665,11 @@ if (withCloudinary) {
   try {
     const { cloudinaryClient } = await import('../src/lib/cloudinary/server');
     const result = await cloudinaryClient().api.delete_resources_by_prefix(
-      'campushub/kyc-review/',
+      'campusnotehub/kyc-review/',
       { type: 'authenticated', resource_type: 'image' },
     );
     console.log(
-      `    cloudinary campushub/kyc-review/ (${Object.keys(result.deleted ?? {}).length} assets)`,
+      `    cloudinary campusnotehub/kyc-review/ (${Object.keys(result.deleted ?? {}).length} assets)`,
     );
   } catch (error) {
     console.log(`    cloudinary skipped: ${firstLine(error)}`);

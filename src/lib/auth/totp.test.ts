@@ -78,13 +78,13 @@ describe('base32 and provisioning', () => {
   });
 
   it('builds an otpauth URI authenticator apps accept', () => {
-    const uri = new URL(otpauthUri(RFC_SECRET, 'aysel_01', 'CampusHub'));
+    const uri = new URL(otpauthUri(RFC_SECRET, 'aysel_01', 'campusnotehub'));
     expect(uri.protocol).toBe('otpauth:');
     // WHATWG URL reads the "totp" type as the host of a non-special scheme.
     expect(uri.host).toBe('totp');
-    expect(decodeURIComponent(uri.pathname)).toBe('/CampusHub:aysel_01');
+    expect(decodeURIComponent(uri.pathname)).toBe('/campusnotehub:aysel_01');
     expect(uri.searchParams.get('secret')).toBe(base32Encode(RFC_SECRET));
-    expect(uri.searchParams.get('issuer')).toBe('CampusHub');
+    expect(uri.searchParams.get('issuer')).toBe('campusnotehub');
     expect(uri.searchParams.get('algorithm')).toBe('SHA1');
     expect(uri.searchParams.get('digits')).toBe('6');
     expect(uri.searchParams.get('period')).toBe('30');

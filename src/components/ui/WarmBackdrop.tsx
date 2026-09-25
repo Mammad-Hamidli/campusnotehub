@@ -15,7 +15,7 @@ import {
  * information. Colours and opacity live in globals.css (`.warm-backdrop`) so
  * the dark theme can tone them down. Server component: it ships no JS.
  *
- * Above the blobs sits a watermark layer: the CampusHub mark plus a few
+ * Above the blobs sits a watermark layer: the campusnotehub mark plus a few
  * study-themed glyphs and abstract shapes, scattered at a few percent opacity
  * so a sparse page never reads as a blank sheet. The `sm-only` entries are
  * dropped on phones, where the same scatter would crowd a narrow column.

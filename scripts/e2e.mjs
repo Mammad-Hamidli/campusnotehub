@@ -1263,7 +1263,7 @@ GROUPS.registration = async (browser) => {
     await page.fill('#nickname', who);
     await page.fill('#email', `${who}@ada.edu.az`);
     await page.fill('#phone', `+99450${String(stamp).slice(-7)}`);
-    await page.fill('#password', 'CampusHubTest2026!');
+    await page.fill('#password', 'campusnotehubTest2026!');
     // Both consents are required to leave step 1.
     await page.locator('#terms').check();
     await page.locator('#consent').check();
@@ -1447,7 +1447,7 @@ GROUPS.registration = async (browser) => {
         accountType: 'TEACHER',
         firstName: 'Elvin', lastName: 'Seferov', dateOfBirth: '1985-09-02',
         nickname: `teach${String(stamp).slice(-6)}`, email,
-        phone: `+99470${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        phone: `+99470${String(stamp).slice(-7)}`, password: 'campusnotehubTest2026!', passwordConfirm: 'campusnotehubTest2026!',
         universityId: 'ADA', department: 'Computer Science', academicTitle: 'Assistant Professor',
         locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
       },
@@ -1478,7 +1478,7 @@ GROUPS.registration = async (browser) => {
         accountType: 'MENTOR',
         firstName: 'Nigar', lastName: 'Aliyeva', dateOfBirth: '1990-03-11',
         nickname: `ment${String(stamp).slice(-6)}`, email,
-        phone: `+99477${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        phone: `+99477${String(stamp).slice(-7)}`, password: 'campusnotehubTest2026!', passwordConfirm: 'campusnotehubTest2026!',
         universityId: 'ADA', department: 'Azercell', academicTitle: 'Senior Product Manager',
         locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
       },
@@ -1511,7 +1511,7 @@ GROUPS.registration = async (browser) => {
         accountType: 'MENTOR',
         firstName: 'Aysel', lastName: 'Mammadova', dateOfBirth: '1992-04-15',
         nickname: `bypassm${stamp}`, email: `bypassm${stamp}@ada.edu.az`,
-        phone: `+99460${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        phone: `+99460${String(stamp).slice(-7)}`, password: 'campusnotehubTest2026!', passwordConfirm: 'campusnotehubTest2026!',
         universityId: 'ADA', locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
       },
     });
@@ -1530,7 +1530,7 @@ GROUPS.registration = async (browser) => {
         accountType: 'STUDENT',
         firstName: 'Aysel', lastName: 'Mammadova', dateOfBirth: '2003-04-15',
         nickname: `bypass${stamp}`, email: `bypass${stamp}@ada.edu.az`,
-        phone: `+99450${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        phone: `+99450${String(stamp).slice(-7)}`, password: 'campusnotehubTest2026!', passwordConfirm: 'campusnotehubTest2026!',
         universityId: 'ADA', locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
         // facultySlug and graduation deliberately omitted
       },
@@ -1550,7 +1550,7 @@ GROUPS.registration = async (browser) => {
         accountType: 'TEACHER',
         firstName: 'Aysel', lastName: 'Mammadova', dateOfBirth: '2003-04-15',
         nickname: `bypasst${stamp}`, email: `bypasst${stamp}@ada.edu.az`,
-        phone: `+99451${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        phone: `+99451${String(stamp).slice(-7)}`, password: 'campusnotehubTest2026!', passwordConfirm: 'campusnotehubTest2026!',
         universityId: 'ADA', locale: 'az', acceptTerms: true, consentDocumentProcessing: true,
       },
     });
@@ -1570,7 +1570,7 @@ GROUPS.registration = async (browser) => {
         firstName: 'Aysel', lastName: 'Mammadova',
         dateOfBirth: '2020-01-01', // a four-year-old
         nickname: `dob${stamp}`, email: `dob${stamp}@ada.edu.az`,
-        phone: `+99455${String(stamp).slice(-7)}`, password: 'CampusHubTest2026!', passwordConfirm: 'CampusHubTest2026!',
+        phone: `+99455${String(stamp).slice(-7)}`, password: 'campusnotehubTest2026!', passwordConfirm: 'campusnotehubTest2026!',
         universityId: 'ADA', facultySlug: 'computer-science',
         graduationYear: new Date().getFullYear() + 1, graduationMonth: 6,
         locale: 'az', acceptTerms: true, consentDocumentProcessing: true,

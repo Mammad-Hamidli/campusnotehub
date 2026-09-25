@@ -36,7 +36,7 @@ import Link from 'next/link';
  */
 export function Logo({ href = '/', showWord = true }: { href?: string; showWord?: boolean }) {
   return (
-    <Link href={href} className="group flex items-center gap-2 rounded-lg" aria-label="CampusHub">
+    <Link href={href} className="group flex items-center gap-2 rounded-lg" aria-label="campusnotehub">
       <svg
         viewBox="0 0 159 194"
         className="h-7 w-7 shrink-0 text-fg transition-transform duration-200 ease-out
@@ -56,7 +56,7 @@ export function Logo({ href = '/', showWord = true }: { href?: string; showWord?
       </svg>
 
       {showWord && (
-        <span className="text-md font-semibold tracking-tight text-fg">CampusHub</span>
+        <span className="text-md font-semibold tracking-tight text-fg">campusnotehub</span>
       )}
     </Link>
   );

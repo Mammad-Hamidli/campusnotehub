@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "CampusHub",
+    "appName": "campusnotehub",
     "save": "Save",
     "cancel": "Cancel",
     "continue": "Continue",
@@ -47,7 +47,7 @@
   },
   "auth": {
     "register": {
-      "title": "Join CampusHub 🎉",
+      "title": "Join campusnotehub 🎉",
       "subtitle": "One minute — and you are in the liveliest crowd on campus.",
       "fullName": "Name",
       "fullNameHint": "Exactly as it appears on your national ID",
@@ -251,7 +251,7 @@
         "failed": "We could not sign you in with that account. Please try again.",
         "unavailable": "This sign-in method is not available right now.",
         "link_required": "An account with this email already exists. Sign in with your password and confirm your email in Settings → Security - {provider} will then connect automatically - or connect {provider} there directly.",
-        "identity_in_use": "That account is already connected to a different CampusHub account.",
+        "identity_in_use": "That account is already connected to a different campusnotehub account.",
         "provider_already_linked": "A different {provider} account is already connected. Disconnect it first.",
         "rate_limited": "Too many attempts. Please wait a few minutes and try again.",
         "signup_expired": "Your sign-up session expired. Start again from the sign-in page.",
@@ -1073,7 +1073,7 @@
       "humanReview": "A moderator may look if the check is inconclusive",
       "window": "In that case the image is held encrypted for at most 24 hours"
     },
-    "created": "Your account was created. Welcome to CampusHub!"
+    "created": "Your account was created. Welcome to campusnotehub!"
   },
   "dashboard": {
     "greeting": "Hi, {name}",
@@ -1625,7 +1625,7 @@
   },
   "stub": {
     "title": "This section is under construction",
-    "body": "We are still building this part of CampusHub. It will be available soon.",
+    "body": "We are still building this part of campusnotehub. It will be available soon.",
     "back": "Go back",
     "toFeed": "Go to the feed"
   },

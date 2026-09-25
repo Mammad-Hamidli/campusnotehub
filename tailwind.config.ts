@@ -1,7 +1,7 @@
 import type { Config } from 'tailwindcss';
 
 /**
- * CampusHub design system — editorial / neo-minimalist.
+ * campusnotehub design system — editorial / neo-minimalist.
  *
  * Every colour is a CSS variable defined in globals.css, so light and dark are
  * one token swap rather than a `dark:` prefix on every element. Components
@@ -57,7 +57,7 @@ export default {
          * Orange: the logo's own colour.
          *
          * Separate from `accent` because it means something different. Accent
-         * says "you can act on this"; brand says "this is CampusHub" - the
+         * says "you can act on this"; brand says "this is campusnotehub" - the
          * mark, and the few places the product should feel warm. Giving it a
          * status meaning as well is how a palette starts to lie.
          */

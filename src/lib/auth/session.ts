@@ -182,8 +182,8 @@ export async function issueSession(params: {
   const accessToken = await new SignJWT({ ver: params.user.verificationStatus, sid: session.id })
     .setProtectedHeader({ alg: 'EdDSA' })
     .setSubject(params.user.id)
-    .setIssuer('campushub')
-    .setAudience('campushub-web')
+    .setIssuer('campusnotehub')
+    .setAudience('campusnotehub-web')
     .setIssuedAt()
     .setExpirationTime(`${ttl}s`)
     .sign(await getPrivateKey());
@@ -366,8 +366,8 @@ async function loadSession(request?: NextRequest): Promise<SessionResult> {
   let sid: string | null;
   try {
     const { payload } = await jwtVerify(token, await getPublicKey(), {
-      issuer: 'campushub',
-      audience: 'campushub-web',
+      issuer: 'campusnotehub',
+      audience: 'campusnotehub-web',
     });
     sub = payload.sub!;
     sid = typeof payload.sid === 'string' ? payload.sid : null;
@@ -621,7 +621,7 @@ export async function sessionIdFromAccessToken(token: string): Promise<string | 
       iss?: unknown;
       aud?: unknown;
     };
-    if (claims.iss !== 'campushub' || claims.aud !== 'campushub-web') return null;
+    if (claims.iss !== 'campusnotehub' || claims.aud !== 'campusnotehub-web') return null;
     return typeof claims.sid === 'string' ? claims.sid : null;
   } catch {
     return null;

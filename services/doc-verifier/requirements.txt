@@ -1,4 +1,4 @@
-# Runtime dependencies for the CampusHub document verifier.
+# Runtime dependencies for the campusnotehub document verifier.
 #
 # opencv-python-headless (not opencv-python): this service never opens a window,
 # and the headless wheel drops the GUI/X11 stack - a smaller image and fewer

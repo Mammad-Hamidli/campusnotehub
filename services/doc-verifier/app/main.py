@@ -1,5 +1,5 @@
 """
-CampusHub document verifier.
+campusnotehub document verifier.
 
 A stateless FastAPI service. It receives four document images in one multipart
 request, analyses them entirely in memory, and returns SCORES AND CATEGORY
@@ -46,7 +46,7 @@ import numpy as np
 from fastapi import Depends, FastAPI, Form, HTTPException, UploadFile, File, Header
 from PIL import Image, ImageChops
 
-app = FastAPI(title="campushub-doc-verifier", version="2.0.0")
+app = FastAPI(title="campusnotehub-doc-verifier", version="2.0.0")
 
 MODEL_VERSIONS = {
     "quality": "laplacian-1.0",

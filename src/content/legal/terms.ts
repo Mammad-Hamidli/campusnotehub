@@ -16,13 +16,13 @@ export const TERMS: LocalizedLegalDocument = {
     en: {
       title: 'Terms of Service',
       summary:
-        'These terms govern your use of CampusHub: the campus feed, UniNotes, PocketMentor and the wallet. Please read them carefully before creating an account.',
+        'These terms govern your use of campusnotehub: the campus feed, UniNotes, PocketMentor and the wallet. Please read them carefully before creating an account.',
       sections: [
         {
           id: 'acceptance',
           heading: '1. Acceptance of these terms',
           body: [
-            'By creating an account or otherwise using CampusHub (the "Platform"), you agree to be bound by these Terms of Service and by our Privacy Policy. If you do not agree, do not use the Platform.',
+            'By creating an account or otherwise using campusnotehub (the "Platform"), you agree to be bound by these Terms of Service and by our Privacy Policy. If you do not agree, do not use the Platform.',
             'If you use the Platform on behalf of an organisation, you confirm that you are authorised to accept these terms on its behalf.',
           ],
         },
@@ -71,7 +71,7 @@ export const TERMS: LocalizedLegalDocument = {
           id: 'content',
           heading: '6. Your content',
           body: [
-            'You keep ownership of the posts, comments, notes and other material you upload ("Your Content"). By uploading it, you grant CampusHub a non-exclusive, worldwide, royalty-free licence to host, store, display and distribute Your Content solely to operate and improve the Platform.',
+            'You keep ownership of the posts, comments, notes and other material you upload ("Your Content"). By uploading it, you grant campusnotehub a non-exclusive, worldwide, royalty-free licence to host, store, display and distribute Your Content solely to operate and improve the Platform.',
             'You confirm that you have the rights needed to share Your Content and that it does not violate these terms or any law. We may remove content that we reasonably believe breaches these terms.',
           ],
         },
@@ -87,7 +87,7 @@ export const TERMS: LocalizedLegalDocument = {
           id: 'mentors',
           heading: '8. PocketMentor sessions',
           body: [
-            'Mentors are independent users, not employees or agents of CampusHub. We do not guarantee the outcome or quality of any session.',
+            'Mentors are independent users, not employees or agents of campusnotehub. We do not guarantee the outcome or quality of any session.',
             'Session fees are held by the Platform until the session is completed. Cancellations made more than 24 hours before a session are refunded in full; other cancellations and disputes are handled under the policy shown at the time of booking.',
           ],
         },
@@ -112,7 +112,7 @@ export const TERMS: LocalizedLegalDocument = {
           heading: '11. Disclaimers and limitation of liability',
           body: [
             'The Platform is provided "as is" and "as available". We do not warrant that it will be uninterrupted or error-free, or that content provided by other users is accurate.',
-            'To the fullest extent permitted by law, CampusHub is not liable for indirect, incidental or consequential damages, or for any loss of data, profits or opportunity arising from your use of the Platform.',
+            'To the fullest extent permitted by law, campusnotehub is not liable for indirect, incidental or consequential damages, or for any loss of data, profits or opportunity arising from your use of the Platform.',
           ],
         },
         {
@@ -140,13 +140,13 @@ export const TERMS: LocalizedLegalDocument = {
     az: {
       title: 'İstifadə Şərtləri',
       summary:
-        'Bu şərtlər CampusHub-dan - kampus lenti, UniNotes, PocketMentor və pul kisəsindən istifadə qaydalarını müəyyən edir. Hesab yaratmazdan əvvəl onları diqqətlə oxuyun.',
+        'Bu şərtlər campusnotehub-dan - kampus lenti, UniNotes, PocketMentor və pul kisəsindən istifadə qaydalarını müəyyən edir. Hesab yaratmazdan əvvəl onları diqqətlə oxuyun.',
       sections: [
         {
           id: 'acceptance',
           heading: '1. Şərtlərin qəbulu',
           body: [
-            'Hesab yaratmaqla və ya CampusHub-dan ("Platforma") hər hansı formada istifadə etməklə siz bu İstifadə Şərtlərini və Məxfilik Siyasətimizi qəbul etmiş olursunuz. Razı deyilsinizsə, Platformadan istifadə etməyin.',
+            'Hesab yaratmaqla və ya campusnotehub-dan ("Platforma") hər hansı formada istifadə etməklə siz bu İstifadə Şərtlərini və Məxfilik Siyasətimizi qəbul etmiş olursunuz. Razı deyilsinizsə, Platformadan istifadə etməyin.',
             'Platformadan hər hansı təşkilat adından istifadə edirsinizsə, həmin təşkilat adından bu şərtləri qəbul etməyə səlahiyyətiniz olduğunu təsdiq edirsiniz.',
           ],
         },
@@ -195,7 +195,7 @@ export const TERMS: LocalizedLegalDocument = {
           id: 'content',
           heading: '6. Sizin məzmununuz',
           body: [
-            'Yüklədiyiniz paylaşımlar, şərhlər, konspektlər və digər materiallar ("Sizin Məzmununuz") sizə məxsus olaraq qalır. Onları yükləməklə CampusHub-a Sizin Məzmununuzu yalnız Platformanın fəaliyyəti və təkmilləşdirilməsi məqsədilə saxlamaq, göstərmək və yaymaq üçün qeyri-müstəsna, ümumdünya, ödənişsiz lisenziya verirsiniz.',
+            'Yüklədiyiniz paylaşımlar, şərhlər, konspektlər və digər materiallar ("Sizin Məzmununuz") sizə məxsus olaraq qalır. Onları yükləməklə campusnotehub-a Sizin Məzmununuzu yalnız Platformanın fəaliyyəti və təkmilləşdirilməsi məqsədilə saxlamaq, göstərmək və yaymaq üçün qeyri-müstəsna, ümumdünya, ödənişsiz lisenziya verirsiniz.',
             'Sizin Məzmununuzu paylaşmaq üçün lazımi hüquqlara malik olduğunuzu və onun bu şərtləri və ya qanunu pozmadığını təsdiq edirsiniz. Bu şərtləri pozduğunu əsaslı şəkildə hesab etdiyimiz məzmunu silə bilərik.',
           ],
         },
@@ -211,7 +211,7 @@ export const TERMS: LocalizedLegalDocument = {
           id: 'mentors',
           heading: '8. PocketMentor sessiyaları',
           body: [
-            'Mentorlar CampusHub-ın əməkdaşı və ya nümayəndəsi deyil, müstəqil istifadəçilərdir. Hər hansı sessiyanın nəticəsinə və ya keyfiyyətinə zəmanət vermirik.',
+            'Mentorlar campusnotehub-ın əməkdaşı və ya nümayəndəsi deyil, müstəqil istifadəçilərdir. Hər hansı sessiyanın nəticəsinə və ya keyfiyyətinə zəmanət vermirik.',
             'Sessiya haqqı sessiya başa çatana qədər Platformada saxlanılır. Sessiyadan 24 saatdan çox əvvəl edilən ləğvlər üçün məbləğ tam qaytarılır; digər ləğvlər və mübahisələr sifariş zamanı göstərilən qaydalara əsasən həll edilir.',
           ],
         },
@@ -236,7 +236,7 @@ export const TERMS: LocalizedLegalDocument = {
           heading: '11. Məsuliyyətdən imtina və məsuliyyətin məhdudlaşdırılması',
           body: [
             'Platforma "olduğu kimi" və "mövcud olduğu qədər" təqdim olunur. Onun fasiləsiz və ya xətasız işləyəcəyinə, yaxud digər istifadəçilərin təqdim etdiyi məzmunun düzgün olduğuna zəmanət vermirik.',
-            'Qanunla icazə verilən maksimum həddə CampusHub Platformadan istifadə nəticəsində yaranan dolayı, təsadüfi və ya nəticə etibarilə dəyən zərərə, həmçinin məlumat, gəlir və ya imkan itkisinə görə məsuliyyət daşımır.',
+            'Qanunla icazə verilən maksimum həddə campusnotehub Platformadan istifadə nəticəsində yaranan dolayı, təsadüfi və ya nəticə etibarilə dəyən zərərə, həmçinin məlumat, gəlir və ya imkan itkisinə görə məsuliyyət daşımır.',
           ],
         },
         {
@@ -264,13 +264,13 @@ export const TERMS: LocalizedLegalDocument = {
     ru: {
       title: 'Условия использования',
       summary:
-        'Эти условия регулируют использование CampusHub: ленты кампуса, UniNotes, PocketMentor и кошелька. Пожалуйста, внимательно прочитайте их перед созданием аккаунта.',
+        'Эти условия регулируют использование campusnotehub: ленты кампуса, UniNotes, PocketMentor и кошелька. Пожалуйста, внимательно прочитайте их перед созданием аккаунта.',
       sections: [
         {
           id: 'acceptance',
           heading: '1. Принятие условий',
           body: [
-            'Создавая аккаунт или иным образом используя CampusHub («Платформа»), вы соглашаетесь с настоящими Условиями использования и нашей Политикой конфиденциальности. Если вы не согласны, не используйте Платформу.',
+            'Создавая аккаунт или иным образом используя campusnotehub («Платформа»), вы соглашаетесь с настоящими Условиями использования и нашей Политикой конфиденциальности. Если вы не согласны, не используйте Платформу.',
             'Если вы используете Платформу от имени организации, вы подтверждаете, что уполномочены принять эти условия от её имени.',
           ],
         },
@@ -319,7 +319,7 @@ export const TERMS: LocalizedLegalDocument = {
           id: 'content',
           heading: '6. Ваш контент',
           body: [
-            'Публикации, комментарии, конспекты и другие загруженные вами материалы («Ваш контент») остаются вашей собственностью. Загружая их, вы предоставляете CampusHub неисключительную, всемирную, безвозмездную лицензию на хранение, отображение и распространение Вашего контента исключительно для работы и улучшения Платформы.',
+            'Публикации, комментарии, конспекты и другие загруженные вами материалы («Ваш контент») остаются вашей собственностью. Загружая их, вы предоставляете campusnotehub неисключительную, всемирную, безвозмездную лицензию на хранение, отображение и распространение Вашего контента исключительно для работы и улучшения Платформы.',
             'Вы подтверждаете, что обладаете необходимыми правами на Ваш контент и что он не нарушает эти условия или закон. Мы можем удалить контент, который, по нашему обоснованному мнению, нарушает эти условия.',
           ],
         },
@@ -335,7 +335,7 @@ export const TERMS: LocalizedLegalDocument = {
           id: 'mentors',
           heading: '8. Сессии PocketMentor',
           body: [
-            'Менторы — независимые пользователи, а не сотрудники или представители CampusHub. Мы не гарантируем результат или качество сессий.',
+            'Менторы — независимые пользователи, а не сотрудники или представители campusnotehub. Мы не гарантируем результат или качество сессий.',
             'Оплата сессии удерживается Платформой до её завершения. При отмене более чем за 24 часа до начала сумма возвращается полностью; прочие отмены и споры рассматриваются по правилам, указанным при бронировании.',
           ],
         },
@@ -360,7 +360,7 @@ export const TERMS: LocalizedLegalDocument = {
           heading: '11. Отказ от гарантий и ограничение ответственности',
           body: [
             'Платформа предоставляется «как есть» и «по мере доступности». Мы не гарантируем её бесперебойную или безошибочную работу, а также точность контента других пользователей.',
-            'В максимальной степени, допустимой законом, CampusHub не несёт ответственности за косвенный, случайный или последующий ущерб, а также за потерю данных, прибыли или возможностей в связи с использованием Платформы.',
+            'В максимальной степени, допустимой законом, campusnotehub не несёт ответственности за косвенный, случайный или последующий ущерб, а также за потерю данных, прибыли или возможностей в связи с использованием Платформы.',
           ],
         },
         {

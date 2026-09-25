@@ -243,10 +243,10 @@ export async function createNote(params: {
   // (Firebase Storage is not provisioned for this project.)
   const extension = (params.fileName.split('.').pop() ?? 'bin').toLowerCase();
   const uploaded = await uploadBuffer(params.bytes, {
-    public_id: 'campushub/notes/' + params.id + '/document.' + extension,
+    public_id: 'campusnotehub/notes/' + params.id + '/document.' + extension,
     resource_type: 'raw',
     type: 'authenticated',
-    tags: ['campushub_note'],
+    tags: ['campusnotehub_note'],
     overwrite: false,
     timeout: 120_000,
   });

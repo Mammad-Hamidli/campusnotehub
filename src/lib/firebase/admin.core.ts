@@ -63,7 +63,7 @@ const PROJECT_ID =
   process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ??
   // The emulator accepts any project id; a stable one keeps its data
   // addressable across restarts.
-  (usingEmulator ? 'campushub-local' : undefined);
+  (usingEmulator ? 'campusnotehub-local' : undefined);
 
 /** Bucket for uploaded files. Defaults to the conventional name. */
 export const STORAGE_BUCKET =
@@ -167,18 +167,18 @@ function createApp(): App {
  * once no matter how many times this file is evaluated.
  */
 const globalForFirebase = globalThis as typeof globalThis & {
-  __campushubFirebaseApp?: App;
-  __campushubFirestore?: Firestore;
+  __campusnotehubFirebaseApp?: App;
+  __campusnotehubFirestore?: Firestore;
 };
 
 export function adminApp(): App {
-  globalForFirebase.__campushubFirebaseApp ??= createApp();
-  return globalForFirebase.__campushubFirebaseApp;
+  globalForFirebase.__campusnotehubFirebaseApp ??= createApp();
+  return globalForFirebase.__campusnotehubFirebaseApp;
 }
 
 export function adminDb(): Firestore {
-  if (globalForFirebase.__campushubFirestore) {
-    return globalForFirebase.__campushubFirestore;
+  if (globalForFirebase.__campusnotehubFirestore) {
+    return globalForFirebase.__campusnotehubFirestore;
   }
 
   const firestore = getFirestore(adminApp());
@@ -202,7 +202,7 @@ export function adminDb(): Firestore {
      */
   }
 
-  globalForFirebase.__campushubFirestore = firestore;
+  globalForFirebase.__campusnotehubFirestore = firestore;
   return firestore;
 }
 

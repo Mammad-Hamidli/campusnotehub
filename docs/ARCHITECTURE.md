@@ -1,4 +1,4 @@
-# CampusHub — Technical Blueprint
+# campusnotehub — Technical Blueprint
 
 Three products on one identity spine: **Feed** (academic social timeline),
 **UniNotes** (peer-to-peer study-note marketplace), **PocketMentor** (1-on-1
@@ -17,7 +17,7 @@ on.
                                      │  multipart: 4 files, 5 MB each
                         ┌────────────▼─────────────┐
                         │  Next.js 15 (App Router) │  web tier
-                        │  SSR · API · PIPELINE    │  role: campushub_app
+                        │  SSR · API · PIPELINE    │  role: campusnotehub_app
                         │  documents live HERE,    │
                         │  in RAM, for ~5 seconds  │
                         └──┬─────────┬─────────┬───┘

@@ -11,7 +11,7 @@ import { docToObject, forFirestore } from '../convert';
  * ===========================================================================
  * `media_assets.bytes` was a BYTEA column. A Firestore document is capped at
  * 1 MiB and an uploaded photo routinely exceeds that even after re-encoding,
- * so the pixels live in Cloudinary (campushub/media/<id>, authenticated) and the
+ * so the pixels live in Cloudinary (campusnotehub/media/<id>, authenticated) and the
  * document holds only what a query needs: owner, mime, dimensions, hash and
  * the attachment state.
  *
@@ -96,10 +96,10 @@ export async function createMediaAsset(params: {
    * showed "Şəkil yüklənmədi" for every image, whatever its size or type.
    */
   const uploaded = await uploadBuffer(params.bytes, {
-    public_id: 'campushub/media/' + params.id,
+    public_id: 'campusnotehub/media/' + params.id,
     resource_type: 'image',
     type: 'authenticated',
-    tags: ['campushub_media'],
+    tags: ['campusnotehub_media'],
     overwrite: false,
     timeout: 60_000,
   });

@@ -26,8 +26,8 @@ const nextConfig = {
   poweredByHeader: false,
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: 'cdn.campushub.com' },
-      { protocol: 'https', hostname: 'campushub-public.s3.eu-central-1.amazonaws.com' },
+      { protocol: 'https', hostname: 'cdn.campusnotehub.com' },
+      { protocol: 'https', hostname: 'campusnotehub-public.s3.eu-central-1.amazonaws.com' },
     ],
   },
   async headers() {

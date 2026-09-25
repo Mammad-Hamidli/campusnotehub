@@ -1,6 +1,6 @@
-# CampusHub — Security & Data Protection
+# campusnotehub — Security & Data Protection
 
-CampusHub verifies students against national ID cards. Those documents belong
+campusnotehub verifies students against national ID cards. Those documents belong
 to people who are mostly 17–22 years old. This document explains how the
 platform avoids holding them.
 

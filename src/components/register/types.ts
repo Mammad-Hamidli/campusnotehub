@@ -91,7 +91,7 @@ export const EMPTY_DOCUMENTS: DocumentMap = {
 };
 
 const RESERVED_NICKNAMES = new Set([
-  'admin', 'administrator', 'moderator', 'mod', 'campushub', 'support', 'help',
+  'admin', 'administrator', 'moderator', 'mod', 'campusnotehub', 'support', 'help',
   'staff', 'official', 'system', 'root', 'security', 'team', 'api', 'null',
   'undefined', 'me', 'you', 'settings', 'login', 'register', 'dashboard',
   'onboarding', 'mentors', 'profile',
@@ -175,7 +175,7 @@ export async function collectFingerprint(): Promise<string | undefined> {
       ctx.fillStyle = '#f60';
       ctx.fillRect(0, 0, 110, 20);
       ctx.fillStyle = '#069';
-      ctx.fillText('CampusHub əşı', 2, 15); // AZ diacritics probe the font stack
+      ctx.fillText('campusnotehub əşı', 2, 15); // AZ diacritics probe the font stack
       parts.push(canvas.toDataURL().slice(-96));
     }
 

@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// CampusHub Firestore security rules.
+// campusnotehub Firestore security rules.
 //
 // =============================================================================
 // THE GOVERNING PRINCIPLE: DEFAULT DENY, AND THE SERVER IS NOT A CLIENT

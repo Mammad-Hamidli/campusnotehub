@@ -2,7 +2,7 @@
  * Checks a password against an account's stored argon2id hash - WITHOUT a
  * login attempt, so it never increments failedLoginCount or trips the lockout.
  *
- *   npx tsx scripts/check-admin-password.mts admin@campushub.com
+ *   npx tsx scripts/check-admin-password.mts admin@campusnotehub.com
  *
  * The password is read from a hidden prompt, never from argv (argv lands in
  * shell history). Read-only: nothing in Firestore is modified. It needs the

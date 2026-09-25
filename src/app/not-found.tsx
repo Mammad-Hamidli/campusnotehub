@@ -50,7 +50,7 @@ export default function NotFound() {
               {t('stub.back')}
             </button>
             <Link href="/" className="btn-primary">
-              CampusHub
+              campusnotehub
             </Link>
           </div>
         </div>

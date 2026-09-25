@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// CampusHub Cloud Storage security rules.
+// campusnotehub Cloud Storage security rules.
 //
 // =============================================================================
 // THE ONE RULE THAT MATTERS MOST

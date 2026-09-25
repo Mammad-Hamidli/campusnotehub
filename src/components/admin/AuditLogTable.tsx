@@ -42,7 +42,7 @@ type Response = {
  * The audit log viewer.
  *
  * Read-only by construction, at three levels: this component renders no
- * mutation control, the API exposes only GET, and campushub_app holds only
+ * mutation control, the API exposes only GET, and campusnotehub_app holds only
  * INSERT and SELECT on the table (0001_invariants.sql revokes UPDATE and
  * DELETE). Even a compromised admin session cannot rewrite history through the
  * application - the grant is the backstop, and the UI simply agrees with it.

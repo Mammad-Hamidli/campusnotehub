@@ -153,7 +153,7 @@ export async function middleware(request: NextRequest) {
   const connectSrc = [
     `'self'`,
     `https://*.s3.eu-central-1.amazonaws.com`,
-    `wss://campushub.com`,
+    `wss://campusnotehub.com`,
     // The dev server pushes hot updates over a plain-ws connection to
     // localhost, which 'self' does not cover once a scheme is involved.
     ...(isDev ? [`ws:`] : []),
@@ -163,11 +163,11 @@ export async function middleware(request: NextRequest) {
     `default-src 'self'`,
     `script-src ${scriptSrc}`,
     `style-src 'self' 'unsafe-inline'`, // Tailwind emits inline styles for animations
-    `img-src 'self' data: blob: https://cdn.campushub.com`,
+    `img-src 'self' data: blob: https://cdn.campusnotehub.com`,
     `media-src 'self' blob:`,
     `font-src 'self' data:`,
     `connect-src ${connectSrc}`,
-    `frame-src 'self' https://meet.campushub.com`,
+    `frame-src 'self' https://meet.campusnotehub.com`,
     `frame-ancestors 'none'`,
     `form-action 'self'`,
     `base-uri 'none'`,
@@ -204,8 +204,8 @@ export async function middleware(request: NextRequest) {
   if (token && process.env.JWT_PUBLIC_KEY_PEM) {
     try {
       const { payload } = await jwtVerify(token, await getPublicKey(), {
-        issuer: 'campushub',
-        audience: 'campushub-web',
+        issuer: 'campusnotehub',
+        audience: 'campusnotehub-web',
       });
       session = { sub: payload.sub!, ver: String(payload.ver ?? 'UNVERIFIED') };
     } catch {
@@ -225,7 +225,7 @@ export async function middleware(request: NextRequest) {
    *
    * The dashboard is behind the session guard, which means it is unreachable
    * until the auth backend is running — inconvenient while building the UI.
-   * This lets `CAMPUSHUB_DEV_BYPASS_AUTH=1 npm run dev` render it directly.
+   * This lets `campusnotehub_DEV_BYPASS_AUTH=1 npm run dev` render it directly.
    *
    * The NODE_ENV check is the load-bearing half and it is deliberately first:
    * Next.js inlines `process.env.NODE_ENV` as the literal 'production' string
@@ -233,7 +233,7 @@ export async function middleware(request: NextRequest) {
    * minifier strips. Setting the variable on a production deploy does nothing.
    */
   const devBypass =
-    process.env.NODE_ENV !== 'production' && process.env.CAMPUSHUB_DEV_BYPASS_AUTH === '1';
+    process.env.NODE_ENV !== 'production' && process.env.campusnotehub_DEV_BYPASS_AUTH === '1';
 
   /**
    * Applied to the redirect responses as well as the rendered page, because a

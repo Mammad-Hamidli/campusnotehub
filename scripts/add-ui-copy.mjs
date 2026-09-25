@@ -188,7 +188,7 @@ const ADDITIONS = {
     },
     stub: {
       title: 'This section is under construction',
-      body: 'We are still building this part of CampusHub. It will be available soon.',
+      body: 'We are still building this part of campusnotehub. It will be available soon.',
       back: 'Go back',
       toFeed: 'Go to the feed',
     },
@@ -283,7 +283,7 @@ const ADDITIONS = {
     },
     stub: {
       title: 'Раздел в разработке',
-      body: 'Мы всё ещё строим эту часть CampusHub. Она появится совсем скоро.',
+      body: 'Мы всё ещё строим эту часть campusnotehub. Она появится совсем скоро.',
       back: 'Назад',
       toFeed: 'Перейти в ленту',
     },

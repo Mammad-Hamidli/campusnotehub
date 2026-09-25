@@ -6,7 +6,7 @@ import { PRIVACY } from '@/content/legal/privacy';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
-  description: 'What personal data CampusHub collects, why, how long it is kept, the cookies we use, and your rights.',
+  description: 'What personal data campusnotehub collects, why, how long it is kept, the cookies we use, and your rights.',
   alternates: { canonical: '/legal/privacy' },
 };
 

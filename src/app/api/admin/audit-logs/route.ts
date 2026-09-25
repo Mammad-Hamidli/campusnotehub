@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  * GET /api/admin/audit-logs - read-only, deliberately.
  *
  * There is no POST, PATCH or DELETE in this file and there must never be one.
- * Under Postgres the `campushub_app` role held only INSERT and SELECT on
+ * Under Postgres the `campusnotehub_app` role held only INSERT and SELECT on
  * audit_logs, so an edit endpoint would have failed at the database. Firestore
  * has no per-collection role grants for a service account - the Admin SDK
  * bypasses every rule - so that backstop is GONE, and the absence of a writer

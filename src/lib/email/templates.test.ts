@@ -67,7 +67,7 @@ describe('email templates', () => {
     it('carries a hidden preheader and the branded footer', () => {
       expect(rendered.html).toContain('mso-hide:all');
       expect(rendered.html).toContain('List-Unsubscribe' in {} ? '' : 'Manage notification preferences');
-      expect(rendered.html).toContain('CampusHub');
+      expect(rendered.html).toContain('campusnotehub');
     });
 
     it('uses a bulletproof button wherever it has a call to action', () => {

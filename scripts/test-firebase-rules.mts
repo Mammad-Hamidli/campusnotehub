@@ -31,7 +31,7 @@ import {
 const HOST = process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080';
 const [hostname, port] = HOST.split(':');
 
-const app = initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID ?? 'campushub-local', apiKey: 'emulator' }, 'rules-test');
+const app = initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID ?? 'campusnotehub-local', apiKey: 'emulator' }, 'rules-test');
 const db = getFirestore(app);
 connectFirestoreEmulator(db, hostname, Number(port));
 
