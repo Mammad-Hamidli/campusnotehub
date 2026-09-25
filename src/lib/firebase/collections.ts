@@ -84,6 +84,12 @@ export const COLLECTIONS = {
    */
   loginTickets: 'loginTickets',
   /**
+   * `deviceLinks/{hash(token)}`: a QR sign-in shown by a signed-in browser.
+   * Two minutes, single use, bound to the issuing session. Server-only; TTL
+   * policy on expiresAt. See repositories/deviceLinks.ts.
+   */
+  deviceLinks: 'deviceLinks',
+  /**
    * `authIdentities/{provider}:{hmac(subject)}` -> { userId, ... }. A Google /
    * Google account linked to a user. Keyed by the provider's
    * SUBJECT, never by email. Server-only; see repositories/identities.ts.

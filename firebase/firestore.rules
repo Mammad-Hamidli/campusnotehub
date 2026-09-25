@@ -244,6 +244,8 @@ service cloud.firestore {
     // hashes; `loginTickets` are half-finished sign-ins. Both are credentials.
     match /mfa/{userId}        { allow read, write: if false; }
     match /loginTickets/{id}   { allow read, write: if false; }
+    // QR sign-in codes: whoever holds one gets a session. Server-only.
+    match /deviceLinks/{id}    { allow read, write: if false; }
 
     // Social sign-in. Identities map a provider account to a user (listing
     // them would reveal who signs in with what); states carry PKCE verifiers;

@@ -63,8 +63,8 @@ type CaseDetail = {
  * Rows written before the de-duplication in decide() still carry repeated
  * codes, so every render path that keys on a code has to collapse them.
  */
-function uniqueCodes(codes: string[]): string[] {
-  return [...new Set(codes)];
+function uniqueCodes(codes: string[] | null | undefined): string[] {
+  return [...new Set(codes ?? [])];
 }
 
 export function ModerationConsole() {
@@ -76,7 +76,9 @@ export function ModerationConsole() {
     const res = await fetch('/api/admin/verification/queue');
     if (!res.ok) return setQueue([]);
     const data = await res.json();
-    setQueue(data.cases ?? []);
+    // The endpoint drops cases whose applicant is gone; this is the belt to
+    // that brace, since a null applicant would take the whole console down.
+    setQueue((Array.isArray(data?.cases) ? data.cases : []).filter((item: QueueItem | null) => item?.id && item.applicant));
   }, []);
 
   useEffect(() => {

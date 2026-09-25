@@ -310,6 +310,17 @@
         "signInAgain": "For your security, sign out and sign in with Google again, then set your password.",
         "alreadySet": "This account already has a password."
       }
+    },
+    "deviceLink": {
+      "title": "Sign in with QR code",
+      "checking": "Checking the code…",
+      "warning": "Continue only if you created this code yourself, in Settings → Account → Devices on your own signed-in device. A code from anyone else would sign you in to THEIR account.",
+      "continue": "Continue as @{nickname}",
+      "notMe": "This is not my account",
+      "toLogin": "Go to sign in",
+      "errors": {
+        "invalid": "This QR code is invalid, already used or expired. Generate a new one on your signed-in device."
+      }
     }
   },
   "verification": {
@@ -1286,6 +1297,7 @@
       "showDismissed": "Show cleared",
       "hideDismissed": "Hide cleared",
       "dismissed": "Cleared",
+      "deletedAccount": "Deleted account",
       "errors": {
         "undecided": "This case is still awaiting a decision and cannot be cleared."
       }
@@ -1604,6 +1616,20 @@
       "unknown": "Unknown device",
       "errors": {
         "current": "Use Sign out to end this device's session."
+      },
+      "link": {
+        "title": "Sign in on another device",
+        "description": "Show a QR code here and scan it with the other device’s camera — no password to type there.",
+        "start": "Show QR code",
+        "proofHint": "Confirm it is you first.",
+        "generate": "Generate QR code",
+        "qrAlt": "QR code for signing in on another device",
+        "scan": "Scan this with the camera of the device you want to sign in on. It works once.",
+        "expiresIn": "Expires in {time}",
+        "waiting": "Waiting for the other device…",
+        "linked": "Signed in on {device}. It now appears in the list above.",
+        "expired": "This code has expired.",
+        "again": "New QR code"
       }
     }
   },

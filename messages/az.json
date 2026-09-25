@@ -310,6 +310,17 @@
         "signInAgain": "Təhlükəsizlik üçün hesabdan çıx, Google ilə yenidən daxil ol və sonra şifrəni təyin et.",
         "alreadySet": "Bu hesabın artıq şifrəsi var."
       }
+    },
+    "deviceLink": {
+      "title": "QR kodla daxil ol",
+      "checking": "Kod yoxlanılır…",
+      "warning": "Yalnız bu kodu özünüz, daxil olduğunuz öz cihazınızda Tənzimləmələr → Hesab → Cihazlar bölməsində yaratmısınızsa davam edin. Başqasının kodu sizi ONUN hesabına daxil edər.",
+      "continue": "@{nickname} kimi davam et",
+      "notMe": "Bu mənim hesabım deyil",
+      "toLogin": "Girişə keç",
+      "errors": {
+        "invalid": "Bu QR kod etibarsızdır, artıq istifadə olunub və ya müddəti bitib. Daxil olduğunuz cihazda yenisini yaradın."
+      }
     }
   },
   "verification": {
@@ -1286,6 +1297,7 @@
       "showDismissed": "Çıxarılanları göstər",
       "hideDismissed": "Çıxarılanları gizlət",
       "dismissed": "Çıxarılıb",
+      "deletedAccount": "Silinmiş hesab",
       "errors": {
         "undecided": "Bu iş hələ qərar gözləyir və siyahıdan çıxarıla bilməz."
       }
@@ -1604,6 +1616,20 @@
       "unknown": "Naməlum cihaz",
       "errors": {
         "current": "Bu cihazdan çıxmaq üçün Çıxış düyməsindən istifadə edin."
+      },
+      "link": {
+        "title": "Başqa cihazda daxil ol",
+        "description": "Burada QR kod göstərin və digər cihazın kamerası ilə skan edin — orada şifrə yazmağa ehtiyac yoxdur.",
+        "start": "QR kodu göstər",
+        "proofHint": "Əvvəlcə bunun siz olduğunuzu təsdiqləyin.",
+        "generate": "QR kod yarat",
+        "qrAlt": "Başqa cihazda daxil olmaq üçün QR kod",
+        "scan": "Daxil olmaq istədiyiniz cihazın kamerası ilə bu kodu skan edin. Kod yalnız bir dəfə işləyir.",
+        "expiresIn": "Qalan vaxt: {time}",
+        "waiting": "Digər cihaz gözlənilir…",
+        "linked": "{device} cihazında daxil olundu. O, artıq yuxarıdakı siyahıdadır.",
+        "expired": "Bu kodun müddəti bitib.",
+        "again": "Yeni QR kod"
       }
     }
   },

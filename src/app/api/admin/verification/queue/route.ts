@@ -40,12 +40,19 @@ export async function GET(request: NextRequest) {
      * and Firestore permits a range on only one - so pushing either into the
      * query would still leave the other to be applied afterwards.
      */
-    const cases = queue.filter(
+    const buffered = queue.filter(
       (c) => Boolean(c.reviewBufferKey) && c.reviewExpiresAt !== null && c.reviewExpiresAt > now,
     );
 
     // The applicant decoration Prisma did with a join, as two batched reads.
-    const applicants = await findUsersByIds(cases.map((c) => c.userId));
+    const applicants = await findUsersByIds(buffered.map((c) => c.userId));
+
+    /**
+     * A case whose applicant account is gone (deleted, or wiped by a purge) is
+     * not actionable either: opening it answers 404 and there is nobody to
+     * approve. Returning it with `applicant: null` is what crashed the console.
+     */
+    const cases = buffered.filter((c) => applicants.has(c.userId));
     const universities = await findUniversitiesByIds(
       [...applicants.values()]
         .map((u) => u.universityId)
@@ -55,8 +62,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         cases: cases.map((c) => {
-          const applicant = applicants.get(c.userId);
-          const university = applicant?.universityId
+          const applicant = applicants.get(c.userId)!; // filtered above
+          const university = applicant.universityId
             ? universities.get(applicant.universityId)
             : null;
           return {
@@ -71,14 +78,12 @@ export async function GET(request: NextRequest) {
             codes: c.failureCodes,
             verdict: c.verdict,
             attempt: c.attempt,
-            applicant: applicant
-              ? {
-                  id: applicant.id,
-                  fullName: applicant.fullName,
-                  memberSince: applicant.createdAt,
-                  university: university?.code ?? null,
-                }
-              : null,
+            applicant: {
+              id: applicant.id,
+              fullName: applicant.fullName,
+              memberSince: applicant.createdAt,
+              university: university?.code ?? null,
+            },
           };
         }),
       },

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Laptop, Loader2, LogOut, Smartphone } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
+import { LinkDeviceCard } from './LinkDeviceCard';
 
 type Device = {
   id: string;
@@ -17,7 +18,8 @@ type Device = {
  * Settings → Account → Devices: every browser signed in to this account, when
  * it signed in and when it was last used, with "This device" marked. Any
  * other one can be signed out on the spot (DELETE /api/me/sessions/:id) - the
- * next request it makes is refused - or all of them at once.
+ * next request it makes is refused - or all of them at once. Below the list, a
+ * QR code signs another device in (LinkDeviceCard).
  */
 export function DevicesPanel() {
   const t = useT();
@@ -146,6 +148,8 @@ export function DevicesPanel() {
           })}
         </ul>
       )}
+
+      <LinkDeviceCard onLinked={load} />
     </section>
   );
 }

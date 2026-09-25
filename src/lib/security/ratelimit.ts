@@ -172,6 +172,13 @@ export const LIMITS = {
    */
   'email:change': { limit: 5, windowMs: 60 * 60_000 },
   'email:change:redeem': { limit: 10, windowMs: 15 * 60_000 },
+  /**
+   * QR sign-in. Issuing is per account (each code is a re-authenticated
+   * session-in-waiting); redeeming is charged per address on FAILURE only,
+   * so cycling random codes is bounded without slowing a real scan.
+   */
+  'auth:deviceLink:create': { limit: 10, windowMs: 60 * 60_000 },
+  'auth:deviceLink:ip': { limit: 30, windowMs: 15 * 60_000 },
   /** Revoking one's own sessions: generous, it only protects the write path. */
   'sessions:revoke': { limit: 60, windowMs: 60 * 60_000 },
   /** Saving and removing hashtag templates. */

@@ -30,6 +30,11 @@ type Case = {
   confidence: number | null;
   failureCodes: string[];
   moderatorNote: string | null;
+  /**
+   * Null when the applicant's account no longer exists (deleted, or wiped by
+   * a purge) - the case outlives it as history. Every read below must allow
+   * for that; `kase.user.id` on such a row is what crashed this page.
+   */
   user: {
     id: string;
     fullName: string;
@@ -41,7 +46,7 @@ type Case = {
     academicTitle: string | null;
     dateOfBirth: string | null;
     university: { code: string; nameEn: string } | null;
-  };
+  } | null;
   reviewer: { id: string; nickname: string } | null;
   reviewable: boolean;
   minutesLeft: number | null;
@@ -53,6 +58,9 @@ type Response = {
   cases: Case[];
   page: { page: number; pageSize: number; total: number; pageCount: number };
 };
+
+/** Legacy rows repeat codes, and some predate the field entirely. */
+const uniqueCodes = (codes: string[] | null | undefined) => [...new Set(codes ?? [])];
 
 const STATUSES = ['NEEDS_REVIEW', 'PROCESSING', 'REJECTED', 'VERIFIED', 'BANNED', 'UNVERIFIED'];
 
@@ -118,6 +126,9 @@ export function VerificationsTable() {
   const [busy, setBusy] = useState(false);
 
   const showDismissed = params.get('includeDismissed') === 'true';
+  // Rows with no id cannot be keyed, dismissed or reviewed; a malformed body
+  // renders as an empty list rather than taking the page down.
+  const cases = (Array.isArray(data?.cases) ? data.cases : []).filter((kase): kase is Case => Boolean(kase?.id));
 
   /**
    * Hides or restores a row.
@@ -228,11 +239,11 @@ export function VerificationsTable() {
                 <tr><td colSpan={10} className="p-0"><TableSkeleton rows={8} cols={7} /></td></tr>
               )}
 
-              {!loading && data?.cases.length === 0 && (
+              {!loading && cases.length === 0 && (
                 <tr><td colSpan={10}><EmptyState title={t('admin.verifications.empty')} hint={t('admin.verifications.emptyHint')} /></td></tr>
               )}
 
-              {!loading && data?.cases.map((kase) => (
+              {!loading && cases.map((kase) => (
                 <tr
                   key={kase.id}
                   className={`border-b border-edge last:border-0 hover:bg-surface-muted ${
@@ -240,10 +251,16 @@ export function VerificationsTable() {
                   }`}
                 >
                   <td className="px-3 py-2">
-                    <Link href={`/admin/users/${kase.user.id}`} className="font-medium text-fg underline-offset-2 hover:underline">
-                      {kase.user.fullName}
-                    </Link>
-                    <span className="mt-0.5 block text-2xs text-fg-subtle">@{kase.user.nickname}</span>
+                    {kase.user ? (
+                      <>
+                        <Link href={`/admin/users/${kase.user.id}`} className="font-medium text-fg underline-offset-2 hover:underline">
+                          {kase.user.fullName}
+                        </Link>
+                        <span className="mt-0.5 block text-2xs text-fg-subtle">@{kase.user.nickname}</span>
+                      </>
+                    ) : (
+                      <span className="font-medium italic text-fg-subtle">{t('admin.verifications.deletedAccount')}</span>
+                    )}
                     {kase.dismissedAt && (
                       <Badge tone="neutral">{t('admin.verifications.dismissed')}</Badge>
                     )}
@@ -252,15 +269,15 @@ export function VerificationsTable() {
                       should contain, so it belongs next to the person rather
                       than buried in the detail view. */}
                   <td className="whitespace-nowrap px-3 py-2">
-                    <StatusBadge kind="role" value={kase.user.role} />
-                    {(kase.user.role === 'TEACHER' || kase.user.role === 'MENTOR') &&
+                    {kase.user ? <StatusBadge kind="role" value={kase.user.role} /> : '—'}
+                    {(kase.user?.role === 'TEACHER' || kase.user?.role === 'MENTOR') &&
                       kase.user.department && (
                         <span className="mt-0.5 block text-2xs text-fg-subtle">
                           {kase.user.department}
                         </span>
                       )}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-fg-muted">{kase.user.university?.code ?? '—'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-fg-muted">{kase.user?.university?.code ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2 tabular-nums text-2xs text-fg-muted">{formatDateTime(kase.submittedAt)}</td>
                   <td className="px-3 py-2"><StatusBadge kind="verification" value={kase.status} /></td>
                   <td className="px-3 py-2 text-2xs text-fg-muted">
@@ -271,11 +288,11 @@ export function VerificationsTable() {
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex max-w-[16rem] flex-wrap gap-1">
-                      {[...new Set(kase.failureCodes)].slice(0, 4).map((code) => (
+                      {uniqueCodes(kase.failureCodes).slice(0, 4).map((code) => (
                         <Badge key={code} tone="warning">{code}</Badge>
                       ))}
-                      {new Set(kase.failureCodes).size > 4 && (
-                        <span className="text-2xs text-fg-subtle">+{new Set(kase.failureCodes).size - 4}</span>
+                      {uniqueCodes(kase.failureCodes).length > 4 && (
+                        <span className="text-2xs text-fg-subtle">+{uniqueCodes(kase.failureCodes).length - 4}</span>
                       )}
                     </div>
                   </td>
@@ -285,7 +302,7 @@ export function VerificationsTable() {
                   <td className="whitespace-nowrap px-3 py-2 tabular-nums text-2xs text-fg-muted">{formatDateTime(kase.decidedAt)}</td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <div className="flex items-center justify-end gap-1">
-                      {kase.reviewable ? (
+                      {kase.reviewable && kase.user ? (
                         <Link href="/admin/moderation" className="btn-secondary px-2 py-1 text-2xs">
                           <ExternalLink className="h-3 w-3" aria-hidden="true" />
                           {t('admin.verifications.review')}
@@ -295,7 +312,7 @@ export function VerificationsTable() {
                         </Link>
                       ) : (
                         <span className="text-2xs text-fg-subtle">
-                          {kase.status === 'NEEDS_REVIEW' ? t('admin.verifications.expired') : '—'}
+                          {kase.status === 'NEEDS_REVIEW' && kase.user ? t('admin.verifications.expired') : '—'}
                         </span>
                       )}
 
@@ -331,7 +348,7 @@ export function VerificationsTable() {
 
         {error && <ErrorState message={t(error)} onRetry={reload} />}
 
-        {data && (
+        {data?.page && (
           <Pagination
             page={data.page.page}
             pageCount={data.page.pageCount}
