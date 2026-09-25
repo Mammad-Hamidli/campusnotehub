@@ -7,6 +7,7 @@ import { Logo } from '@/components/ui/Logo';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { WindowsDownloadLink } from './WindowsDownload';
 
 /**
  * Marketing header.
@@ -66,6 +67,9 @@ export function SiteHeader() {
                 {link.label}
               </Link>
             ))}
+            {/* xl+ only: below that, a fourth link wraps the Russian labels
+                ("Приложение для Windows") onto two lines. */}
+            <WindowsDownloadLink className="hidden items-center gap-1.5 whitespace-nowrap text-sm text-fg-muted transition-colors duration-150 hover:text-fg xl:inline-flex" />
           </nav>
         </div>
 
@@ -108,6 +112,10 @@ export function SiteHeader() {
                 {link.label}
               </Link>
             ))}
+            <WindowsDownloadLink
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-md text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg"
+            />
             <div className="grid grid-cols-2 gap-2 pt-2">
               <Link href="/login" onClick={() => setMenuOpen(false)} className="btn-secondary py-2.5">
                 {t('nav.login')}

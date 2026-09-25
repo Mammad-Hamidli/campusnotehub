@@ -5,6 +5,7 @@ import { FeatureGrid } from '@/components/marketing/FeatureGrid';
 import { CallToAction } from '@/components/marketing/CallToAction';
 import { SiteFooter } from '@/components/marketing/SiteFooter';
 import { getPublicStats } from '@/lib/stats/public';
+import { getWindowsInstaller } from '@/lib/desktop/windowsInstaller';
 import { getViewer } from '@/lib/auth/session';
 import { UserRole } from '@/lib/enums';
 
@@ -17,6 +18,8 @@ import { UserRole } from '@/lib/enums';
  *
  * The stats are read here, on the server, from live collections (cached for
  * 15 minutes - see src/lib/stats/public.ts) and handed down as plain props.
+ * So is the Windows installer link (cached for 10 minutes - see
+ * src/lib/desktop/windowsInstaller.ts); the two lookups run in parallel.
  *
  * A signed-in visitor never sees it: every logo links to "/", and for someone
  * with a live session "/" means their home feed. Decided here with getViewer()
@@ -29,13 +32,13 @@ export default async function HomePage() {
     redirect(viewer.role === UserRole.ADMIN || viewer.role === UserRole.MODERATOR ? '/admin' : '/dashboard');
   }
 
-  const stats = await getPublicStats();
+  const [stats, installer] = await Promise.all([getPublicStats(), getWindowsInstaller()]);
 
   return (
     <>
       <SiteHeader />
       <main id="main">
-        <Hero stats={stats} />
+        <Hero stats={stats} installer={installer} />
         <FeatureGrid />
         <CallToAction />
       </main>

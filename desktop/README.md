@@ -91,6 +91,13 @@ opens no console (`windows_subsystem` in `src/main.rs`; `tauri.conf.json` has no
   The workflow checks that the tag matches the version and attaches the installer to a
   GitHub Release named after the tag.
 
+The site's "Download for Windows" button (landing page, header, footer, and the stable link
+`https://www.campusnotehub.com/download/windows`) picks up the newest `desktop-v*` release
+with a `*-setup.exe` asset within 10 minutes, with no redeploy. Until the first release exists
+it shows "coming soon". Drafts and pre-releases are ignored, so publishing a release as a
+pre-release is a way to test it before the site links to it. It is hidden inside the desktop
+app itself.
+
 ## Before public distribution: code signing
 
 The installer is unsigned, so Windows SmartScreen shows "Windows protected your PC"

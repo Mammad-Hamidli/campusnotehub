@@ -919,6 +919,14 @@
       "trust": "No fake profiles — every account is verified",
       "ctaJoin": "Join for free"
     },
+    "desktop": {
+      "download": "Download for Windows",
+      "short": "Windows app",
+      "comingSoon": "Windows app coming soon",
+      "version": "Version {version}",
+      "sizeMb": "{size} MB",
+      "requirements": "Windows 10 and 11"
+    },
     "stats": {
       "students": "Active students",
       "notes": "Class notes shared",

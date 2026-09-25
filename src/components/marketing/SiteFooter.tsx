@@ -5,6 +5,7 @@ import { Logo } from '@/components/ui/Logo';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { WindowsDownloadLink } from './WindowsDownload';
 
 /**
  * Footer.
@@ -61,6 +62,10 @@ export function SiteFooter() {
               <LanguageToggle />
               <ThemeToggle />
             </div>
+            <WindowsDownloadLink
+              label={t('landing.desktop.download')}
+              className="btn-secondary mt-4 h-8 rounded-full px-3 text-xs"
+            />
           </div>
 
           {columns.map((column) => (

@@ -919,6 +919,14 @@
       "trust": "Никаких фейковых профилей — каждый аккаунт проверен",
       "ctaJoin": "Присоединиться бесплатно"
     },
+    "desktop": {
+      "download": "Скачать для Windows",
+      "short": "Приложение для Windows",
+      "comingSoon": "Приложение для Windows — скоро",
+      "version": "Версия {version}",
+      "sizeMb": "{size} МБ",
+      "requirements": "Windows 10 и 11"
+    },
     "stats": {
       "students": "Активных студентов",
       "notes": "Конспектов лекций",

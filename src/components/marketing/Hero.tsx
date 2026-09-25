@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import type { PublicStats } from '@/lib/stats/public';
+import type { WindowsInstaller } from '@/lib/desktop/windowsInstaller';
 import { StatsRow } from './StatsBanner';
+import { WindowsDownloadButton } from './WindowsDownload';
 
 /**
  * The social features, each in its own floating bubble.
@@ -31,7 +33,7 @@ const BUBBLES = [
   { key: 'campus', emoji: '🎓', tone: 'fun-bubble-verified', pos: 'lg:right-[10%] lg:top-[80%]', tilt: '4deg', delay: '-3.7s' },
 ] as const;
 
-export function Hero({ stats }: { stats: PublicStats }) {
+export function Hero({ stats, installer }: { stats: PublicStats; installer: WindowsInstaller | null }) {
   const t = useT();
 
   return (
@@ -66,6 +68,11 @@ export function Hero({ stats }: { stats: PublicStats }) {
               <Link href="/notes" className="btn-secondary h-11 rounded-full px-5">
                 {t('landing.hero.ctaNotes')}
               </Link>
+            </div>
+
+            {/* empty:hidden - the button renders nothing inside the desktop app. */}
+            <div className="mt-4 empty:hidden">
+              <WindowsDownloadButton installer={installer} />
             </div>
 
             <p className="mt-5 text-xs text-fg-subtle">{t('landing.hero.trust')}</p>

@@ -919,6 +919,14 @@
       "trust": "Saxta profil yoxdur — hər hesab doğrulanır",
       "ctaJoin": "Pulsuz qoşul"
     },
+    "desktop": {
+      "download": "Windows üçün yüklə",
+      "short": "Windows tətbiqi",
+      "comingSoon": "Windows tətbiqi tezliklə gəlir",
+      "version": "Versiya {version}",
+      "sizeMb": "{size} MB",
+      "requirements": "Windows 10 və 11"
+    },
     "stats": {
       "students": "Aktiv tələbə",
       "notes": "Paylaşılan dərs notu",
