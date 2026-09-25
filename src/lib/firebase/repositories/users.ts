@@ -102,6 +102,13 @@ export type UserRecord = {
    * Absent on every other document, which reads as "complete".
    */
   profileIncomplete?: boolean;
+  /**
+   * True for a Google-created account that finished its profile before a
+   * local password was required, found on its next Google sign-in. The
+   * account is view-only and every page sends it to /set-password until
+   * setInitialPassword() clears it. Absent reads as "nothing owed".
+   */
+  passwordSetupRequired?: boolean;
   lastLoginAt: Date | null;
   failedLoginCount: number;
   lockedUntil: Date | null;
@@ -598,6 +605,8 @@ export async function completeProfile(
     lastName: string | null;
     nickname: string;
     universityId: string;
+    /** The argon2id hash of the local password chosen at /onboarding. */
+    passwordHash: string;
     /** Only when the account has no usable address yet. */
     email?: { value: string; hash: string };
   },
@@ -664,6 +673,7 @@ export async function completeProfile(
           universityId: patch.universityId,
           ...(patch.email ? { email: patch.email.value, emailVerifiedAt: null } : {}),
           profileIncomplete: false,
+          passwordSetupRequired: false,
           updatedAt: new Date(),
         }),
       );
@@ -676,13 +686,80 @@ export async function completeProfile(
         else tx.create(usernames().doc(nextKey), claimData);
       }
       // The credentials document is created with the account, so it exists.
-      if (patch.email) tx.update(credentials().doc(userId), { emailHash: patch.email.hash });
+      tx.update(
+        credentials().doc(userId),
+        forFirestore({
+          passwordHash: patch.passwordHash,
+          passwordChangedAt: new Date(),
+          ...(patch.email ? { emailHash: patch.email.hash } : {}),
+        }),
+      );
       return 'ok' as const;
     });
   } catch (error) {
     if (error instanceof DuplicateUserError) return error.field;
     throw error;
   }
+}
+
+/**
+ * Gives a Google-created account its FIRST local password. Refuses to
+ * overwrite an existing one ('already_set'): changing a password needs the
+ * current one, which is /api/me/password's job, not this function's.
+ */
+export async function setInitialPassword(userId: string, passwordHash: string): Promise<'ok' | 'already_set'> {
+  return adminDb().runTransaction(async (tx) => {
+    const cred = await tx.get(credentials().doc(userId));
+    if (typeof cred.data()?.passwordHash === 'string') return 'already_set' as const;
+    tx.set(credentials().doc(userId), forFirestore({ passwordHash, passwordChangedAt: new Date() }), { merge: true });
+    tx.update(users().doc(userId), forFirestore({ passwordSetupRequired: false, updatedAt: new Date() }));
+    return 'ok' as const;
+  });
+}
+
+/**
+ * Renames an established account: the `usernames` claim moves in the SAME
+ * transaction as the profile field - the old claim released, the new one
+ * create()d - for the reason given on updateUser(). Refused for an incomplete
+ * profile, which renames through completeProfile() instead.
+ */
+export async function renameUser(
+  userId: string,
+  nickname: string,
+): Promise<'ok' | 'unchanged' | 'incomplete' | 'nickname'> {
+  const nextKey = claimKeyFor(nickname);
+  return adminDb().runTransaction(async (tx) => {
+    const ref = users().doc(userId);
+    const current = docToObject<UserRecord>(await tx.get(ref)) as UserRecord | null;
+    if (!current) throw new Error('renameUser: user not found');
+    if (current.profileIncomplete === true) return 'incomplete' as const;
+    if (current.nickname === nickname) return 'unchanged' as const;
+
+    const prevKey = current.nicknameLower;
+    // Case-only change ("aysel" -> "Aysel"): same claim, just the display form.
+    if (prevKey === nextKey) {
+      tx.update(ref, forFirestore({ nickname, updatedAt: new Date() }));
+      return 'ok' as const;
+    }
+
+    const [byNickname, claim] = await Promise.all([
+      tx.get(users().where('nicknameLower', '==', nextKey).limit(IDENTIFIER_SCAN)),
+      tx.get(usernames().doc(nextKey)),
+    ]);
+    const claimOwner = claim.exists
+      ? await liveOwners(tx, [{ ref: claim.ref, ownerId: (claim.data() as UsernameClaim).userId }])
+      : ({ live: [], stale: [] } as OwnerSplit);
+
+    if (byNickname.docs.some((d) => d.id !== userId)) return 'nickname' as const;
+    if (claimOwner.live.some((owner) => owner !== userId)) return 'nickname' as const;
+
+    tx.update(ref, forFirestore({ nickname, nicknameLower: nextKey, updatedAt: new Date() }));
+    tx.delete(usernames().doc(prevKey));
+    const claimData = forFirestore({ userId, createdAt: new Date() } satisfies UsernameClaim);
+    if (claimOwner.stale.length > 0) tx.set(usernames().doc(nextKey), claimData);
+    else tx.create(usernames().doc(nextKey), claimData);
+    return 'ok' as const;
+  });
 }
 
 export async function updateCredentials(id: string, patch: Record<string, unknown>): Promise<void> {

@@ -1,16 +1,20 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { FieldVisibility, Locale } from '@/lib/enums';
+import { FieldVisibility, Locale, VerificationStatus } from '@/lib/enums';
 import { z } from 'zod';
 import {
   findUserById,
   profileCounts,
+  renameUser,
   updateUser,
   type UserRecord,
 } from '@/lib/firebase/repositories/users';
 import {
   findFacultyById,
+  findUniversityByCode,
   findUniversityById,
 } from '@/lib/firebase/repositories/reference';
+import { nicknameSchema, universityCodeSchema } from '@/server/validators/auth';
+import { clientIp, rateLimit } from '@/lib/security/ratelimit';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { creatorStatsFor } from '@/lib/firebase/repositories/notes';
 import { findMentorByUserId } from '@/lib/firebase/repositories/mentors';
@@ -197,6 +201,15 @@ export async function GET(request: NextRequest) {
  * handler written as `data: body`. Naming the permitted fields means a new
  * column on the model is not silently editable by whoever finds this route.
  *
+ * `nickname` IS editable, but never as a plain field: it is a claimed login
+ * identifier, so it goes through renameUser(), which moves the `usernames`
+ * claim in the same transaction, and through nicknameSchema, which refuses
+ * reserved staff handles ("admin", "adm1n", "admin_2") exactly as signup does.
+ *
+ * `universityId` (a CODE, like registration) is editable until the account is
+ * VERIFIED: verification was done against that university's student card, so
+ * a verified account moving elsewhere would keep a badge it never earned.
+ *
  * `email` and `phone` are excluded for a different reason: both have HMAC
  * companion columns (emailHash, phoneHash) that are unique and are documented
  * as surviving account deletion so a banned identity cannot be recycled.
@@ -210,6 +223,11 @@ export async function GET(request: NextRequest) {
  */
 const patchSchema = z
   .object({
+    nickname: nicknameSchema.optional(),
+    universityId: universityCodeSchema.optional(),
+    /** null clears it. */
+    graduationYear: z.number().int().min(1950).max(new Date().getFullYear() + 10).nullable().optional(),
+    graduationMonth: z.number().int().min(1).max(12).nullable().optional(),
     fullName: z
       .string()
       .trim()
@@ -242,8 +260,11 @@ const patchSchema = z
 
 export async function PATCH(request: NextRequest) {
   let userId: string;
+  let isVerified: boolean;
   try {
-    ({ userId } = await requireSession(request));
+    let viewer;
+    ({ userId, viewer } = await requireSession(request));
+    isVerified = viewer.verificationStatus === VerificationStatus.VERIFIED;
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
@@ -290,11 +311,61 @@ export async function PATCH(request: NextRequest) {
     if (input[key] !== undefined) data[key] = input[key];
   }
 
-  if (Object.keys(data).length === 0) {
+  if (input.graduationYear !== undefined) data.graduationYear = input.graduationYear;
+  if (input.graduationMonth !== undefined) data.graduationMonth = input.graduationMonth;
+
+  if (input.universityId !== undefined) {
+    const university = await findUniversityByCode(input.universityId);
+    if (!university) {
+      return NextResponse.json(
+        { error: 'errors.validationFailed', fields: { universityId: ['errors.fieldRequired'] } },
+        { status: 400 },
+      );
+    }
+    const current = await findUserById(userId);
+    if (current?.universityId !== university.id) {
+      if (isVerified) {
+        return NextResponse.json(
+          { error: 'settings.academic.universityLocked', fields: { universityId: ['settings.academic.universityLocked'] } },
+          { status: 409 },
+        );
+      }
+      data.universityId = university.id;
+    }
+  }
+
+  if (Object.keys(data).length === 0 && input.nickname === undefined) {
     return NextResponse.json({ error: 'errors.validationFailed' }, { status: 400 });
   }
 
-  await updateUser(userId, data);
+  /**
+   * The rename runs FIRST and on its own transaction: a taken handle must
+   * refuse the whole save before any other field is written, so the form's
+   * "not saved" state is the truth.
+   */
+  let renamedTo: string | null = null;
+  if (input.nickname !== undefined) {
+    const rate = await rateLimit('profile:rename', { userId, ip: clientIp(request.headers) });
+    if (!rate.ok) {
+      return NextResponse.json(
+        { error: 'errors.rateLimited' },
+        { status: 429, headers: { 'Retry-After': String(rate.retryAfterSeconds) } },
+      );
+    }
+    const renamed = await renameUser(userId, input.nickname);
+    if (renamed === 'nickname') {
+      return NextResponse.json(
+        { error: 'auth.errors.nicknameTaken', fields: { nickname: ['auth.errors.nicknameTaken'] } },
+        { status: 409 },
+      );
+    }
+    if (renamed === 'incomplete') {
+      return NextResponse.json({ error: 'onboarding.restricted' }, { status: 409 });
+    }
+    if (renamed === 'ok') renamedTo = input.nickname;
+  }
+
+  if (Object.keys(data).length > 0) await updateUser(userId, data);
 
   /**
    * Read back rather than echoing the patch.
@@ -312,7 +383,7 @@ export async function PATCH(request: NextRequest) {
 
   sendEmailAsync(user.email, 'profileUpdated', {
     nickname: user.nickname,
-    fields: Object.keys(data).filter((key) => key !== 'facultyOther'),
+    fields: [...Object.keys(data).filter((key) => key !== 'facultyOther'), ...(renamedTo ? ['nickname'] : [])],
   });
 
   // Narrowed to the editable set - the same fields the old `select` returned.
@@ -322,6 +393,9 @@ export async function PATCH(request: NextRequest) {
         id: user.id,
         fullName: user.fullName,
         nickname: user.nickname,
+        universityId: user.universityId,
+        graduationYear: user.graduationYear,
+        graduationMonth: user.graduationMonth,
         headline: user.headline,
         bio: user.bio,
         locale: user.locale,

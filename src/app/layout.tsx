@@ -7,6 +7,8 @@ import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 import { SessionKeeper } from '@/components/auth/SessionKeeper';
 import { IdentityPromptSlot } from '@/components/account/IdentityPromptSlot';
 import { FeedbackProvider } from '@/components/ui/Feedback';
+import { FollowingProvider } from '@/components/social/Following';
+import { getViewer } from '@/lib/auth/session';
 import { WarmBackdrop } from '@/components/ui/WarmBackdrop';
 // Imported from constants.ts, NOT from the 'use client' provider: a plain
 // export read across that boundary resolves to undefined on the server.
@@ -82,6 +84,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
    */
   const nonce = (await headers()).get('x-nonce') ?? undefined;
 
+  // Free: the same memoised session read IdentityPromptSlot and the page's
+  // own guard make. Signed out, there is no cookie and no Firestore read.
+  const viewer = await getViewer();
+
   // Both preferences resolve on the SERVER so the first paint is already
   // correct. A client-only read renders in the default language and light
   // theme, hydrates, then repaints — and the flash is very visible.
@@ -152,7 +158,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 at all; see IdentityPromptSlot for why the session read is free.
               */}
               <IdentityPromptSlot />
-              {children}
+              {/* "Following" badges next to names, on every route. */}
+              <FollowingProvider viewerId={viewer?.id ?? null}>{children}</FollowingProvider>
             </FeedbackProvider>
           </LocaleProvider>
         </ThemeProvider>

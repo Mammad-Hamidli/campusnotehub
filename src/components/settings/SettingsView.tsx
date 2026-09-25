@@ -29,11 +29,14 @@ import { VISIBILITY_OPTIONS, VisibilitySelect, type Visibility } from './Visibil
 import { UNIVERSITIES } from '@/lib/universities';
 import { VerificationSection, type IdentityState } from './VerificationSection';
 import { DeletionRequestCard } from './DeletionRequestCard';
+import { AvatarUploader } from '@/components/profile/AvatarUploader';
 
 type Section = 'profile' | 'verification' | 'privacy' | 'appearance' | 'account';
 
 export type SettingsData = {
   nickname: string;
+  /** Saved the moment it is uploaded (POST /api/me/avatar), never by the Save bar. */
+  avatarUrl: string | null;
   fullName: string;
   email: string;
   phone: string;
@@ -81,6 +84,7 @@ export type SettingsData = {
  */
 const EMPTY: SettingsData = {
   nickname: '',
+  avatarUrl: null,
   fullName: '',
   email: '',
   phone: '',
@@ -164,6 +168,7 @@ export function SettingsView() {
         const u = body.user;
         const next: SettingsData = {
           nickname: u.nickname ?? '',
+          avatarUrl: u.avatarUrl ?? null,
           fullName: u.fullName ?? '',
           email: u.email ?? '',
           phone: u.phone ?? '',
@@ -211,11 +216,15 @@ export function SettingsView() {
    * on the next reload. That is the same simulated-success pattern the
    * composer had, and it is the reason this screen looked finished.
    *
-   * Only the fields /api/me actually accepts are sent. `email`, `phone` and
-   * `nickname` are deliberately NOT among them - see the allow-list note on
-   * that route: the first two have unique HMAC companion columns that must
-   * change together and need a verified flow, and they are rendered read-only
-   * here for the same reason.
+   * Only the fields /api/me actually accepts are sent. `email` and `phone`
+   * are deliberately NOT among them - see the allow-list note on that route:
+   * both have unique HMAC companion columns that must change together and need
+   * a verified flow.
+   *
+   * Nickname, university and graduation date used to be editable here but were
+   * never sent: a change to only those took the "nothing to send" branch below,
+   * reported "Saved", and was gone on the next reload. Every editable input on
+   * this form now has a field in the patch.
    */
   async function save() {
     if (!dirty || saving) return;
@@ -241,6 +250,14 @@ export function SettingsView() {
        */
       const patch: Record<string, unknown> = {};
 
+      if (data.nickname.trim() !== baseline.nickname.trim()) patch.nickname = data.nickname.trim();
+      if (data.universityId !== baseline.universityId && data.universityId) patch.universityId = data.universityId;
+      if (data.graduationYear !== baseline.graduationYear) {
+        patch.graduationYear = data.graduationYear ? Number(data.graduationYear) : null;
+      }
+      if (data.graduationMonth !== baseline.graduationMonth) {
+        patch.graduationMonth = data.graduationMonth ? Number(data.graduationMonth) : null;
+      }
       if (data.fullName.trim() !== baseline.fullName.trim()) patch.fullName = data.fullName.trim();
       if (data.headline.trim() !== baseline.headline.trim()) patch.headline = data.headline.trim();
       if (data.bio.trim() !== baseline.bio.trim()) patch.bio = data.bio.trim();
@@ -257,7 +274,7 @@ export function SettingsView() {
       }
 
       // `dirty` is computed over the whole object, which includes fields this
-      // form cannot submit (email, phone, nickname). If none of the editable
+      // form cannot submit (email, phone). If none of the editable
       // ones moved there is nothing to send, and PATCH would 400 on an empty
       // body.
       if (Object.keys(patch).length === 0) {
@@ -283,11 +300,21 @@ export function SettingsView() {
         // the difference between a fixable message and a dead end.
         const fields = payload?.fields as Record<string, string[]> | undefined;
         const firstField = fields ? Object.keys(fields)[0] : undefined;
-        setSaveError(firstField ? `${firstField}: ${fields![firstField][0]}` : (payload?.error ?? 'errors.generic'));
+        setSaveError(firstField ? fields![firstField][0] : (payload?.error ?? 'errors.generic'));
         return;
       }
 
-      setBaseline(data);
+      // The form now holds what was stored (trimmed the way the server trims),
+      // so a reload shows exactly this and the dirty check starts clean.
+      const saved: SettingsData = {
+        ...data,
+        nickname: data.nickname.trim(),
+        fullName: data.fullName.trim(),
+        headline: data.headline.trim(),
+        bio: data.bio.trim(),
+      };
+      setData(saved);
+      setBaseline(saved);
       toast.success(t('settings.saved'));
     } catch {
       setSaveError('errors.generic');
@@ -364,7 +391,16 @@ export function SettingsView() {
 
           <div className="min-w-0 space-y-6">
             {section === 'profile' && (
-              <ProfileSection data={data} onChange={patch} />
+              <ProfileSection
+                data={data}
+                onChange={patch}
+                onAvatarChange={(avatarUrl) => {
+                  // Already persisted by the upload - move the baseline too, so
+                  // a new picture never shows up as an unsaved change.
+                  setData((prev) => ({ ...prev, avatarUrl }));
+                  setBaseline((prev) => ({ ...prev, avatarUrl }));
+                }}
+              />
             )}
             {section === 'verification' && (
               <VerificationSection
@@ -427,27 +463,27 @@ export function SettingsView() {
 function ProfileSection({
   data,
   onChange,
+  onAvatarChange,
 }: {
   data: SettingsData;
   onChange: (patch: Partial<SettingsData>) => void;
+  onAvatarChange: (avatarUrl: string | null) => void;
 }) {
   const t = useT();
 
   return (
     <>
       <Card title={t('settings.profile.title')} description={t('settings.profile.description')}>
+        {/* This was an initials circle next to a button with no onClick. The
+            uploader is the same one /profile uses. */}
         <Row label={t('settings.profile.avatar')} hint={t('settings.profile.avatarHint')}>
-          <div className="flex items-center gap-3">
-            <span
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full
- bg-surface-inset text-sm font-medium text-fg-muted"
-              aria-hidden="true"
-            >
-              {data.nickname.slice(0, 2).toUpperCase()}
-            </span>
-            <button type="button" className="btn-secondary h-8 text-xs">
-              {t('settings.profile.changeAvatar')}
-            </button>
+          <div className="flex justify-start">
+            <AvatarUploader
+              nickname={data.nickname}
+              avatarUrl={data.avatarUrl}
+              verified={data.isVerified}
+              onChange={onAvatarChange}
+            />
           </div>
         </Row>
 
@@ -491,13 +527,23 @@ function ProfileSection({
       </Card>
 
       <Card title={t('settings.academic.title')} description={t('settings.academic.description')}>
-        <Row label={t('auth.register.university')} htmlFor="university">
+        <Row
+          label={t('auth.register.university')}
+          hint={data.isVerified ? t('settings.academic.universityLocked') : undefined}
+          htmlFor="university"
+        >
           <select
             id="university"
             value={data.universityId}
+            disabled={data.isVerified}
             onChange={(e) => onChange({ universityId: e.target.value })}
-            className="input appearance-none"
+            className="input appearance-none disabled:cursor-not-allowed disabled:opacity-70"
           >
+            {/* Without a blank option an account with no university showed the
+                FIRST one as if it were stored. */}
+            <option value="" disabled>
+              —
+            </option>
             {UNIVERSITIES.map((uni) => (
               <option key={uni.id} value={uni.id}>
                 {uni.id} — {uni.az}
@@ -521,6 +567,7 @@ function ProfileSection({
               onChange={(e) => onChange({ graduationMonth: e.target.value })}
               className="input appearance-none"
             >
+              <option value="">—</option>
               {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => (
                 <option key={m} value={m}>
                   {m.padStart(2, '0')}

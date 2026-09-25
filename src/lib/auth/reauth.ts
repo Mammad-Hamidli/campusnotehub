@@ -26,6 +26,17 @@ import { mfaJson, stepUp } from '@/lib/auth/mfa-http';
  */
 export const RECENT_SIGN_IN_MS = 10 * 60_000;
 
+/**
+ * How recent the Google sign-in must be for a password-less account to add
+ * its FIRST password (/onboarding, /set-password). Adding a password is adding
+ * a sign-in method, so a borrowed cookie must not be enough - but the person
+ * is filling in a form, so this is longer than the ten minutes above.
+ */
+export const PASSWORD_SETUP_WINDOW_MS = 30 * 60_000;
+
+export const isRecentSignIn = (authenticatedAt: Date, windowMs = PASSWORD_SETUP_WINDOW_MS) =>
+  Date.now() - authenticatedAt.getTime() <= windowMs;
+
 export type ReauthBody = { password?: string; code?: string; recoveryCode?: string };
 export type ReauthMethod = 'totp' | 'recovery' | 'password' | 'recent_sign_in';
 

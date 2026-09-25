@@ -10,6 +10,7 @@ import { VerifiedBadge } from '@/components/dashboard/VerificationBanner';
 import { PostCard, type Post } from '@/components/dashboard/PostCard';
 import { toPost, type ApiPost } from '@/components/dashboard/postMapping';
 import type { PublicProfile } from '@/lib/profile/public';
+import { FollowingBadge, useFollowing } from '@/components/social/Following';
 
 /**
  * Someone's profile: picture (with the verification ring), handle, name when
@@ -96,6 +97,7 @@ export function PublicProfileView({
           <h1 className="mt-3 flex flex-wrap items-center gap-1.5 text-xl font-bold tracking-tight text-fg">
             @{profile.nickname}
             <VerifiedBadge verified={profile.isVerified} />
+            {!profile.viewer.isSelf && <FollowingBadge nickname={profile.nickname} />}
           </h1>
           {profile.fullName && <p className="text-sm font-medium text-fg-muted">{profile.fullName}</p>}
           {profile.headline && <p className="mt-1 text-sm text-fg">{profile.headline}</p>}
@@ -179,8 +181,21 @@ function FollowButton({
 }) {
   const t = useT();
   const toast = useToast();
-  const [following, setFollowing] = useState(initiallyFollowing);
+  const [following, setFollowingLocal] = useState(initiallyFollowing);
   const [busy, setBusy] = useState(false);
+  const shared = useFollowing();
+
+  // Every "Following" badge on screen reads the shared set, so the button
+  // writes through to it; the server-rendered value seeds it on first paint.
+  const setFollowing = (value: boolean) => {
+    setFollowingLocal(value);
+    shared?.setFollowing(nickname, value);
+  };
+  useEffect(() => {
+    shared?.setFollowing(nickname, initiallyFollowing);
+    // Seed once per profile; later changes go through setFollowing above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nickname]);
 
   if (!signedIn) {
     return (

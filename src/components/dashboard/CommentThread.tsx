@@ -6,6 +6,7 @@ import { Loader2, Send } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { FollowingBadge } from '@/components/social/Following';
 import { VerifiedBadge } from './VerificationBanner';
 
 /**
@@ -187,6 +188,7 @@ export function CommentThread({
                     @{comment.author.nickname}
                   </Link>
                   <VerifiedBadge verified={comment.author.isVerified} />
+                  <FollowingBadge nickname={comment.author.nickname} />
                   <time className="text-2xs text-fg-subtle">{age(comment.createdAt)}</time>
                 </div>
                 <p

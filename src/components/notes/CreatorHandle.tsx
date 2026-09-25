@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { FollowingBadge } from '@/components/social/Following';
 
 export type CreatorStats = { ratingAvg: number; ratedFiles: number; reviewCount: number };
 
@@ -23,6 +24,7 @@ export function CreatorHandle({
   return (
     <span className={className}>
       @{nickname}
+      <FollowingBadge nickname={nickname} className="ml-1 align-middle" />
       {stats && stats.reviewCount > 0 && (
         <span className="ml-1 tabular-nums text-fg-subtle">
           {t('notes.creatorStats', {

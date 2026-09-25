@@ -25,8 +25,11 @@ type User = {
   deletedAt: Date | null;
   lockedUntil: Date | null;
   profileIncomplete?: boolean;
+  passwordSetupRequired?: boolean;
 };
 const users = new Map<string, User>();
+/** Accounts that have never had a password (Google-only). Everyone else has one. */
+const passwordless = new Set<string>();
 const identities = new Map<string, { userId: string; provider: string }>();
 const mfaEnrolled = new Set<string>();
 const sessions = new Map<string, { userId: string; revokedAt: Date | null; expiresAt: Date }>();
@@ -83,6 +86,7 @@ vi.mock('@/lib/firebase/repositories/users', () => ({
   findUserById: async (id: string) => users.get(id) ?? null,
   findUserIdByEmailHash: async (hash: string) => [...users.values()].find((u) => `h:${u.email}` === hash)?.id ?? null,
   updateUser: (...a: unknown[]) => updateUser(...(a as [string, Partial<User>])),
+  getCredentials: async (id: string) => ({ id, passwordHash: passwordless.has(id) ? null : '$argon2id$x' }),
 }));
 vi.mock('@/lib/crypto/hash', async () => {
   const actual = await vi.importActual<typeof import('@/lib/crypto/hash')>('@/lib/crypto/hash');
@@ -151,6 +155,7 @@ beforeEach(() => {
   users.clear();
   identities.clear();
   mfaEnrolled.clear();
+  passwordless.clear();
   sessions.clear();
   vi.clearAllMocks();
   consumed = loginState();
@@ -310,6 +315,40 @@ describe('link from settings', () => {
     const { location } = await callback();
     expect(location.searchParams.get('oauth')).toBe('identity_in_use');
     expect(identities.get('google:g-sub')?.userId).toBe('u2');
+  });
+});
+
+describe('owed local password', () => {
+  it('sends a Google-only account to /set-password and flags it until one is set', async () => {
+    user('u1');
+    passwordless.add('u1');
+    identities.set('google:g-sub', { userId: 'u1', provider: 'google' });
+    profile = google();
+    consumed = loginState('/notes');
+    await callback();
+    expect(updateUser).toHaveBeenCalledWith('u1', { passwordSetupRequired: true });
+    expect(completeLogin).toHaveBeenCalledWith(expect.objectContaining({ redirectTo: '/set-password' }));
+  });
+
+  it('flags it BEFORE the 2FA step, so the code does not skip the password', async () => {
+    user('u1');
+    passwordless.add('u1');
+    mfaEnrolled.add('u1');
+    identities.set('google:g-sub', { userId: 'u1', provider: 'google' });
+    profile = google();
+    const { location } = await callback();
+    expect(location.searchParams.get('mfa')).toBe('1');
+    expect(users.get('u1')!.passwordSetupRequired).toBe(true);
+  });
+
+  it('leaves accounts with a password alone', async () => {
+    user('u1');
+    identities.set('google:g-sub', { userId: 'u1', provider: 'google' });
+    profile = google();
+    consumed = loginState('/notes');
+    await callback();
+    expect(updateUser).not.toHaveBeenCalledWith('u1', { passwordSetupRequired: true });
+    expect(completeLogin).toHaveBeenCalledWith(expect.objectContaining({ redirectTo: '/notes' }));
   });
 });
 

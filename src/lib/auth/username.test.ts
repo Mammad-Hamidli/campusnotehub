@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLoginIdentifier, usernameKey } from './username';
+import { isReservedUsername, parseLoginIdentifier, usernameKey } from './username';
 import { loginSchema } from '@/server/validators/auth';
 
 describe('usernameKey', () => {
@@ -67,5 +67,23 @@ describe('loginSchema', () => {
   it('refuses a missing identifier or password', () => {
     expect(loginSchema.safeParse({ password }).success).toBe(false);
     expect(loginSchema.safeParse({ identifier: 'aysel', password: '' }).success).toBe(false);
+  });
+});
+
+describe('isReservedUsername', () => {
+  it('refuses staff and brand handles, however they are dressed up', () => {
+    for (const name of [
+      'admin', 'Administrator', '@admin', 'admin_1', 'admin2', '_admin_', 'adm1n', '4dmin', 'sysadmin',
+      'the_administrator', 'theadmin', 'adminbob', 'Moderator', 'm0derator_x', 'mod_team', 'official_ada',
+      'support_team', 'campusnotehub_help', 'root', 'user34232',
+    ]) {
+      expect(isReservedUsername(name), name).toBe(true);
+    }
+  });
+
+  it('leaves ordinary handles alone', () => {
+    for (const name of ['aysel_m', 'badminton_fan', 'moderate_joe', 'modern_art', 'rooted', 'supporter', 'user1234', 'ilkin']) {
+      expect(isReservedUsername(name), name).toBe(false);
+    }
   });
 });

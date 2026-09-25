@@ -8,6 +8,7 @@ import { clampFeedAspect } from '@/lib/media/constants';
 import { Menu, MenuItem } from '@/components/ui/Menu';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { FollowingBadge } from '@/components/social/Following';
 import { VerifiedBadge } from './VerificationBanner';
 import { CommentThread } from './CommentThread';
 import { PostTranslation } from './PostTranslation';
@@ -196,6 +197,7 @@ export function PostCard({
               @{post.author.nickname}
             </Link>
             <VerifiedBadge verified={post.author.verified} />
+            {!isOwn && <FollowingBadge nickname={post.author.nickname} />}
             <span
               className="rounded-md bg-surface-inset px-1.5 py-0.5 text-2xs font-semibold text-fg-muted"
             >

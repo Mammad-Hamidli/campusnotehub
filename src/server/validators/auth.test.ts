@@ -110,10 +110,24 @@ describe('nickname rules', () => {
 });
 
 describe('completeProfileSchema', () => {
-  const profile = { fullName: 'Aysel', nickname: 'aysel_m', universityId: 'ADA', acceptTerms: true };
+  const profile = {
+    fullName: 'Aysel',
+    nickname: 'aysel_m',
+    universityId: 'ADA',
+    password: 'correct horse battery',
+    acceptTerms: true,
+  };
 
-  it('needs no password (the account signs in through its provider)', () => {
+  it('requires a strong local password (a Google-only account is lost with its Google account)', () => {
     expect(completeProfileSchema.safeParse(profile).success).toBe(true);
+    expect(completeProfileSchema.safeParse({ ...profile, password: undefined }).success).toBe(false);
+    expect(completeProfileSchema.safeParse({ ...profile, password: 'short' }).success).toBe(false);
+  });
+
+  it('refuses reserved staff handles', () => {
+    for (const nickname of ['admin', 'admin_2', 'adm1n', 'Administrator']) {
+      expect(completeProfileSchema.safeParse({ ...profile, nickname }).success, nickname).toBe(false);
+    }
   });
 
   it('accepts an email for accounts whose provider supplied none', () => {

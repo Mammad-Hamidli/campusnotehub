@@ -10,9 +10,10 @@ import { ErrorSummary } from '@/components/register/ErrorSummary';
 import { EMPTY_PROFILE, validateProfile, type ProfileErrors, type ProfileForm } from '@/components/register/types';
 
 /**
- * Finishing a quick-login account: name, nickname, university (and an email
- * only when the provider supplied none). Posts to /api/me/onboarding, which
- * swaps the temporary handle for the chosen one and lifts the view-only gate.
+ * Finishing a quick-login account: name, nickname, university, a local
+ * password (and an email only when the provider supplied none). Posts to
+ * /api/me/onboarding, which swaps the temporary handle for the chosen one,
+ * stores the password and lifts the view-only gate.
  */
 export function OnboardingForm({
   temporaryHandle,
@@ -47,7 +48,7 @@ export function OnboardingForm({
     event.preventDefault();
     if (submitting) return;
 
-    const found = validateProfile(form, { requirePassword: false, requireEmail: needsEmail });
+    const found = validateProfile(form, { requirePassword: true, requireEmail: needsEmail });
     setErrors(found);
     if (Object.keys(found).length > 0) {
       setShowSummary(true);
@@ -64,6 +65,7 @@ export function OnboardingForm({
           fullName: form.fullName.trim().replace(/\s+/g, ' '),
           nickname: form.nickname.trim(),
           universityId: form.universityId,
+          password: form.password,
           ...(needsEmail ? { email: form.email.trim().toLowerCase() } : {}),
           acceptTerms: form.acceptTerms,
         }),
@@ -80,8 +82,20 @@ export function OnboardingForm({
         router.replace('/dashboard');
         return;
       }
+      if (res.status === 400 && body.fields) {
+        // Per-field keys from the server (a weak password, a reserved handle).
+        const fields = body.fields as Record<string, string[] | undefined>;
+        setErrors(
+          Object.fromEntries(
+            Object.entries(fields).flatMap(([key, messages]) => (messages?.[0] ? [[key, messages[0]]] : [])),
+          ) as ProfileErrors,
+        );
+        setShowSummary(true);
+        return;
+      }
       if (!res.ok) {
-        setFormError(res.status === 429 ? 'errors.rateLimited' : res.status === 400 ? 'errors.validationFailed' : 'errors.generic');
+        // 403 = the Google sign-in is too old to be trusted with adding a password.
+        setFormError(res.status === 403 ? body.error ?? 'errors.forbidden' : res.status === 429 ? 'errors.rateLimited' : res.status === 400 ? 'errors.validationFailed' : 'errors.generic');
         return;
       }
 
@@ -117,7 +131,7 @@ export function OnboardingForm({
           errors={errors}
           onChange={update}
           showEmail={needsEmail}
-          showPassword={false}
+          showPassword
         />
 
         {formError && (

@@ -11,7 +11,7 @@ import { jwtVerify, importSPKI } from 'jose';
 
 /** Routes that require a session. */
 const PROTECTED = [
-  /^\/(dashboard|wallet|settings|notifications|profile|bookmarks|bookings|verify|onboarding)/,
+  /^\/(dashboard|wallet|settings|notifications|profile|bookmarks|bookings|verify|onboarding|set-password)/,
   /^\/notes\/(new|purchases)/,
   /**
    * /mentors/apply is deliberately NOT here.

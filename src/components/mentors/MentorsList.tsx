@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BadgeCheck, Briefcase, GraduationCap, Search, ShieldAlert, Star, UserRoundSearch, Video } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { FollowingBadge } from '@/components/social/Following';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 
 /**
@@ -295,6 +296,7 @@ export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
                       <span className="truncate text-sm font-medium text-fg">
                         @{mentor.user.nickname}
                       </span>
+                      <FollowingBadge nickname={mentor.user.nickname} />
                       {mentor.user.isVerified && (
                         <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-verified" aria-hidden="true" />
                       )}

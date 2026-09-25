@@ -168,6 +168,9 @@ export const LIMITS = {
   // taken nicknames without letting the form probe which handles exist.
   'profile:complete': { limit: 20, windowMs: 60 * 60_000 },
   'profile:avatar': { limit: 20, windowMs: 60 * 60_000 },
+  // Renaming frees the old handle for anyone to take, so a rename is rare by
+  // design: enough to fix a typo, not enough to cycle through handles.
+  'profile:rename': { limit: 5, windowMs: 24 * 60 * 60_000 },
   'users:follow': { limit: 200, windowMs: 60 * 60_000 },
 } as const;
 

@@ -36,6 +36,64 @@ export function usernameKey(raw: string): string | null {
   return USERNAME_PATTERN.test(bare) ? bare.toLowerCase() : null;
 }
 
+/**
+ * Handles nobody may CHOOSE - at registration, at onboarding, or by renaming
+ * in Settings. They would let someone pass as the platform or its staff, or
+ * collide with a route. Accounts provisioned by operators (bootstrap-admin)
+ * do not go through the chooser and are unaffected.
+ */
+const RESERVED_USERNAMES = new Set([
+  'admin', 'administrator', 'administration', 'sysadmin', 'superuser', 'moderator', 'mod',
+  'campusnotehub', 'support', 'help', 'staff', 'official', 'system', 'root', 'security',
+  'team', 'owner', 'webmaster', 'postmaster', 'hostmaster', 'abuse', 'noreply', 'no_reply',
+  'api', 'null', 'undefined', 'me', 'you', 'settings', 'login', 'logout', 'register',
+  'dashboard', 'onboarding', 'mentors', 'profile',
+]);
+
+/**
+ * Staff words refused as any `_`-separated PART of a handle, with digits
+ * around it ignored: "admin_2", "mod99", "official_ada", "support_team".
+ */
+const STAFF_WORDS = new Set([
+  'admin', 'administrator', 'sysadmin', 'superuser', 'moderator', 'mod', 'staff', 'official',
+  'support', 'campusnotehub', 'root',
+]);
+
+/**
+ * Words refused at the START or END of a handle even when glued to other
+ * letters ("adminbob", "theadmin", "administrator2"). Not "anywhere" - that
+ * would refuse "badminton".
+ */
+const STAFF_AFFIXES = ['admin', 'moderator', 'campusnotehub', 'superuser'];
+
+/** The digit look-alikes people use to dodge a word list: "adm1n", "m0derator". */
+const LEET: Record<string, string> = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't' };
+const deLeet = (s: string) => s.replace(/[013457]/g, (d) => LEET[d]);
+const trimDigits = (s: string) => s.replace(/^\d+|\d+$/g, '');
+
+/**
+ * The temporary handles quick-login accounts start with ("user34232" - see
+ * temporaryHandle()). Refused as a CHOSEN nickname so a real person can never
+ * look like an unfinished account, and so the random space stays free.
+ */
+export const TEMPORARY_HANDLE = /^user\d{5}$/i;
+
+/**
+ * True when `raw` may not be chosen as a handle. Shared by the server
+ * validators and the client forms, so both refuse exactly the same names.
+ */
+export function isReservedUsername(raw: string): boolean {
+  const key = raw.trim().replace(/^@/, '').toLowerCase();
+  if (RESERVED_USERNAMES.has(key) || TEMPORARY_HANDLE.test(key)) return true;
+
+  for (const token of key.split('_').filter(Boolean)) {
+    if (STAFF_WORDS.has(trimDigits(token)) || STAFF_WORDS.has(trimDigits(deLeet(token)))) return true;
+  }
+
+  const compact = trimDigits(deLeet(key.replace(/_/g, '')));
+  return STAFF_AFFIXES.some((word) => compact.startsWith(word) || compact.endsWith(word));
+}
+
 export type LoginIdentifier =
   | { kind: 'email'; value: string }
   | { kind: 'username'; value: string };

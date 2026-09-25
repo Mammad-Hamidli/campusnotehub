@@ -2,7 +2,13 @@ import type { NextRequest, NextResponse } from 'next/server';
 import { AccountStatus } from '@/lib/enums';
 import { hashEmail } from '@/lib/crypto/hash';
 import { findSessionById } from '@/lib/firebase/repositories/sessions';
-import { findUserById, findUserIdByEmailHash, updateUser, type UserRecord } from '@/lib/firebase/repositories/users';
+import {
+  findUserById,
+  findUserIdByEmailHash,
+  getCredentials,
+  updateUser,
+  type UserRecord,
+} from '@/lib/firebase/repositories/users';
 import { createLoginTicket, getMfa, isEnrolled } from '@/lib/firebase/repositories/mfa';
 import {
   findIdentity,
@@ -262,10 +268,26 @@ async function handleLogin(request: NextRequest, state: ConsumedState, profile: 
     });
   }
 
+  const [mfa, credential] = await Promise.all([getMfa(user.id), getCredentials(user.id)]);
+
+  /**
+   * A Google-only account that finished its profile before a local password
+   * was required owes one now. It is flagged here - the one way such an
+   * account signs in - BEFORE the 2FA branch, so the flag is already set when
+   * the code is entered. requirePageSession() then sends every page to
+   * /set-password, and can() keeps the account view-only until
+   * setInitialPassword() clears it. An incomplete profile sets its password
+   * at /onboarding instead.
+   */
+  const owesPassword = user.profileIncomplete !== true && typeof credential?.passwordHash !== 'string';
+  if (owesPassword && user.passwordSetupRequired !== true) {
+    await updateUser(user.id, { passwordSetupRequired: true });
+  }
+
   // 'fed' (RFC 8176: federated) is a FIRST factor. It does not satisfy the
   // staff MFA gate, and an enrolled account still owes its code.
   const amr = ['fed'];
-  if (isEnrolled(await getMfa(user.id))) {
+  if (isEnrolled(mfa)) {
     const ticket = await createLoginTicket({ userId: user.id, userAgent, amr });
     const next = state.returnTo ? `&next=${encodeURIComponent(state.returnTo)}` : '';
     const response = redirectTo(request, `/login?mfa=1${next}`);
@@ -279,7 +301,7 @@ async function handleLogin(request: NextRequest, state: ConsumedState, profile: 
     amr,
     mfaAt: null,
     method: `oauth_${profile.provider}`,
-    redirectTo: state.returnTo,
+    redirectTo: owesPassword ? '/set-password' : state.returnTo,
   });
   response.headers.set('Referrer-Policy', 'no-referrer');
   return clearBindingCookie(response);

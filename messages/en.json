@@ -299,6 +299,18 @@
         "sameAsCurrent": "Choose a password different from your current one.",
         "noPassword": "Your account signs in with Google and has no password to change."
       }
+    },
+    "setPassword": {
+      "badge": "One more step",
+      "title": "Set a password",
+      "subtitle": "You signed in with Google. Add a password so you can still get into your account if you ever lose access to Google.",
+      "done": "Password saved",
+      "signOut": "Sign out instead",
+      "restricted": "Set a password for your account to continue.",
+      "errors": {
+        "signInAgain": "For your security, sign out and sign in with Google again, then set your password.",
+        "alreadySet": "This account already has a password."
+      }
     }
   },
   "verification": {
@@ -1476,7 +1488,7 @@
       "title": "Profile",
       "description": "This is what other people see",
       "avatar": "Profile picture",
-      "avatarHint": "JPG or PNG, up to 2 MB",
+      "avatarHint": "JPG, PNG, WebP or GIF, up to 12 MB",
       "changeAvatar": "Change picture",
       "removeAvatar": "Remove picture",
       "headline": "Headline",
@@ -1485,7 +1497,8 @@
     },
     "academic": {
       "title": "Academic details",
-      "description": "University and graduation date"
+      "description": "University and graduation date",
+      "universityLocked": "Your account is verified at this university. Changing it needs a new verification - contact support."
     },
     "privacy": {
       "title": "Privacy",

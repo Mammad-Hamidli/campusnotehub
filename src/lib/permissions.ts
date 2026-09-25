@@ -44,6 +44,11 @@ export type Viewer = {
    * is completed at /onboarding - see can() below.
    */
   profileIncomplete?: boolean;
+  /**
+   * A Google-only account that owes its first local password. View-only, like
+   * an incomplete profile, until it is set at /set-password.
+   */
+  passwordSetupRequired?: boolean;
 };
 
 /**
@@ -94,7 +99,7 @@ export function can(viewer: Viewer | null, capability: Capability): boolean {
    * handle in front of everyone else - so the same read-only set a freeze
    * leaves open is all an incomplete profile gets.
    */
-  if (viewer.profileIncomplete) {
+  if (viewer.profileIncomplete || viewer.passwordSetupRequired) {
     return ALWAYS_ALLOWED.has(capability);
   }
 
@@ -127,6 +132,9 @@ export function can(viewer: Viewer | null, capability: Capability): boolean {
 export function denialKey(viewer: Viewer | null, capability: Capability): string {
   if (viewer?.profileIncomplete && !ALWAYS_ALLOWED.has(capability)) {
     return 'onboarding.restricted';
+  }
+  if (viewer?.passwordSetupRequired && !ALWAYS_ALLOWED.has(capability)) {
+    return 'auth.setPassword.restricted';
   }
   if (
     viewer &&

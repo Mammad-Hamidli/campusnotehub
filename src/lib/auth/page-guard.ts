@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { COOKIE_ACCESS, getViewer } from '@/lib/auth/session';
 import type { Viewer } from '@/lib/permissions';
 
+export const SET_PASSWORD_PATH = '/set-password';
+
 /**
  * The server-side session gate for protected PAGES.
  *
@@ -34,7 +36,12 @@ import type { Viewer } from '@/lib/permissions';
  */
 export async function requirePageSession(next: string): Promise<Viewer> {
   const viewer = await getViewer();
-  if (viewer) return viewer;
+  if (viewer) {
+    // A Google-only account owes a local password before anything else - see
+    // the OAuth callback. /set-password itself is the one page it may open.
+    if (viewer.passwordSetupRequired && next !== SET_PASSWORD_PATH) redirect(SET_PASSWORD_PATH);
+    return viewer;
+  }
 
   /**
    * Two different failures, two different destinations.

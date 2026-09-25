@@ -484,6 +484,7 @@ async function loadSession(request?: NextRequest): Promise<SessionResult> {
       frozenUntil: user.frozenUntil,
       mfaRequired,
       profileIncomplete: user.profileIncomplete === true,
+      passwordSetupRequired: user.passwordSetupRequired === true,
     },
   };
 }

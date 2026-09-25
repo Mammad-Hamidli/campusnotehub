@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { USERNAME_PATTERN, parseLoginIdentifier } from '@/lib/auth/username';
+import { USERNAME_PATTERN, isReservedUsername, parseLoginIdentifier } from '@/lib/auth/username';
 import { normalizeAzPhone } from '@/lib/auth/phone';
 import { UNIVERSITIES } from '@/lib/universities';
 
@@ -15,14 +15,6 @@ import { UNIVERSITIES } from '@/lib/universities';
  * refused here, and the route still confirms the row exists and is active.
  */
 const UNIVERSITY_CODES = new Set(UNIVERSITIES.map((uni) => uni.id));
-
-/** Handles that would let someone impersonate the platform or its staff. */
-const RESERVED_NICKNAMES = new Set([
-  'admin', 'administrator', 'moderator', 'mod', 'campusnotehub', 'support', 'help',
-  'staff', 'official', 'system', 'root', 'security', 'team', 'api', 'null',
-  'undefined', 'me', 'you', 'settings', 'login', 'register', 'dashboard',
-  'onboarding', 'mentors', 'profile',
-]);
 
 /**
  * Password rule is length-first, deliberately. A 12-character minimum with no
@@ -61,13 +53,6 @@ export const changePasswordSchema = z
   });
 
 /**
- * The temporary handles quick-login accounts start with ("user34232" - see
- * temporaryHandle()). Refused as a CHOSEN nickname so a real person can never
- * look like an unfinished account, and so the random space stays free.
- */
-const TEMPORARY_HANDLE = /^user\d{5}$/i;
-
-/**
  * Public handle. Everything social renders this, never the real name.
  * Shared with the login lookup and the usernames claim - see username.ts.
  */
@@ -75,8 +60,9 @@ export const nicknameSchema = z
   .string()
   .trim()
   .regex(USERNAME_PATTERN, 'auth.errors.nicknameInvalid')
-  .refine((v) => !RESERVED_NICKNAMES.has(v.toLowerCase()), 'auth.errors.nicknameReserved')
-  .refine((v) => !TEMPORARY_HANDLE.test(v), 'auth.errors.nicknameReserved');
+  // Staff/brand names, their "admin_2" / "adm1n" variants, route names and
+  // the temporary "user34232" handles - see isReservedUsername().
+  .refine((v) => !isReservedUsername(v), 'auth.errors.nicknameReserved');
 
 /**
  * The person's name, as ONE field.
@@ -161,17 +147,22 @@ export const registerSchema = z
 
 /**
  * Finishing a quick-login account at /onboarding. The same identity fields as
- * registration, minus the password (the account signs in through its
- * provider). `email` is only accepted - and then required - when the provider
- * supplied none; the route decides which.
+ * registration, INCLUDING a password: an account that can only be entered
+ * through Google is lost the day that Google account is, so a local password
+ * is required before the profile is usable. `email` is only accepted - and
+ * then required - when the provider supplied none; the route decides which.
  */
 export const completeProfileSchema = z.object({
   fullName: fullNameSchema,
   nickname: nicknameSchema,
   universityId: universityCodeSchema,
+  password,
   email: z.string().trim().toLowerCase().email('auth.errors.emailInvalid').max(254).optional(),
   acceptTerms: z.literal(true, { errorMap: () => ({ message: 'auth.errors.termsRequired' }) }),
 });
+
+/** Setting the FIRST password on an account that signed up through Google. */
+export const setInitialPasswordSchema = z.object({ password: passwordSchema }).strict();
 
 /** Splits a one-field name into the halves the verification check compares. */
 export function splitFullName(fullName: string): { firstName: string; lastName: string | null } {

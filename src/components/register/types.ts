@@ -1,6 +1,7 @@
 import type { DocKind, DocState } from './DocumentDropzone';
 import { requiredKindsFor } from '@/lib/verification/requirements';
 import { normalizeAzPhone } from '@/lib/auth/phone';
+import { isReservedUsername } from '@/lib/auth/username';
 
 /**
  * The registration form: ONE step, six fields (+ terms).
@@ -90,13 +91,6 @@ export const EMPTY_DOCUMENTS: DocumentMap = {
   ID_BACK: { phase: 'empty' },
 };
 
-const RESERVED_NICKNAMES = new Set([
-  'admin', 'administrator', 'moderator', 'mod', 'campusnotehub', 'support', 'help',
-  'staff', 'official', 'system', 'root', 'security', 'team', 'api', 'null',
-  'undefined', 'me', 'you', 'settings', 'login', 'register', 'dashboard',
-  'onboarding', 'mentors', 'profile',
-]);
-
 /**
  * Client-side mirror of registerSchema / completeProfileSchema in
  * src/server/validators/auth.ts. This one gives instant inline feedback; the
@@ -116,8 +110,7 @@ export function validateProfile(
   const nickname = form.nickname.trim();
   if (!nickname) errors.nickname = 'errors.fieldRequired';
   else if (!/^[a-zA-Z0-9_]{3,24}$/.test(nickname)) errors.nickname = 'auth.errors.nicknameInvalid';
-  else if (RESERVED_NICKNAMES.has(nickname.toLowerCase()) || /^user\d{5}$/i.test(nickname))
-    errors.nickname = 'auth.errors.nicknameReserved';
+  else if (isReservedUsername(nickname)) errors.nickname = 'auth.errors.nicknameReserved';
 
   if (!form.universityId) errors.universityId = 'errors.fieldRequired';
 

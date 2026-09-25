@@ -4,7 +4,8 @@ import { completeProfile, findUserById } from '@/lib/firebase/repositories/users
 import { findUniversityByCode } from '@/lib/firebase/repositories/reference';
 import { writeAuditLog } from '@/lib/firebase/repositories/audit';
 import { completeProfileSchema, splitFullName } from '@/server/validators/auth';
-import { hashEmail } from '@/lib/crypto/hash';
+import { hashEmail, hashPassword } from '@/lib/crypto/hash';
+import { isRecentSignIn } from '@/lib/auth/reauth';
 import { isPlaceholderEmail } from '@/lib/auth/username';
 import { sendVerificationEmail } from '@/lib/auth/email-verification';
 import { sendEmailAsync } from '@/lib/email/send';
@@ -19,15 +20,18 @@ export const dynamic = 'force-dynamic';
  * A first Google sign-in creates an account at once, with
  * a temporary "user34232" handle and `profileIncomplete: true`, which keeps it
  * view-only (see permissions.can). This is the one way out of that state: name,
- * nickname and university - plus an email when the provider gave none.
+ * nickname, university and a local PASSWORD - plus an email when the provider
+ * gave none. The password is what keeps the account reachable if the Google
+ * account is ever lost, so the profile cannot be finished without it.
  *
  * Refused (409) once the profile is complete, so it can never become a second,
  * unaudited way to rename an existing account.
  */
 export async function POST(request: NextRequest) {
   let userId: string;
+  let authenticatedAt: Date;
   try {
-    ({ userId } = await requireSession(request));
+    ({ userId, authenticatedAt } = await requireSession(request));
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
@@ -51,6 +55,11 @@ export async function POST(request: NextRequest) {
     );
   }
   const input = parsed.data;
+
+  // A password is a new way in; a stale or borrowed session may not add one.
+  if (!isRecentSignIn(authenticatedAt)) {
+    return NextResponse.json({ error: 'auth.setPassword.errors.signInAgain' }, { status: 403 });
+  }
 
   const user = await findUserById(userId);
   if (!user) return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
@@ -83,6 +92,7 @@ export async function POST(request: NextRequest) {
     lastName,
     nickname: input.nickname,
     universityId: university.id,
+    passwordHash: await hashPassword(input.password),
     email: needsEmail && input.email ? { value: input.email, hash: hashEmail(input.email) } : undefined,
   });
 

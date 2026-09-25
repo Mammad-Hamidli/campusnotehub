@@ -15,6 +15,7 @@ import {
   UserRoundSearch,
 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { FollowingBadge } from '@/components/social/Following';
 import { BookingPanel } from './BookingPanel';
 
 /**
@@ -206,6 +207,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
               <h1 className="text-xl font-bold tracking-tight text-fg">
                 @{mentor.user.nickname}
               </h1>
+              <FollowingBadge nickname={mentor.user.nickname} />
               {mentor.user.isVerified && (
                 <BadgeCheck className="h-4 w-4 shrink-0 text-verified" aria-hidden="true" />
               )}
@@ -363,6 +365,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
                       <span className="text-xs font-medium text-fg">
                         @{review.reviewer?.nickname ?? '—'}
                       </span>
+                      <FollowingBadge nickname={review.reviewer?.nickname} />
                       {review.reviewer?.isVerified && (
                         <BadgeCheck className="h-3 w-3 text-verified" aria-hidden="true" />
                       )}

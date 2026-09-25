@@ -299,6 +299,18 @@
         "sameAsCurrent": "Cari şifrənizdən fərqli şifrə seçin.",
         "noPassword": "Hesabınız Google ilə daxil olur və dəyişdiriləcək şifrəsi yoxdur."
       }
+    },
+    "setPassword": {
+      "badge": "Son addım",
+      "title": "Şifrə təyin et",
+      "subtitle": "Google ilə daxil oldun. Google hesabına girişi itirsən belə hesabına daxil ola bilməyin üçün şifrə əlavə et.",
+      "done": "Şifrə yadda saxlanıldı",
+      "signOut": "Hesabdan çıx",
+      "restricted": "Davam etmək üçün hesabına şifrə təyin et.",
+      "errors": {
+        "signInAgain": "Təhlükəsizlik üçün hesabdan çıx, Google ilə yenidən daxil ol və sonra şifrəni təyin et.",
+        "alreadySet": "Bu hesabın artıq şifrəsi var."
+      }
     }
   },
   "verification": {
@@ -1476,7 +1488,7 @@
       "title": "Profil",
       "description": "Bu məlumatlar platformada görünür",
       "avatar": "Profil şəkli",
-      "avatarHint": "JPG və ya PNG, maksimum 2 MB",
+      "avatarHint": "JPG, PNG, WebP və ya GIF, maksimum 12 MB",
       "changeAvatar": "Şəkli dəyiş",
       "removeAvatar": "Şəkli sil",
       "headline": "Qısa təqdimat",
@@ -1485,7 +1497,8 @@
     },
     "academic": {
       "title": "Akademik məlumat",
-      "description": "Universitet və məzuniyyət tarixi"
+      "description": "Universitet və məzuniyyət tarixi",
+      "universityLocked": "Hesabın bu universitetdə təsdiqlənib. Dəyişmək üçün yenidən təsdiq lazımdır - dəstək xidmətinə yaz."
     },
     "privacy": {
       "title": "Məxfilik",
