@@ -221,8 +221,15 @@ export async function exchangeCode(config: ProviderConfig, state: ConsumedState,
   } catch {
     throw new OAuthError('exchange', 'network');
   }
-  // Status only: the body of a failed exchange can echo the code.
-  if (!response.ok) throw new OAuthError('exchange', `status ${response.status}`);
+  // Status plus the RFC 6749 `error` code, and nothing else: the rest of a
+  // failed exchange's body can echo the code. The code is what tells a revoked
+  // or mistyped GOOGLE_CLIENT_SECRET (invalid_client) apart from a stale or
+  // replayed code (invalid_grant) or a redirect URI drift (redirect_uri_mismatch).
+  if (!response.ok) {
+    const error = ((await response.json().catch(() => null)) as { error?: unknown } | null)?.error;
+    const reason = typeof error === 'string' && /^[a-z_]{1,64}$/.test(error) ? ` ${error}` : '';
+    throw new OAuthError('exchange', `status ${response.status}${reason}`);
+  }
   const json = (await response.json().catch(() => null)) as { id_token?: unknown } | null;
   if (typeof json?.id_token !== 'string') throw new OAuthError('exchange', 'no id_token');
   return json.id_token;

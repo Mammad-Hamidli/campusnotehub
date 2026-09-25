@@ -31,12 +31,21 @@ const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
  * redirect URI) - a different host from the one holding the CH_OAUTH binding
  * cookie, so the flow could never complete. Only loopback hosts qualify, so a
  * spoofed Host header still cannot steer where codes are sent.
+ *
+ * Every loopback address is answered as `localhost` (same port): the Google
+ * client registers http://localhost:3000/... only, and rejects a 127.0.0.1
+ * redirect URI with redirect_uri_mismatch. The start route's canonical-host
+ * check turns this into one hop to localhost BEFORE the binding cookie is set,
+ * so cookie and callback share a host.
  */
 export function flowOrigin(requestOrigin: string): string | null {
   if (process.env.NODE_ENV !== 'production') {
     try {
       const url = new URL(requestOrigin);
-      if (LOOPBACK_HOSTS.has(url.hostname)) return url.origin;
+      if (LOOPBACK_HOSTS.has(url.hostname)) {
+        url.hostname = 'localhost';
+        return url.origin;
+      }
     } catch {
       // Not a URL: fall through to APP_URL.
     }

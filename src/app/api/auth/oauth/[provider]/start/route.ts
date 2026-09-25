@@ -25,8 +25,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   // Compared by HOST as the browser sent it, not by nextUrl.origin: behind a
   // TLS-terminating proxy nextUrl can read http:// (or an internal host), which
   // never equals APP_URL and turned this hop into an endless 308 to itself.
-  // Locally (loopback, not production) the browser's own origin IS canonical,
-  // so localhost:3000 and 127.0.0.1:3000 both go straight to Google.
+  // Locally (loopback, not production) localhost on the browser's port IS
+  // canonical: localhost:3000 goes straight to Google, while 127.0.0.1:3000
+  // hops to localhost:3000 first - Google rejects a 127.0.0.1 redirect URI.
   const origin = browserOrigin(request);
   const canonical = flowOrigin(origin);
   if (canonical && new URL(origin).host !== new URL(canonical).host) {
