@@ -255,6 +255,7 @@
         "provider_already_linked": "Başqa {provider} hesabı artıq qoşulub. Əvvəlcə onu ayırın.",
         "rate_limited": "Çox sayda cəhd. Bir neçə dəqiqə gözləyib yenidən cəhd edin.",
         "signup_expired": "Qeydiyyat sessiyasının vaxtı bitdi. Giriş səhifəsindən yenidən başlayın.",
+        "account_deleted": "Bu hesab silinib. Onun {provider} girişi və e-poçtu {until} tarixindən yeni hesab üçün istifadə oluna bilər.",
         "last_method": "Bu, yeganə giriş üsulunuzdur, ona görə də ayırmaq olmaz."
       }
     },

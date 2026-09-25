@@ -87,6 +87,9 @@ vi.mock('@/lib/firebase/repositories/users', () => ({
   findUserIdByEmailHash: async (hash: string) => [...users.values()].find((u) => `h:${u.email}` === hash)?.id ?? null,
   updateUser: (...a: unknown[]) => updateUser(...(a as [string, Partial<User>])),
   getCredentials: async (id: string) => ({ id, passwordHash: passwordless.has(id) ? null : '$argon2id$x' }),
+  // The real rule with the default 30-day cool-down.
+  identifiersReleaseAt: (u: User) => (u.deletedAt ? new Date(u.deletedAt.getTime() + 30 * 86_400_000) : null),
+  identifiersReleased: (u: User) => !!u.deletedAt && u.deletedAt.getTime() + 30 * 86_400_000 <= Date.now(),
 }));
 vi.mock('@/lib/crypto/hash', async () => {
   const actual = await vi.importActual<typeof import('@/lib/crypto/hash')>('@/lib/crypto/hash');
@@ -162,6 +165,34 @@ beforeEach(() => {
 });
 
 describe('sign-in', () => {
+  it('a deleted account inside its cool-down keeps its Google sign-in, and says until when', async () => {
+    const deletedAt = new Date(Date.now() - 86_400_000);
+    user('gone', { deletedAt, accountStatus: 'DELETED' });
+    identities.set('google:g-sub', { userId: 'gone', provider: 'google' });
+    profile = google();
+    const { location } = await callback();
+    expect(location.pathname).toBe('/login');
+    expect(location.searchParams.get('oauth')).toBe('account_deleted');
+    expect(location.searchParams.get('until')).toBe(new Date(deletedAt.getTime() + 30 * 86_400_000).toISOString().slice(0, 10));
+    expect(createQuickAccount).not.toHaveBeenCalled();
+  });
+
+  it('an identity left behind by an account that no longer exists signs up afresh instead of failing', async () => {
+    identities.set('google:g-sub', { userId: 'hard-deleted', provider: 'google' });
+    profile = google();
+    const { location } = await callback();
+    expect(createQuickAccount).toHaveBeenCalled();
+    expect(location.pathname).toBe('/__session/new-g-sub');
+  });
+
+  it('a deleted account past its cool-down no longer holds the Google sign-in', async () => {
+    user('gone', { deletedAt: new Date(Date.now() - 31 * 86_400_000), accountStatus: 'DELETED', email: 'old@x.az' });
+    identities.set('google:g-sub', { userId: 'gone', provider: 'google' });
+    profile = google();
+    await callback();
+    expect(createQuickAccount).toHaveBeenCalled();
+  });
+
   it('signs in a known identity as its account, with a federated (first-factor) amr', async () => {
     user('u1');
     identities.set('google:g-sub', { userId: 'u1', provider: 'google' });

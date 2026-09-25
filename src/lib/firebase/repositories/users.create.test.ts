@@ -128,3 +128,55 @@ describe('createUser uniqueness', () => {
     expect(user.id).toBe('new-user');
   });
 });
+
+describe('deleted accounts and the re-use cool-down', () => {
+  const DAY = 86_400_000;
+  async function seedDeleted(daysAgo: number) {
+    await seedAccount('old', BASE.email, BASE.phone, 'old_handle');
+    await fake.db.collection('users').doc('old').update({ deletedAt: new Date(Date.now() - daysAgo * DAY), accountStatus: 'DELETED' });
+  }
+
+  beforeEach(() => fake.store.clear());
+
+  it('still blocks the email and phone of an account deleted inside the cool-down', async () => {
+    await seedDeleted(1);
+    await expect(signup()).rejects.toMatchObject({ fields: ['email', 'phone'] });
+  });
+
+  it('releases them after the cool-down, scrubbing them off the old account in the same commit', async () => {
+    await seedDeleted(31);
+    await signup();
+    expect(fake.store.get('users/new-user')).toMatchObject({ email: BASE.email });
+    expect(fake.store.get('users/old')).toMatchObject({ email: 'old@released.invalid', phone: null, deletedAt: expect.any(Date) });
+    expect(fake.store.get('credentials/old')).toMatchObject({ emailHash: null, phoneHash: null });
+  });
+
+  it('never releases the handle of a deleted account', async () => {
+    await seedDeleted(31);
+    await expect(signup({ nickname: 'old_handle' })).rejects.toMatchObject({ fields: ['nickname'] });
+  });
+
+  it('re-uses an identity left behind by an account that no longer exists', async () => {
+    const ref = fake.db.collection('authIdentities').doc('google:sub');
+    await ref.set({ userId: 'vanished', provider: 'google' });
+    await createUser({
+      profile: { ...BASE, id: 'new-user' } as never,
+      credentials: { passwordHash: null, emailHash: `h:${BASE.email}`, phoneHash: null },
+      identity: { ref: ref as never, data: { provider: 'google' } },
+    });
+    expect(fake.store.get('authIdentities/google:sub')).toMatchObject({ userId: 'new-user' });
+  });
+
+  it('still refuses an identity owned by a live account', async () => {
+    await seedAccount('owner', 'o@x.az', '+994500000000', 'owner');
+    const ref = fake.db.collection('authIdentities').doc('google:sub');
+    await ref.set({ userId: 'owner', provider: 'google' });
+    await expect(
+      createUser({
+        profile: { ...BASE, id: 'new-user' } as never,
+        credentials: { passwordHash: null, emailHash: `h:${BASE.email}`, phoneHash: null },
+        identity: { ref: ref as never, data: { provider: 'google' } },
+      }),
+    ).rejects.toBeInstanceOf(DuplicateUserError);
+  });
+});

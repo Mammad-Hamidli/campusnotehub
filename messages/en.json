@@ -255,6 +255,7 @@
         "provider_already_linked": "A different {provider} account is already connected. Disconnect it first.",
         "rate_limited": "Too many attempts. Please wait a few minutes and try again.",
         "signup_expired": "Your sign-up session expired. Start again from the sign-in page.",
+        "account_deleted": "This account was deleted. Its {provider} sign-in and email can be used for a new account from {until}.",
         "last_method": "This is your only way to sign in, so it cannot be disconnected."
       }
     },

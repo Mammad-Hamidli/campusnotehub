@@ -319,29 +319,71 @@ const IDENTIFIER_SCAN = 5;
  * WHY THIS IS NOT A SECURITY REGRESSION: identifiers that must never be reused
  * are the BANNED ones, and those live in `blocklist/{type__hash}`, which is
  * checked separately before this function is ever reached and is not touched
- * here. Soft-deleted accounts keep their `users` document, so they are "live"
- * by this test and still block - recycling the address of a deleted account
- * remains impossible.
+ * here. A soft-deleted account keeps its `users` document, so it stays "live"
+ * by this test - and keeps its email, phone and Google identity - until the
+ * cool-down below has run out. Its HANDLE is never released (see
+ * findUserByUsername), so claims are never resolved with releaseDeleted.
  */
 type OwnerSplit = {
   /** Ids of accounts that really hold the identifier. */
   live: string[];
   /** Documents whose owning account no longer exists. Safe to remove. */
   stale: FirebaseFirestore.DocumentReference[];
+  /** Soft-deleted accounts past the cool-down: the identifier is theirs no more. */
+  released: string[];
 };
+
+/**
+ * How long a DELETED account keeps its email, phone and Google sign-in to
+ * itself. Until then nobody - including its former owner - can sign up with
+ * them: a deletion that can be undone by re-registering a minute later is a
+ * way to shed a moderation history, and the window also gives an account
+ * deleted by mistake (or by someone else) time to be restored.
+ *
+ * After it, the identifiers belong to nobody. They are released LAZILY, by
+ * the sign-up that wants them (createUser), which scrubs them off the old
+ * account in the same transaction - no job to schedule, no window where two
+ * accounts share an address. Banned identifiers never come back this way:
+ * those live in the blocklist, which every sign-up checks first.
+ *
+ * `DELETED_ACCOUNT_REUSE_DAYS`, default 30; 0 releases at once. An empty or
+ * malformed value falls back to the default rather than to 0.
+ */
+const DELETED_ACCOUNT_REUSE_MS = (() => {
+  const raw = process.env.DELETED_ACCOUNT_REUSE_DAYS?.trim();
+  const days = raw ? Number(raw) : NaN;
+  return (Number.isFinite(days) && days >= 0 ? days : 30) * 86_400_000;
+})();
+
+/** When a deleted account's email, phone and Google sign-in become free; null for a live account. */
+export function identifiersReleaseAt(user: Pick<UserRecord, 'deletedAt'>): Date | null {
+  return user.deletedAt ? new Date(user.deletedAt.getTime() + DELETED_ACCOUNT_REUSE_MS) : null;
+}
+
+export function identifiersReleased(user: Pick<UserRecord, 'deletedAt'>, now = new Date()): boolean {
+  const at = identifiersReleaseAt(user);
+  return at !== null && at <= now;
+}
+
+/** The address a released account is left holding: unique, undeliverable, matching nothing. */
+const releasedEmail = (userId: string) => `${userId}@released.invalid`;
 
 async function liveOwners(
   tx: FirebaseFirestore.Transaction,
   candidates: { ref: FirebaseFirestore.DocumentReference; ownerId: string }[],
+  // Opt-in: only a caller that scrubs what is released (createUser) may pass it.
+  { releaseDeleted = false }: { releaseDeleted?: boolean } = {},
 ): Promise<OwnerSplit> {
-  const split: OwnerSplit = { live: [], stale: [] };
+  const split: OwnerSplit = { live: [], stale: [], released: [] };
   if (candidates.length === 0) return split;
 
   // Still a READ, so it stays legal before the transaction's writes.
   const owners = await Promise.all(candidates.map((c) => tx.get(users().doc(c.ownerId))));
   candidates.forEach((candidate, index) => {
-    if (owners[index].exists) split.live.push(candidate.ownerId);
-    else split.stale.push(candidate.ref);
+    const owner = docToObject<UserRecord>(owners[index]) as UserRecord | null;
+    if (!owner) split.stale.push(candidate.ref);
+    else if (releaseDeleted && identifiersReleased(owner)) split.released.push(candidate.ownerId);
+    else split.live.push(candidate.ownerId);
   });
   return split;
 }
@@ -474,7 +516,22 @@ export async function createUser(params: {
     // transaction, and every check below is a read, so nothing is written
     // until the last one has been decided.
     // ---------------------------------------------------------------------
-    if (identity && (await tx.get(identity.ref)).exists) throw new DuplicateUserError('identity');
+    /**
+     * An identity whose account is gone (deleted by hand, leaving this behind)
+     * or deleted past the cool-down is leftover state like a stale claim: it
+     * is overwritten below, not a duplicate. Without this a Google account
+     * that once belonged to a deleted account could never sign up again.
+     */
+    let replaceIdentity = false;
+    if (identity) {
+      const existing = await tx.get(identity.ref);
+      if (existing.exists) {
+        const ownerId = (existing.data() as { userId?: string }).userId;
+        const owner = ownerId ? (docToObject<UserRecord>(await tx.get(users().doc(ownerId))) as UserRecord | null) : null;
+        if (owner && !identifiersReleased(owner)) throw new DuplicateUserError('identity');
+        replaceIdentity = true;
+      }
+    }
 
     /**
      * The username is checked TWICE, deliberately. The claim document is the
@@ -503,15 +560,20 @@ export async function createUser(params: {
      * The `users` queries need no such resolution: there the matched document
      * IS the account.
      */
+    const none: OwnerSplit = { live: [], stale: [], released: [] };
     const [emailCreds, phoneCreds, staleClaimOwner] = await Promise.all([
-      liveOwners(tx, byEmailHash.docs.map((doc) => ({ ref: doc.ref, ownerId: doc.id }))),
+      liveOwners(tx, byEmailHash.docs.map((doc) => ({ ref: doc.ref, ownerId: doc.id })), { releaseDeleted: true }),
       byPhoneHash
-        ? liveOwners(tx, byPhoneHash.docs.map((doc) => ({ ref: doc.ref, ownerId: doc.id })))
-        : Promise.resolve({ live: [], stale: [] } as OwnerSplit),
+        ? liveOwners(tx, byPhoneHash.docs.map((doc) => ({ ref: doc.ref, ownerId: doc.id })), { releaseDeleted: true })
+        : Promise.resolve(none),
       claim.exists
         ? liveOwners(tx, [{ ref: claim.ref, ownerId: (claim.data() as UsernameClaim).userId }])
-        : Promise.resolve({ live: [], stale: [] } as OwnerSplit),
+        : Promise.resolve(none),
     ]);
+
+    // The `users` match IS the account, so it is judged directly.
+    const emailHolders = byEmail.docs.map((doc) => docToObject<UserRecord>(doc) as UserRecord);
+    const releasedEmailHolders = emailHolders.filter((u) => identifiersReleased(u)).map((u) => u.id);
 
     /**
      * EVERY clash, not the first one.
@@ -521,7 +583,7 @@ export async function createUser(params: {
      * turns this set into one error per field.
      */
     const conflicts: ConflictField[] = [];
-    if (!byEmail.empty || emailCreds.live.length > 0) conflicts.push('email');
+    if (emailHolders.length > releasedEmailHolders.length || emailCreds.live.length > 0) conflicts.push('email');
     if (phoneCreds.live.length > 0) conflicts.push('phone');
     if (!byNickname.empty || staleClaimOwner.live.length > 0) conflicts.push('nickname');
     if (conflicts.length > 0) throw new DuplicateUserError(conflicts);
@@ -539,6 +601,27 @@ export async function createUser(params: {
      * The stale CLAIM is excluded here on purpose - see the set/create below.
      */
     for (const ref of [...emailCreds.stale, ...phoneCreds.stale]) tx.delete(ref);
+
+    /**
+     * Released identifiers are scrubbed off the deleted account in this same
+     * commit, so there is never a moment where two accounts answer to one
+     * address - a login or reset lookup by email would otherwise be free to
+     * resolve to the dead one. One write per document: merged per owner.
+     */
+    const scrub = new Map<string, { user: Record<string, unknown>; cred: Record<string, unknown> }>();
+    const scrubOf = (id: string) => scrub.get(id) ?? scrub.set(id, { user: {}, cred: {} }).get(id)!;
+    for (const id of [...emailCreds.released, ...releasedEmailHolders]) {
+      Object.assign(scrubOf(id).user, { email: releasedEmail(id) });
+      Object.assign(scrubOf(id).cred, { emailHash: null });
+    }
+    for (const id of phoneCreds.released) {
+      Object.assign(scrubOf(id).user, { phone: null });
+      Object.assign(scrubOf(id).cred, { phoneHash: null });
+    }
+    for (const [id, patch] of scrub) {
+      tx.update(users().doc(id), forFirestore({ ...patch.user, identifiersReleasedAt: new Date() }));
+      tx.set(credentials().doc(id), forFirestore(patch.cred), { merge: true });
+    }
 
     tx.set(
       users().doc(profile.id),
@@ -565,7 +648,13 @@ export async function createUser(params: {
       // commit fails instead of overwriting another account's handle.
       tx.create(usernames().doc(nicknameKey), claimData);
     }
-    if (identity) tx.create(identity.ref, forFirestore({ ...identity.data, userId: profile.id }));
+    if (identity) {
+      const data = forFirestore({ ...identity.data, userId: profile.id });
+      // set() over a leftover (see the read above); create() otherwise, so a
+      // link that appeared since the read fails the commit instead.
+      if (replaceIdentity) tx.set(identity.ref, data);
+      else tx.create(identity.ref, data);
+    }
   });
 
   const created = await findUserById(profile.id);
@@ -649,7 +738,7 @@ export async function completeProfile(
         ),
         claim?.exists
           ? liveOwners(tx, [{ ref: claim.ref, ownerId: (claim.data() as UsernameClaim).userId }])
-          : Promise.resolve({ live: [], stale: [] } as OwnerSplit),
+          : Promise.resolve({ live: [], stale: [], released: [] } as OwnerSplit),
       ]);
 
       if (byNickname && !byNickname.empty) throw new DuplicateUserError('nickname');
@@ -748,7 +837,7 @@ export async function renameUser(
     ]);
     const claimOwner = claim.exists
       ? await liveOwners(tx, [{ ref: claim.ref, ownerId: (claim.data() as UsernameClaim).userId }])
-      : ({ live: [], stale: [] } as OwnerSplit);
+      : ({ live: [], stale: [], released: [] } as OwnerSplit);
 
     if (byNickname.docs.some((d) => d.id !== userId)) return 'nickname' as const;
     if (claimOwner.live.some((owner) => owner !== userId)) return 'nickname' as const;

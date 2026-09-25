@@ -122,7 +122,14 @@ export function SetPasswordForm() {
         </button>
       </form>
 
-      <Link href="/logout" className="mt-6 inline-block text-xs text-fg-muted underline-offset-2 hover:underline">
+      {/* prefetch={false}: /logout revokes the session, and this link is in the
+          viewport the moment the page paints - a prefetch signed the account
+          out before the form could be submitted (see Menu.tsx). */}
+      <Link
+        href="/logout"
+        prefetch={false}
+        className="mt-6 inline-block text-xs text-fg-muted underline-offset-2 hover:underline"
+      >
         {t('auth.setPassword.signOut')}
       </Link>
     </div>

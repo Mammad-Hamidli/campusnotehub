@@ -40,7 +40,33 @@ export const dynamic = 'force-dynamic';
  * closes it, and requireSession() now checks the row on every request, so the
  * revocation takes effect immediately and everywhere.
  */
+/**
+ * True for a speculative fetch - a Next.js <Link> prefetch, or a browser
+ * prefetch/prerender hint - rather than a person clicking "Sign out".
+ */
+function isPrefetch(request: NextRequest): boolean {
+  const h = request.headers;
+  return (
+    h.get('next-router-prefetch') === '1' ||
+    /prefetch|prerender/i.test(h.get('sec-purpose') ?? h.get('purpose') ?? '')
+  );
+}
+
 export async function GET(request: NextRequest) {
+  /**
+   * A prefetch must never sign anyone out.
+   *
+   * Next.js prefetches every <Link> that scrolls into view, and this handler is
+   * a GET. One bare <Link href="/logout"> on /set-password was enough to revoke
+   * the session a second after the page painted, so the password POST that
+   * followed met "Your session expired". Every call site now opts out of
+   * prefetching, and this guard means a future one that forgets costs nothing.
+   * The non-RSC 204 makes the router do a real navigation on the actual click.
+   */
+  if (isPrefetch(request)) {
+    return new NextResponse(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
+  }
+
   /**
    * The session id comes from sessionIdFromAccessToken(), not requireSession().
    *

@@ -19,7 +19,8 @@ export type OAuthOutcome =
   | 'link_required'
   | 'identity_in_use'
   | 'provider_already_linked'
-  | 'rate_limited';
+  | 'rate_limited'
+  | 'account_deleted';
 
 /** Public base for redirects: APP_URL (or loopback in dev), never a Host header an attacker can set. */
 export function appBase(request: NextRequest): string {

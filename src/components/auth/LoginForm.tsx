@@ -14,7 +14,7 @@ import { GoogleMark } from '@/components/auth/GoogleMark';
 /** Every code the OAuth callback can send back as ?oauth=... - see lib/auth/oauth/http.ts. */
 const OAUTH_OUTCOMES = new Set([
   'cancelled', 'expired', 'failed', 'unavailable', 'link_required',
-  'identity_in_use', 'provider_already_linked', 'rate_limited', 'signup_expired',
+  'identity_in_use', 'provider_already_linked', 'rate_limited', 'signup_expired', 'account_deleted',
 ]);
 const PROVIDER_LABELS: Record<string, string> = { google: 'Google' };
 
@@ -277,7 +277,7 @@ export function LoginForm({ providers = [] }: { providers?: string[] }) {
         {error && (
           <p role="alert" className="alert-danger">
             <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span className="min-w-0">{t(error, { provider: oauthProvider })}</span>
+            <span className="min-w-0">{t(error, { provider: oauthProvider, until: params.get('until') ?? '' })}</span>
           </p>
         )}
 

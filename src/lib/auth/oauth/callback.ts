@@ -6,6 +6,8 @@ import {
   findUserById,
   findUserIdByEmailHash,
   getCredentials,
+  identifiersReleaseAt,
+  identifiersReleased,
   updateUser,
   type UserRecord,
 } from '@/lib/firebase/repositories/users';
@@ -192,16 +194,46 @@ async function handleLink(request: NextRequest, state: ConsumedState, profile: P
   return clearBindingCookie(redirectTo(request, `${page}?linked=${profile.provider}`));
 }
 
+/**
+ * A deleted account still inside its cool-down keeps its Google sign-in and
+ * email; the person is told when they free up (see identifiersReleaseAt).
+ * The provider has just proven the address is theirs, so the date is no leak.
+ */
+async function deletedAccountRedirect(request: NextRequest, owner: UserRecord, provider: string) {
+  await audit(request, 'OAUTH_LOGIN', owner.id, 'DENIED', { provider, reason: 'account_deleted' });
+  const until = identifiersReleaseAt(owner)!.toISOString().slice(0, 10);
+  return outcomeRedirect(request, '/login', 'account_deleted', { until });
+}
+
+/** Deleted, and still inside the cool-down. */
+const coolingDown = (user: UserRecord | null): boolean => !!user?.deletedAt && !identifiersReleased(user);
+
 async function handleLogin(request: NextRequest, state: ConsumedState, profile: ProviderProfile, userAgent: string) {
   const key = identityKey(profile.provider, profile.subject);
   const identity = await findIdentity(key);
-  let userId = identity?.userId ?? null;
+  let userId: string | null = null;
   let autoLinked = false;
 
-  if (!identity && profile.linkableByEmail && profile.email) {
+  /**
+   * An identity leads to its account - unless that account is deleted. Inside
+   * the cool-down the answer is "deleted, free again on <date>". After it, or
+   * when the account document is gone altogether (deleted by hand, leaving the
+   * identity behind), the identity is leftover state: the sign-in carries on
+   * as if Google had never been seen here, and rule 3 re-uses the identity.
+   * Following a leftover to a missing account used to answer "failed" forever.
+   */
+  if (identity) {
+    const owner = await findUserById(identity.userId);
+    if (coolingDown(owner)) return deletedAccountRedirect(request, owner!, profile.provider);
+    if (owner && !owner.deletedAt) userId = owner.id;
+  }
+
+  if (!userId && profile.linkableByEmail && profile.email) {
     const existingId = await findUserIdByEmailHash(hashEmail(profile.email));
-    if (existingId) {
-      const existing = await findUserById(existingId);
+    const existing = existingId ? await findUserById(existingId) : null;
+    if (coolingDown(existing)) return deletedAccountRedirect(request, existing!, profile.provider);
+    // A released or orphaned address is nobody's: straight on to rule 3.
+    if (existing && !existing.deletedAt) {
       if (!usable(existing)) return outcomeRedirect(request, '/login', 'failed');
 
       if (!existing.emailVerifiedAt) {
