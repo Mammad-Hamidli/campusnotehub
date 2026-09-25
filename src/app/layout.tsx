@@ -11,6 +11,7 @@ import { FollowingProvider } from '@/components/social/Following';
 import { LiveNotificationsProvider } from '@/components/notifications/LiveNotifications';
 import { getViewer } from '@/lib/auth/session';
 import { WarmBackdrop } from '@/components/ui/WarmBackdrop';
+import { ServiceWorkerRegistrar } from '@/components/pwa/ServiceWorkerRegistrar';
 // Imported from constants.ts, NOT from the 'use client' provider: a plain
 // export read across that boundary resolves to undefined on the server.
 // See src/lib/theme/constants.ts.
@@ -51,6 +52,9 @@ export const metadata: Metadata = {
    * <link rel="icon"> tags itself. Repeating them in this object would produce
    * a second, unhashed set of tags pointing at the same artwork, and the two
    * would then have to be kept in step by hand.
+   *
+   * The web app manifest is NOT declared here either - see the <link> in
+   * RootLayout's <head> for why it cannot be.
    */
 };
 
@@ -126,6 +130,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
         />
+        {/*
+          Written here by hand rather than as `metadata.manifest`, which is what
+          makes the app installable at all.
+
+          This layout reads cookies(), so every route is dynamic, and Next
+          streams the metadata of dynamic routes into <body> after the shell.
+          Chromium only honours a manifest <link> that is a direct child of
+          <head>, so the metadata version is invisible to it: Edge and Chrome
+          report "no-manifest" and never offer Install. The icons it points at
+          are PNGs in public/icons because the Windows shortcut and taskbar
+          icon are built from those, not from the SVG favicon.
+        */}
+        <link rel="manifest" href="/manifest.webmanifest" />
       </head>
       {/* Last-resort guard: one overflowing element must never make the whole
           page pan sideways on a phone. `clip`, not `hidden`, keeps sticky
@@ -140,6 +157,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           Skip to content
         </a>
         <WarmBackdrop />
+        <ServiceWorkerRegistrar />
         <ThemeProvider initialPreference={themePreference}>
           <LocaleProvider initialLocale={locale}>
             {/* Toasts and confirmation dialogs for every route, admin included.
