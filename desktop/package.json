@@ -1,0 +1,15 @@
+{
+  "name": "campusnotehub-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Native Windows shell (Tauri 2) around https://www.campusnotehub.com",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icons": "tauri icon ../public/brand/campus-hub-app-icon.svg --output src-tauri/icons"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.5"
+  }
+}

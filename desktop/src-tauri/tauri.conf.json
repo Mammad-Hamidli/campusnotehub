@@ -1,0 +1,57 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "campusnotehub",
+  "version": "../package.json",
+  "identifier": "com.campusnotehub.desktop",
+  "build": {
+    "frontendDist": "https://www.campusnotehub.com",
+    "devUrl": "http://localhost:3000"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "create": false,
+        "title": "campusnotehub",
+        "width": 1280,
+        "height": 832,
+        "minWidth": 380,
+        "minHeight": 560,
+        "center": true,
+        "dragDropEnabled": false,
+        "zoomHotkeysEnabled": true,
+        "backgroundColor": "#F6F8FB"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "campusnotehub",
+    "homepage": "https://www.campusnotehub.com",
+    "copyright": "© 2026 campusnotehub",
+    "category": "Education",
+    "shortDescription": "Peer study notes, mentorship and a campus feed for university students",
+    "longDescription": "The verified platform for Azerbaijani university students: peer study notes, 1-on-1 mentorship with working professionals, and a campus feed.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English", "Russian"],
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico",
+        "compression": "lzma"
+      }
+    }
+  }
+}

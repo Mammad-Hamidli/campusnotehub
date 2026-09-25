@@ -49,6 +49,7 @@ User roles are student, teacher, moderator and admin.
 - Hosted on Vercel at https://www.campusnotehub.com, also reachable at https://campusnotehub.com.
 - Configuration comes from environment variables set in the Vercel project. `.env.example` lists the variable names; real values are never committed.
 - One Vercel cron job (`/api/cron/verification-cleanup`) runs daily to delete expired review documents.
+- A native Windows app (Tauri) that opens the production site in its own window is in `desktop/`, with its own build instructions in `desktop/README.md`.
 
 For local development: copy `.env.example` to `.env`, fill in the values, then run `npm install` and `npm run dev`. Before deploying, run `npm run typecheck`, `npm test` and `npm run build`.
 

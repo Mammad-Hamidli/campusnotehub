@@ -1,0 +1,23 @@
+[package]
+name = "campusnotehub-desktop"
+version = "1.0.0"
+description = "Native Windows shell around https://www.campusnotehub.com"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+
+[dependencies]
+# 2.11+ for WebviewWindowBuilder::on_new_window (see src/main.rs).
+tauri = { version = "2.11", features = [] }
+tauri-plugin-opener = "2.5"
+tauri-plugin-single-instance = "2.4"
+
+# The binary is a thin shell, so optimise for size.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

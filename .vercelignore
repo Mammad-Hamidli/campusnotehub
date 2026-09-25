@@ -1,0 +1,4 @@
+# The native Windows shell is built by .github/workflows/desktop-windows.yml, never
+# by Vercel. Its Cargo output (desktop/src-tauri/target, several GB) is only
+# gitignored, and `vercel deploy` from a local checkout reads this file, not .gitignore.
+/desktop

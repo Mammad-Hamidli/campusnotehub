@@ -1,0 +1,75 @@
+# Builds the native Windows installer (desktop/, Tauri 2 + NSIS).
+#
+# - Manual run (Actions tab -> "Desktop - Windows installer" -> Run workflow) or any
+#   PR touching desktop/: the setup .exe is uploaded as a workflow artifact.
+# - Tag push `desktop-vX.Y.Z` (X.Y.Z must equal desktop/package.json "version"):
+#   same build, then the .exe is attached to a GitHub Release for that tag.
+#
+# The web app is not built here: the desktop shell loads https://www.campusnotehub.com.
+name: Desktop - Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['desktop-v*']
+  pull_request:
+    paths: ['desktop/**', '.github/workflows/desktop-windows.yml']
+
+concurrency:
+  group: desktop-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write # only used by the release step, which runs on tags only
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Check tag matches desktop/package.json version
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_NAME#desktop-v}" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match desktop/package.json version $version"
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: Build installer
+        run: npm run build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: campusnotehub-windows-installer
+          path: desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+
+      - name: Attach installer to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          src-tauri/target/release/bundle/nsis/*-setup.exe
+          --title "campusnotehub for Windows ${GITHUB_REF_NAME#desktop-v}"
+          --generate-notes

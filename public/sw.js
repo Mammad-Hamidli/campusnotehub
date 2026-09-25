@@ -1,17 +1,17 @@
 /**
- * Service worker: installability only, deliberately NO fetch handler.
+ * Retirement worker: unregisters itself. Nothing registers /sw.js any more.
  *
- * The app is online-only and its correctness depends on every request reaching
- * the server untouched: the middleware's per-request CSP nonce, the no-store
- * headers that keep signed-out pages out of the back/forward cache, the 307s
- * through /api/auth/refresh, and the HttpOnly session cookies. A worker without
- * a fetch listener is never consulted for requests at all - the browser goes
- * straight to the network, exactly as it does with no worker installed - so
- * none of that can be cached, replayed or dropped here.
+ * The browser-install (PWA) path was replaced by the native Windows app in
+ * desktop/. Browsers that visited while the PWA shipped still hold a
+ * registration for this URL, and deleting the file would not remove it: a 404
+ * on the update check fails the update but keeps the old worker registered
+ * indefinitely. Serving this changed script instead makes the next update check
+ * install it, and on activation it removes the registration. Like its
+ * predecessor it has no fetch handler, so it never touches a request.
  *
- * Do not add a pass-through `fetch` listener "for completeness": Chrome no
- * longer requires one to install, and an empty handler still makes the browser
- * start this worker before every navigation, adding latency for nothing.
+ * A returning visitor's browser checks for an update on its first navigation
+ * and is cleaned up then. Safe to delete once past visitors have had a few
+ * weeks to come back.
  */
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener('activate', (event) => event.waitUntil(self.registration.unregister()));
