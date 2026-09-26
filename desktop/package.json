@@ -1,6 +1,6 @@
 {
   "name": "campusnotehub-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Native Windows shell (Tauri 2) around https://www.campusnotehub.com",
   "scripts": {
