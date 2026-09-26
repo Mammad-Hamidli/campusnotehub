@@ -315,9 +315,9 @@ export function Composer({
           {image && (
             <div className="relative mt-2.5 overflow-hidden rounded-xl border border-edge bg-surface-muted">
               {preview && (
-                // eslint-disable-next-line @next/next/no-img-element -- a local
-                // object URL, never a remote asset; next/image cannot optimise
-                // a blob: URL and would only add a loader hop.
+                // A local object URL, never a remote asset: next/image cannot
+                // optimise a blob: URL and would only add a loader hop.
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={preview}
                   alt={image.name}

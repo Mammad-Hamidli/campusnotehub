@@ -323,14 +323,6 @@ export async function bookingsOverlapping(
   );
 }
 
-export async function listBookingsForMentee(
-  menteeId: string,
-  take = 50,
-): Promise<BookingRecord[]> {
-  const snap = await bookings().where('menteeId', '==', menteeId).limit(take).get();
-  return sortBy(docsToObjects<BookingRecord>(snap.docs) as BookingRecord[], 'startsAt', 'desc');
-}
-
 // ---------------------------------------------------------------- reviews
 //
 // The same mechanics as note reviews (upsertNoteReview in notes.ts), with a
@@ -461,18 +453,6 @@ export async function listReviewsForMentor(
     'createdAt',
     'desc',
   ).slice(0, take);
-}
-
-export async function updateMentor(id: string, patch: Record<string, unknown>): Promise<void> {
-  await mentors()
-    .doc(id)
-    .update(forFirestore({ ...patch, updatedAt: new Date() }));
-}
-
-export async function countMentors(where: Record<string, unknown> = {}): Promise<number> {
-  let query: FirebaseFirestore.Query = mentors();
-  for (const [field, value] of Object.entries(where)) query = query.where(field, '==', value);
-  return (await query.count().get()).data().count;
 }
 
 export const mentorCollections = { mentors, bookings, reviews, rules, exceptions };

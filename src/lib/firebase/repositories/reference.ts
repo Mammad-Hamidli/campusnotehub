@@ -137,14 +137,6 @@ export async function universityCodeTaken(code: string, excludeId?: string): Pro
 
 // ---------------------------------------------------------------------------
 
-export async function listFaculties(universityId?: string): Promise<FacultyRecord[]> {
-  const query = universityId
-    ? faculties().where('universityId', '==', universityId)
-    : faculties();
-  const rows = docsToObjects<FacultyRecord>((await query.get()).docs) as FacultyRecord[];
-  return rows.sort((a, b) => a.nameEn.localeCompare(b.nameEn));
-}
-
 export async function findFacultyById(id: string): Promise<FacultyRecord | null> {
   return docToObject<FacultyRecord>(await faculties().doc(id).get()) as FacultyRecord | null;
 }

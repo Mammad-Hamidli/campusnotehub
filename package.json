@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.11"
+    "node": ">=22"
   },
   "scripts": {
     "predev": "node scripts/clean-next.mjs",
@@ -12,7 +12,7 @@
     "dev:preview": "node scripts/clean-next.mjs && cross-env campusnotehub_DEV_BYPASS_AUTH=1 next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.mjs && node scripts/check-keys-used.mjs",
     "test": "vitest run",
@@ -52,6 +52,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
     "@types/bcryptjs": "^2.4.6",
     "@types/mailparser": "^3.4.6",
     "@types/node": "^22.10.2",
@@ -72,10 +73,6 @@
   },
   "overrides": {
     "jose": "$jose",
-    "jwks-rsa": "^3.1.0"
-  },
-  "resolutions": {
-    "jose": "4.15.9",
     "jwks-rsa": "^3.1.0"
   }
 }

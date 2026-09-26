@@ -152,11 +152,9 @@ export async function middleware(request: NextRequest) {
 
   const connectSrc = [
     `'self'`,
-    `https://*.s3.eu-central-1.amazonaws.com`,
     // Post translation runs in the browser against MyMemory's free API; see
     // src/lib/translate/mymemory.ts.
     `https://api.mymemory.translated.net`,
-    `wss://campusnotehub.com`,
     // The dev server pushes hot updates over a plain-ws connection to
     // localhost, which 'self' does not cover once a scheme is involved.
     ...(isDev ? [`ws:`] : []),
@@ -166,7 +164,7 @@ export async function middleware(request: NextRequest) {
     `default-src 'self'`,
     `script-src ${scriptSrc}`,
     `style-src 'self' 'unsafe-inline'`, // Tailwind emits inline styles for animations
-    `img-src 'self' data: blob: https://cdn.campusnotehub.com`,
+    `img-src 'self' data: blob:`,
     `media-src 'self' blob:`,
     `font-src 'self' data:`,
     `connect-src ${connectSrc}`,

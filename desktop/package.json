@@ -7,7 +7,9 @@
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
-    "icons": "tauri icon ../public/brand/campus-hub-app-icon.svg --output src-tauri/icons"
+    "icons": "tauri icon ../public/brand/campus-hub-app-icon.svg --output src-tauri/icons",
+    "version:bump": "node scripts/version.mjs",
+    "version:check": "node scripts/version.mjs --check"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.5"

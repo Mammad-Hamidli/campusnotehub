@@ -5,14 +5,17 @@ import { FlatCompat } from '@eslint/eslintrc';
 /**
  * ESLint 9 flat config wrapping Next's shareable configs.
  *
- * Without a config `next lint` stops at an interactive setup prompt, which is
- * why lint had never actually run on this codebase.
+ * Run with `npm run lint` (plain `eslint .`: `next lint` is deprecated and is
+ * removed in Next 16). Unlike `next lint`, this also covers scripts/ and the
+ * root config files.
  */
 const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta.url)) });
 
-export default [
+const config = [
   {
-    ignores: ['.next/**', 'node_modules/**', 'graphify-out/**', 'services/**', 'next-env.d.ts'],
+    ignores: ['.next/**', 'node_modules/**', 'graphify-out/**', 'services/**', 'desktop/src-tauri/target/**', 'next-env.d.ts'],
   },
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
 ];
+
+export default config;

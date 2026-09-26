@@ -186,40 +186,6 @@ function isPolyglot(buffer: Buffer): boolean {
 }
 
 /**
- * Reads a request body into memory with a hard cap, aborting the stream the
- * moment the cap is passed.
- *
- * Buffering the whole body first and checking length afterwards means a
- * malicious client can make the process allocate unbounded memory before the
- * check ever runs. Content-Length is also just a client claim.
- */
-export async function readCapped(
-  stream: ReadableStream<Uint8Array>,
-  maxBytes: number,
-): Promise<Buffer | null> {
-  const reader = stream.getReader();
-  const chunks: Buffer[] = [];
-  let total = 0;
-
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel('size limit exceeded');
-        wipeAll(chunks);
-        return null;
-      }
-      chunks.push(Buffer.from(value));
-    }
-    return Buffer.concat(chunks);
-  } finally {
-    reader.releaseLock();
-  }
-}
-
-/**
  * Overwrites buffers before releasing them.
  *
  * Node will not zero freed memory, and a heap snapshot taken after a crash can
@@ -231,7 +197,3 @@ export function wipe(buffer: Buffer): void {
   buffer.fill(0);
 }
 
-export function wipeAll(buffers: Buffer[]): void {
-  for (const buffer of buffers) buffer.fill(0);
-  buffers.length = 0;
-}

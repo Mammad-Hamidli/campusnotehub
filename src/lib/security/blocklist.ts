@@ -20,7 +20,7 @@ function blocklistDoc(type: string, value: string) {
   const id = `${type}__${Buffer.from(value).toString('base64url')}`;
   return adminDb().collection(COLLECTIONS.blocklist).doc(id);
 }
-import { hashEmail, hashPhone, piiHash } from '@/lib/crypto/hash';
+import { hashEmail, hashPhone } from '@/lib/crypto/hash';
 
 /**
  * Account- and device-level ban enforcement.
@@ -337,4 +337,3 @@ export async function isUserBlocked(userId: string): Promise<boolean> {
   return asDate > new Date();
 }
 
-export const hashDeviceValue = (raw: string) => piiHash(raw, 'device');

@@ -131,8 +131,6 @@ export const COLLECTIONS = {
   accountDeletionRequests: 'accountDeletionRequests',
 } as const;
 
-export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
-
 /**
  * Subcollections, keyed by their parent.
  *
@@ -164,10 +162,10 @@ export const SUBCOLLECTIONS = {
  * Storage paths.
  *
  * Identity documents are deliberately ABSENT. Under the zero-retention policy
- * they never reach durable storage at all - they live in an encrypted Redis
- * buffer for the review window and are wiped. Adding a bucket path for them
- * here would be the first step toward breaking that promise, which is why
- * src/lib/storage/s3.ts carries the same warning about a KYC bucket.
+ * they never reach durable storage at all - they live in the ephemeral review
+ * buffer (src/lib/verification/reviewBuffer.ts) for the review window and are
+ * wiped. Adding a bucket path for them here would be the first step toward
+ * breaking that promise.
  */
 export const STORAGE_PATHS = {
   /** Study-note files. Private; served through an authorization check. */

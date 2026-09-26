@@ -13,8 +13,8 @@ import 'server-only';
  * src/lib/media/images.ts after sharp leaked into the client bundle and took
  * the whole app down.
  *
- * Client code uses src/lib/firebase/client.ts, which carries only the public
- * config and is subject to the security rules.
+ * There is no browser-side Firebase client: pages go through the API routes,
+ * and firebase/firestore.rules refuse direct client access.
  *
  * The implementation is in ./admin.core so that CLI scripts, which cannot load
  * `server-only`, can still use it.

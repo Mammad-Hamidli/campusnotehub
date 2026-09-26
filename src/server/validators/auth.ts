@@ -170,8 +170,6 @@ export function splitFullName(fullName: string): { firstName: string; lastName: 
   return { firstName: first, lastName: rest.join(' ') || null };
 }
 
-export type RegisterInput = z.infer<typeof registerSchema>;
-
 /**
  * Login body. `identifier` is whatever was typed into the "email or username"
  * box; see parseLoginIdentifier() for how the two are told apart.
@@ -205,15 +203,6 @@ export const loginSchema = z
     }
     return { identifier: parsed, password: body.password, deviceFingerprint: body.deviceFingerprint };
   });
-
-export type LoginInput = z.infer<typeof loginSchema>;
-
-export const documentKindSchema = z.enum([
-  'ID_FRONT',
-  'ID_BACK',
-  'STUDENT_CARD_FRONT',
-  'STUDENT_CARD_BACK',
-]);
 
 /**
  * NOTE: there is no submitVerificationSchema any more.

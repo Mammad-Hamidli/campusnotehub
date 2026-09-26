@@ -1771,5 +1771,11 @@
       "title": "Hələ də sualınız var?",
       "body": "Bizə yazın — hər mesajı oxuyuruq."
     }
+  },
+  "desktopUpdate": {
+    "title": "campusnotehub-un yeni versiyası çıxıb",
+    "body": "Versiya {version} hazırdır. Yeniləmək üçün onu yükləyin və quraşdırıcını işə salın.",
+    "download": "Yeniləməni yüklə",
+    "later": "Sonra"
   }
 }

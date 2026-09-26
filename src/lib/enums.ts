@@ -38,7 +38,6 @@ export const Locale = {
   ru: 'ru',
 } as const;
 export type Locale = (typeof Locale)[keyof typeof Locale];
-export const LocaleValues = Object.values(Locale) as Locale[];
 
 export const UserRole = {
   STUDENT: 'STUDENT',
@@ -49,7 +48,6 @@ export const UserRole = {
   ADMIN: 'ADMIN',
 } as const;
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
-export const UserRoleValues = Object.values(UserRole) as UserRole[];
 
 export const VerificationStatus = {
   UNVERIFIED: 'UNVERIFIED',
@@ -60,7 +58,6 @@ export const VerificationStatus = {
   BANNED: 'BANNED',
 } as const;
 export type VerificationStatus = (typeof VerificationStatus)[keyof typeof VerificationStatus];
-export const VerificationStatusValues = Object.values(VerificationStatus) as VerificationStatus[];
 
 export const AccountStatus = {
   ACTIVE: 'ACTIVE',
@@ -70,7 +67,6 @@ export const AccountStatus = {
   DELETED: 'DELETED',
 } as const;
 export type AccountStatus = (typeof AccountStatus)[keyof typeof AccountStatus];
-export const AccountStatusValues = Object.values(AccountStatus) as AccountStatus[];
 
 export const DocumentKind = {
   ID_FRONT: 'ID_FRONT',
@@ -79,7 +75,6 @@ export const DocumentKind = {
   STUDENT_CARD_BACK: 'STUDENT_CARD_BACK',
 } as const;
 export type DocumentKind = (typeof DocumentKind)[keyof typeof DocumentKind];
-export const DocumentKindValues = Object.values(DocumentKind) as DocumentKind[];
 
 export const FraudVerdict = {
   CLEAN: 'CLEAN',
@@ -87,7 +82,6 @@ export const FraudVerdict = {
   TAMPERED: 'TAMPERED',
 } as const;
 export type FraudVerdict = (typeof FraudVerdict)[keyof typeof FraudVerdict];
-export const FraudVerdictValues = Object.values(FraudVerdict) as FraudVerdict[];
 
 export const BlocklistType = {
   USER_ID: 'USER_ID',
@@ -96,7 +90,6 @@ export const BlocklistType = {
   DEVICE_FINGERPRINT: 'DEVICE_FINGERPRINT',
 } as const;
 export type BlocklistType = (typeof BlocklistType)[keyof typeof BlocklistType];
-export const BlocklistTypeValues = Object.values(BlocklistType) as BlocklistType[];
 
 export const FieldVisibility = {
   PUBLIC: 'PUBLIC',
@@ -104,7 +97,6 @@ export const FieldVisibility = {
   PRIVATE: 'PRIVATE',
 } as const;
 export type FieldVisibility = (typeof FieldVisibility)[keyof typeof FieldVisibility];
-export const FieldVisibilityValues = Object.values(FieldVisibility) as FieldVisibility[];
 
 export const PostVisibility = {
   PUBLIC: 'PUBLIC',
@@ -113,7 +105,6 @@ export const PostVisibility = {
   FOLLOWERS: 'FOLLOWERS',
 } as const;
 export type PostVisibility = (typeof PostVisibility)[keyof typeof PostVisibility];
-export const PostVisibilityValues = Object.values(PostVisibility) as PostVisibility[];
 
 export const NoteStatus = {
   DRAFT: 'DRAFT',
@@ -124,7 +115,6 @@ export const NoteStatus = {
   DELISTED: 'DELISTED',
 } as const;
 export type NoteStatus = (typeof NoteStatus)[keyof typeof NoteStatus];
-export const NoteStatusValues = Object.values(NoteStatus) as NoteStatus[];
 
 export const MentorIndustry = {
   IT: 'IT',
@@ -138,7 +128,6 @@ export const MentorIndustry = {
   OTHER: 'OTHER',
 } as const;
 export type MentorIndustry = (typeof MentorIndustry)[keyof typeof MentorIndustry];
-export const MentorIndustryValues = Object.values(MentorIndustry) as MentorIndustry[];
 
 export const BookingStatus = {
   REQUESTED: 'REQUESTED',
@@ -151,7 +140,6 @@ export const BookingStatus = {
   EXPIRED: 'EXPIRED',
 } as const;
 export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];
-export const BookingStatusValues = Object.values(BookingStatus) as BookingStatus[];
 
 export const NotificationChannel = {
   IN_APP: 'IN_APP',
@@ -159,7 +147,6 @@ export const NotificationChannel = {
   EMAIL: 'EMAIL',
 } as const;
 export type NotificationChannel = (typeof NotificationChannel)[keyof typeof NotificationChannel];
-export const NotificationChannelValues = Object.values(NotificationChannel) as NotificationChannel[];
 
 export const NotificationType = {
   VERIFICATION_APPROVED: 'VERIFICATION_APPROVED',
@@ -182,7 +169,6 @@ export const NotificationType = {
   SYSTEM: 'SYSTEM',
 } as const;
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
-export const NotificationTypeValues = Object.values(NotificationType) as NotificationType[];
 
 export const ReportReason = {
   SPAM: 'SPAM',
@@ -194,4 +180,3 @@ export const ReportReason = {
   OTHER: 'OTHER',
 } as const;
 export type ReportReason = (typeof ReportReason)[keyof typeof ReportReason];
-export const ReportReasonValues = Object.values(ReportReason) as ReportReason[];

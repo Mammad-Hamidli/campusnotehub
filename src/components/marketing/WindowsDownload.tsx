@@ -3,6 +3,7 @@
 import { useSyncExternalStore, type MouseEventHandler } from 'react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { WINDOWS_DOWNLOAD_PATH } from '@/lib/site';
+import { isDesktopApp } from '@/lib/desktop/appVersion';
 import type { WindowsInstaller } from '@/lib/desktop/windowsInstaller';
 
 /**
@@ -28,19 +29,14 @@ const noopSubscribe = () => () => {};
 /**
  * True inside the campusnotehub desktop app (desktop/, Tauri). It loads this
  * same site, and a signed-out launch opens on the landing page, so without
- * this the app would offer to download itself on every start.
+ * this the app would offer to download itself on every start. Updating the
+ * app is DesktopUpdateNotice's job.
  *
- * Tauri injects __TAURI_INTERNALS__ into every page it hosts, remote ones
- * included (the site cannot call anything through it: desktop/ grants no
- * capabilities). The server cannot know, so the server render and hydration
- * say false and the app hides the links right after.
+ * The server cannot know, so the server render and hydration say false and
+ * the app hides the links right after.
  */
 function useInDesktopApp(): boolean {
-  return useSyncExternalStore(
-    noopSubscribe,
-    () => '__TAURI_INTERNALS__' in window,
-    () => false,
-  );
+  return useSyncExternalStore(noopSubscribe, isDesktopApp, () => false);
 }
 
 /**

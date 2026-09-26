@@ -1,9 +1,14 @@
 # Builds the native Windows installer (desktop/, Tauri 2 + NSIS).
 #
-# - Manual run (Actions tab -> "Desktop - Windows installer" -> Run workflow) or any
-#   PR touching desktop/: the setup .exe is uploaded as a workflow artifact.
-# - Tag push `desktop-vX.Y.Z` (X.Y.Z must equal desktop/package.json "version"):
-#   same build, then the .exe is attached to a GitHub Release for that tag.
+# - Release (Actions tab -> "Desktop - Windows installer" -> Run workflow on main,
+#   release = patch/minor/major): bumps every version file (desktop/scripts/version.mjs),
+#   commits and pushes the bump with tag desktop-vX.Y.Z, builds, and publishes a
+#   GitHub Release. The site's download buttons and the in-app update notice pick
+#   it up within 10 minutes.
+# - Tag push `desktop-vX.Y.Z` made by hand: same build and release, after checking
+#   the tag equals the version in every file.
+# - Run workflow with release = none, or any PR touching desktop/: build only; the
+#   setup .exe is uploaded as a workflow artifact.
 #
 # The web app is not built here: the desktop shell loads https://www.campusnotehub.com.
 #
@@ -14,20 +19,28 @@ name: Desktop - Windows installer
 
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: Publish a new version (none = build only)
+        type: choice
+        options: [none, patch, minor, major]
+        default: none
   push:
     tags: ['desktop-v*']
   pull_request:
     paths: ['desktop/**', '.github/workflows/desktop-windows.yml']
 
+# Only superseded PR builds are cancelled: cancelling a release after its tag
+# was pushed would leave a tag with no GitHub Release behind it.
 concurrency:
   group: desktop-windows-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     runs-on: windows-latest
     permissions:
-      contents: write # only used by the release step, which runs on tags only
+      contents: write # the version-bump push and the release; PR runs from forks get read-only
     defaults:
       run:
         working-directory: desktop
@@ -46,15 +59,37 @@ jobs:
         with:
           workspaces: desktop/src-tauri -> target
 
-      - name: Check tag matches desktop/package.json version
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
+      # Pushed with GITHUB_TOKEN, so the tag does not start a second run of this
+      # workflow; this run builds and publishes it.
+      - name: Bump version, commit and tag
+        id: bump
+        if: github.event_name == 'workflow_dispatch' && inputs.release != 'none'
         shell: bash
+        env:
+          RELEASE: ${{ inputs.release }}
         run: |
-          version="$(node -p "require('./package.json').version")"
-          if [ "${GITHUB_REF_NAME#desktop-v}" != "$version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match desktop/package.json version $version"
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Releases are cut from main, not $GITHUB_REF_NAME"
             exit 1
           fi
+          version="$(node scripts/version.mjs "$RELEASE")"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit --all --message "Release campusnotehub for Windows $version"
+          git tag "desktop-v$version"
+          git push --atomic origin HEAD:main "desktop-v$version"
+          echo "tag=desktop-v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check version files
+        id: release
+        shell: bash
+        env:
+          BUMPED_TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          tag="$BUMPED_TAG"
+          if [ -z "$tag" ] && [[ "$GITHUB_REF" == refs/tags/desktop-v* ]]; then tag="$GITHUB_REF_NAME"; fi
+          node scripts/version.mjs --check ${tag:+"${tag#desktop-v}"}
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - run: npm ci
 
@@ -78,7 +113,7 @@ jobs:
           "config=$path" >> $env:GITHUB_OUTPUT
 
       - name: Warn about an unsigned release
-        if: startsWith(github.ref, 'refs/tags/desktop-v') && steps.signing.outcome != 'success'
+        if: steps.release.outputs.tag != '' && steps.signing.outcome != 'success'
         run: echo "::warning::This release is UNSIGNED - Windows SmartScreen will show 'Unknown publisher'. See desktop/README.md, Code signing."
 
       - name: Build installer
@@ -109,12 +144,13 @@ jobs:
           if-no-files-found: error
 
       - name: Attach installer to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        if: steps.release.outputs.tag != ''
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
         run: >
-          gh release create "$GITHUB_REF_NAME"
+          gh release create "$TAG"
           src-tauri/target/release/bundle/nsis/*-setup.exe
-          --title "campusnotehub for Windows ${GITHUB_REF_NAME#desktop-v}"
+          --title "campusnotehub for Windows ${TAG#desktop-v}"
           --generate-notes

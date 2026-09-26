@@ -311,7 +311,7 @@ export function renderEmail(content: EmailContent): {
   <o:AllowPNG/>
   <!-- Without this Outlook assumes 120dpi and renders every pixel value ~25%
        larger, which is what makes an otherwise correct email look bloated. -->
-  <o:PixelsPerInch>96</o:PixelsPerInch>
+  <o:PixelsPerInch></o:PixelsPerInch>
 </o:OfficeDocumentSettings></xml>
 <![endif]-->
 <style>

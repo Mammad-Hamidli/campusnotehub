@@ -118,21 +118,6 @@ export async function updateCase(id: string, patch: Record<string, unknown>): Pr
   await cases().doc(id).update(forFirestore(patch));
 }
 
-/** How many times this user has already submitted. Caps retries. */
-export async function countAttempts(userId: string): Promise<number> {
-  return (await cases().where('userId', '==', userId).count().get()).data().count;
-}
-
-export async function latestCaseForUser(userId: string): Promise<VerificationCaseRecord | null> {
-  const snap = await cases().where('userId', '==', userId).limit(50).get();
-  const rows = sortBy(
-    docsToObjects<VerificationCaseRecord>(snap.docs) as VerificationCaseRecord[],
-    'submittedAt',
-    'desc',
-  );
-  return rows[0] ?? null;
-}
-
 export type CaseListFilter = {
   status?: VerificationStatus;
   verdict?: FraudVerdict;
@@ -217,10 +202,3 @@ export async function expiredReviewCases(
   );
 }
 
-export async function countCases(where: Record<string, unknown> = {}): Promise<number> {
-  let query: FirebaseFirestore.Query = cases();
-  for (const [field, value] of Object.entries(where)) query = query.where(field, '==', value);
-  return (await query.count().get()).data().count;
-}
-
-export const verificationCollections = { cases };

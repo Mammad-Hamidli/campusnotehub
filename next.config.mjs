@@ -24,18 +24,9 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: 'cdn.campusnotehub.com' },
-      { protocol: 'https', hostname: 'campusnotehub-public.s3.eu-central-1.amazonaws.com' },
-    ],
-  },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
-  // Uploads never pass through a Server Action; they go straight to S3 with a
-  // presigned POST, so the body limit stays small on purpose.
-  experimental: { serverActions: { bodySizeLimit: '1mb' } },
 };
 
 export default nextConfig;

@@ -193,33 +193,3 @@ async function store(parsed: Parsed, uid: number): Promise<boolean> {
   }
 }
 
-/**
- * Proves the IMAP credentials work without reading anything.
- * Used by `npm run email:verify`'s inbound half and by operators after a
- * password rotation.
- */
-export async function verifyInbox(): Promise<
-  { ok: true; mailbox: string; unseen: number } | { ok: false; error: string }
-> {
-  const settings = imapSettings();
-  if (!settings) return { ok: false, error: 'IMAP_PASSWORD is not set.' };
-
-  const client = new ImapFlow({
-    host: settings.host,
-    port: settings.port,
-    secure: settings.port === 993,
-    auth: { user: settings.user, pass: settings.pass },
-    logger: false,
-    greetingTimeout: 10_000,
-  });
-
-  try {
-    await client.connect();
-    const status = await client.status('INBOX', { unseen: true });
-    return { ok: true, mailbox: settings.user, unseen: status.unseen ?? 0 };
-  } catch (cause) {
-    return { ok: false, error: cause instanceof Error ? cause.message : 'unknown error' };
-  } finally {
-    await client.logout().catch(() => client.close());
-  }
-}

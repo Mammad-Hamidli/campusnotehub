@@ -2,7 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import type { NoteStatus } from '@/lib/enums';
 import { adminDb } from '../admin.core';
 import { COLLECTIONS, SUBCOLLECTIONS } from '../collections';
-import { deleteAuthenticated, downloadAuthenticated, uploadBuffer } from '@/lib/cloudinary/server';
+import { downloadAuthenticated, uploadBuffer } from '@/lib/cloudinary/server';
 import { docToObject, docsToObjects, forFirestore } from '../convert';
 
 /**
@@ -252,17 +252,6 @@ export async function updateNote(id: string, patch: Record<string, unknown>): Pr
   await notes()
     .doc(id)
     .update(forFirestore({ ...patch, updatedAt: new Date() }));
-}
-
-/** Deletes the note document AND its object. Used by account erasure. */
-export async function deleteNote(note: NoteRecord): Promise<void> {
-  const path = note.attachment?.storagePath ?? note.fileKey;
-  if (path && !path.startsWith('db://')) {
-    // The object may already be gone; a delete that finds nothing has done its
-    // job, so a missing object is not a failure.
-    await deleteAuthenticated(path, 'raw');
-  }
-  await notes().doc(note.id).delete();
 }
 
 /** Counts a download. Fire-and-forget: a failed counter never fails a download. */

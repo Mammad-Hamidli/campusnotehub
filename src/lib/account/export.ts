@@ -417,8 +417,6 @@ export async function buildAccountExport(userId: string) {
   };
 }
 
-export type AccountExport = NonNullable<Awaited<ReturnType<typeof buildAccountExport>>>;
-
 async function mentorProfilesByIds(ids: string[]): Promise<Map<string, MentorProfileRecord>> {
   if (ids.length === 0) return new Map();
   const db = adminDb();

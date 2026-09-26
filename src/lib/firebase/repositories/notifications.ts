@@ -168,17 +168,3 @@ export async function notificationPreferences(
   });
 }
 
-export async function setNotificationPreference(
-  userId: string,
-  type: string,
-  channel: string,
-  enabled: boolean,
-): Promise<void> {
-  // Keyed by type+channel so a preference cannot be recorded twice - the
-  // structural stand-in for the SQL unique constraint on (userId, type,
-  // channel).
-  await adminDb()
-    .collection(SUBCOLLECTIONS.notifPrefs(userId))
-    .doc(`${type}__${channel}`)
-    .set(forFirestore({ type, channel, enabled }), { merge: true });
-}

@@ -229,12 +229,3 @@ export function detectUniversityFromEmail(email: string): string | null {
   return null;
 }
 
-/** Localised display name. Falls back to the code if the id is unknown. */
-export function universityName(id: string, locale: 'az' | 'en' | 'ru'): string {
-  return UNIVERSITIES.find((uni) => uni.id === id)?.[locale] ?? id;
-}
-
-/** True when the address is on an official domain for the selected university. */
-export function emailMatchesUniversity(email: string, universityId: string): boolean {
-  return detectUniversityFromEmail(email) === universityId;
-}

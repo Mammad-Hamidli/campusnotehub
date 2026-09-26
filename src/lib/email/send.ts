@@ -381,24 +381,6 @@ export function sendEmailAsync<K extends TemplateName>(
   }
 }
 
-/**
- * Confirms the credentials actually work, without sending anything.
- * Wired to `npm run email:verify`.
- */
-export async function verifyTransport(): Promise<
-  { ok: true; kind: 'smtp'; from: string } | { ok: false; error: string }
-> {
-  const transport = getTransport();
-  if (!transport) return { ok: false, error: 'No transport configured.' };
-
-  try {
-    await transport.client.verify();
-    return { ok: true, kind: 'smtp', from: fromAddress(transport) };
-  } catch (cause) {
-    return { ok: false, error: cause instanceof Error ? cause.message : 'unknown error' };
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Durable retry: the email outbox
 // ---------------------------------------------------------------------------

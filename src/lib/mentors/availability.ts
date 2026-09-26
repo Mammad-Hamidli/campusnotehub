@@ -1,4 +1,4 @@
-import { addMinutes, startOfDay } from 'date-fns';
+import { addMinutes } from 'date-fns';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import {
   bookingsOverlapping,
@@ -156,22 +156,3 @@ export class BookingError extends Error {
   }
 }
 
-/** Groups slots into morning/afternoon/evening for the picker UI. */
-export function groupSlots(slots: Slot[], timezone: string) {
-  const bucket = (d: Date) => {
-    const h = toZonedTime(d, timezone).getHours();
-    if (h < 12) return 'morning' as const;
-    if (h < 17) return 'afternoon' as const;
-    return 'evening' as const;
-  };
-  return slots.reduce<Record<'morning' | 'afternoon' | 'evening', Slot[]>>(
-    (acc, s) => {
-      acc[bucket(s.startsAt)].push(s);
-      return acc;
-    },
-    { morning: [], afternoon: [], evening: [] },
-  );
-}
-
-export const dayBoundary = (date: string, tz: string) =>
-  startOfDay(toZonedTime(fromZonedTime(`${date}T00:00:00`, tz), tz));

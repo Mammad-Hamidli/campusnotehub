@@ -19,8 +19,9 @@
 // stdout/stderr, panic messages included, never reach the terminal it runs from.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use tauri::utils::config::FrontendDist;
 use tauri::webview::NewWindowResponse;
-use tauri::{AppHandle, Manager, Url, WebviewWindowBuilder};
+use tauri::{App, AppHandle, Manager, Url, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
 /// Hands a URL to the default browser or mail client.
@@ -33,6 +34,34 @@ fn open_externally(app: &AppHandle, url: &Url) {
             eprintln!("could not open {url} externally: {err}");
         }
     }
+}
+
+/// Tells the site which build of the app it is running in, for its "new version
+/// available" notice (src/lib/desktop/appVersion.ts). A frozen JS global, not
+/// IPC: the page still cannot call into the shell.
+///
+/// Scoped to the site's own origin because Tauri runs initialization scripts on
+/// every top-level navigation (Google and university sign-in included) and, on
+/// Windows, in iframes too. The version is package.json's (via tauri.conf.json),
+/// the same one the installer is named after, not Cargo.toml's.
+fn app_info_script(app: &App) -> Option<String> {
+    let build = &app.config().build;
+    let site = if tauri::is_dev() {
+        build.dev_url.as_ref()
+    } else {
+        match &build.frontend_dist {
+            Some(FrontendDist::Url(url)) => Some(url),
+            _ => None,
+        }
+    };
+    let origin = site?.origin().ascii_serialization();
+    let version = app.package_info().version.to_string();
+    // Both are build-time constants (an ASCII origin and a semver), for which
+    // Rust's Debug quoting is also a valid JS string literal.
+    Some(format!(
+        "if (location.origin === {origin:?}) Object.defineProperty(window, '__CAMPUSNOTEHUB_DESKTOP__', \
+         {{ value: Object.freeze({{ version: {version:?} }}) }});"
+    ))
 }
 
 fn main() {
@@ -64,7 +93,11 @@ fn main() {
 
             let popups = app.handle().clone();
             let schemes = app.handle().clone();
-            WebviewWindowBuilder::from_config(app.handle(), &config)?
+            let mut builder = WebviewWindowBuilder::from_config(app.handle(), &config)?;
+            if let Some(script) = app_info_script(app) {
+                builder = builder.initialization_script(script);
+            }
+            builder
                 // target="_blank", window.open(), Ctrl/middle-click. Without a
                 // handler Tauri drops these silently, so every external link
                 // (LinkedIn, mentor meeting links, links in posts) would do nothing.

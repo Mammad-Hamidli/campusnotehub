@@ -1,7 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '../admin.core';
 import { COLLECTIONS } from '../collections';
-import { docsToObjects, forFirestore } from '../convert';
+import { forFirestore } from '../convert';
 
 /**
  * Hashtags.
@@ -18,15 +18,6 @@ import { docsToObjects, forFirestore } from '../convert';
  * (keyed by liker). Where SQL had a unique constraint, the Firestore
  * translation puts that value in the document id wherever it can.
  */
-
-export type TagRecord = {
-  id: string;
-  slug: string;
-  label: string;
-  usageCount: number;
-  isBlocked: boolean;
-  createdAt: Date;
-};
 
 const tags = () => adminDb().collection(COLLECTIONS.tags);
 
@@ -94,12 +85,3 @@ export async function upsertTags(
   return allowed;
 }
 
-/** The trending list: most-used tags that are not blocked. */
-export async function popularTags(take = 20): Promise<TagRecord[]> {
-  const snap = await tags()
-    .where('isBlocked', '==', false)
-    .orderBy('usageCount', 'desc')
-    .limit(take)
-    .get();
-  return docsToObjects<TagRecord>(snap.docs) as TagRecord[];
-}

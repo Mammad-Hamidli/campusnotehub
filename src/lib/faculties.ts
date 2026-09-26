@@ -150,24 +150,6 @@ export const FACULTIES: readonly FacultyOption[] = [
   { slug: FACULTY_OTHER, label: 'Other', group: 'Education & Other' },
 ] as const;
 
-/**
- * Display order for the grouped picker.
- *
- * Declared explicitly rather than derived from first-appearance in FACULTIES,
- * so reordering the array above (or inserting a faculty into the middle of a
- * group) cannot silently reshuffle the dropdown.
- */
-export const FACULTY_GROUPS: readonly FacultyGroup[] = [
-  'Computing & IT',
-  'Engineering',
-  'Natural Sciences',
-  'Health & Medicine',
-  'Business & Economics',
-  'Social Sciences & Law',
-  'Arts & Humanities',
-  'Education & Other',
-];
-
 const BY_SLUG = new Map(FACULTIES.map((f) => [f.slug, f]));
 
 /**

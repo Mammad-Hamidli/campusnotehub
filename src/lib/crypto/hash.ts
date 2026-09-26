@@ -75,7 +75,6 @@ export function piiHash(value: string, domain: string): string {
 }
 
 export const hashEmail = (email: string) => piiHash(email, 'email');
-export const hashDevice = (fp: string) => piiHash(fp, 'device');
 
 /**
  * E.164 normalisation before hashing, so +994 50 123 45 67, 0501234567 and

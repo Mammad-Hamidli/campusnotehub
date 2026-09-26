@@ -5,6 +5,7 @@ import { LocaleProvider } from '@/lib/i18n/LocaleProvider';
 import { DEFAULT_LOCALE, LOCALE_COOKIE, isLocale } from '@/lib/i18n/dictionaries';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 import { SessionKeeper } from '@/components/auth/SessionKeeper';
+import { DesktopUpdateNotice } from '@/components/desktop/DesktopUpdateNotice';
 import { IdentityPromptSlot } from '@/components/account/IdentityPromptSlot';
 import { FeedbackProvider } from '@/components/ui/Feedback';
 import { FollowingProvider } from '@/components/social/Following';
@@ -146,6 +147,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 Inside LocaleProvider so their built-in labels are translated. */}
             <FeedbackProvider>
               <SessionKeeper />
+              {/* Renders only inside the desktop app, when a newer build exists. */}
+              <DesktopUpdateNotice />
               {/*
                 The standing "Verify your identity" banner, mounted once for the
                 WHOLE app rather than per page, and BEFORE {children} so it is

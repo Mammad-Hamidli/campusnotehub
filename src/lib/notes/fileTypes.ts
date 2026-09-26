@@ -210,12 +210,6 @@ const EXTENSION_FOR: Record<AllowedNoteMime, string[]> = {
   'text/plain': ['txt', 'md', 'csv'],
 };
 
-/** The accept= attribute for the file input, derived from the same table. */
-export const ACCEPT_ATTRIBUTE = [
-  ...ALLOWED_NOTE_MIME,
-  ...Object.values(EXTENSION_FOR).flat().map((ext) => `.${ext}`),
-].join(',');
-
 export function validateNoteFile(
   buffer: Buffer,
   declaredMime: string,

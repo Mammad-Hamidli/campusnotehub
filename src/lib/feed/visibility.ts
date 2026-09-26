@@ -66,18 +66,6 @@ export async function resolveViewerAudience(viewer: Viewer | null): Promise<View
 }
 
 /**
- * Resolves the viewer's own university.
- *
- * Always from their record, never from a query string: trusting a client
- * supplied `universityId` would let anyone read another university's private
- * feed by editing a URL.
- */
-export async function viewerUniversityId(viewer: Viewer | null): Promise<string | null> {
-  if (!viewer) return null;
-  return (await findUserById(viewer.id))?.universityId ?? null;
-}
-
-/**
  * Loads a post the viewer is allowed to interact with, or null.
  *
  * Returning null for BOTH "no such post" and "not allowed to see it" is

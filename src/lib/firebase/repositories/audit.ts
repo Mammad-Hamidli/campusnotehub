@@ -139,22 +139,3 @@ export async function listAuditLogs(
   return { rows, truncated: snap.size >= Math.min(limit, SCAN_CEILING) };
 }
 
-export async function countAuditLogs(): Promise<number> {
-  const snap = await logs().count().get();
-  return snap.data().count;
-}
-
-/** Recent entries about one entity, for the admin user detail view. */
-export async function auditForEntity(
-  entityType: string,
-  entityId: string,
-  take = 50,
-): Promise<AuditRecord[]> {
-  const snap = await logs()
-    .where('entityType', '==', entityType)
-    .where('entityId', '==', entityId)
-    .orderBy('createdAt', 'desc')
-    .limit(take)
-    .get();
-  return docsToObjects<AuditRecord>(snap.docs) as AuditRecord[];
-}

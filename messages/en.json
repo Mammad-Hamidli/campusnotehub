@@ -1771,5 +1771,11 @@
       "title": "Still have a question?",
       "body": "Write to us — we read every message."
     }
+  },
+  "desktopUpdate": {
+    "title": "A new version of campusnotehub is available",
+    "body": "Version {version} is ready. Download it and run the installer to update.",
+    "download": "Download update",
+    "later": "Later"
   }
 }

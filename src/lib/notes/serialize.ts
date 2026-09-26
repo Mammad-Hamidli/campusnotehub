@@ -68,4 +68,3 @@ export async function serializeNotes(rows: NoteRecord[], viewerId: string | null
   });
 }
 
-export type SerializedNote = Awaited<ReturnType<typeof serializeNotes>>[number];

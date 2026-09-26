@@ -139,8 +139,3 @@ export function resolveAsset(filename: string): ResolvedAsset | null {
   };
 }
 
-/** Test seam: forget cached reads so a newly added file is picked up. */
-export function resetAssetCache(): void {
-  cache.clear();
-  warned.clear();
-}

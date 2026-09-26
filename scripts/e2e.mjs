@@ -198,17 +198,6 @@ async function login(page, who) {
   return page.url();
 }
 
-/** A 1x1 PNG is too small for the uploader; this makes a real 300x200 one. */
-function pngFixture() {
-  // Minimal but valid PNG produced by hand would be fragile; use a data URI
-  // decoded from a tiny base64 PNG scaled by the server instead. This is a
-  // 300x200 solid-colour PNG.
-  const { execSync } = require('node:child_process');
-  void execSync;
-  return null;
-}
-void pngFixture;
-
 const GROUPS = {};
 
 // ---------------------------------------------------------------------------

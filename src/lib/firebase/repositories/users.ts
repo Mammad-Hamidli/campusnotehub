@@ -248,11 +248,6 @@ export async function findUserIdByEmailHash(emailHash: string): Promise<string |
   return snap.empty ? null : snap.docs[0].id;
 }
 
-export async function findUserIdByPhoneHash(phoneHash: string): Promise<string | null> {
-  const snap = await credentials().where('phoneHash', '==', phoneHash).limit(1).get();
-  return snap.empty ? null : snap.docs[0].id;
-}
-
 /** The identifiers signup can collide on, in the order the form shows them. */
 export type ConflictField = 'email' | 'phone' | 'nickname' | 'identity';
 

@@ -302,14 +302,6 @@ export async function resetRateLimit(
   await adminDb().collection(COLLECTION).doc(bucketKey(key, identity)).delete();
 }
 
-export class RateLimitError extends Error {
-  readonly status = 429;
-  readonly messageKey = 'errors.rateLimited';
-  constructor(public readonly retryAfterSeconds: number) {
-    super('Rate limit exceeded');
-  }
-}
-
 /**
  * Extracts the client IP behind the CDN. Trusts only the leftmost address in
  * the header the platform itself sets - reading a raw X-Forwarded-For allows

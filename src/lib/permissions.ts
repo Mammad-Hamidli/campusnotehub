@@ -1,5 +1,4 @@
 import { AccountStatus, UserRole, VerificationStatus } from '@/lib/enums';
-import { VERIFICATION_SETTINGS_HREF } from '@/lib/verification/requirements';
 
 export type Capability =
   | 'feed:read'
@@ -143,19 +142,3 @@ export function assertCan(viewer: Viewer | null, capability: Capability): assert
   if (!can(viewer, capability)) throw new ForbiddenError(capability);
 }
 
-/** Drives the banner component without leaking the whole permission table. */
-export function verificationBannerState(viewer: Viewer | null) {
-  if (!viewer) return null;
-  switch (viewer.verificationStatus) {
-    case VerificationStatus.UNVERIFIED:
-      return { tone: 'warning', key: 'verification.banner.unverified', ctaKey: 'verification.banner.unverifiedCta', href: VERIFICATION_SETTINGS_HREF } as const;
-    case VerificationStatus.PROCESSING:
-      return { tone: 'info', key: 'verification.banner.pending', ctaKey: null, href: null } as const;
-    case VerificationStatus.NEEDS_REVIEW:
-      return { tone: 'info', key: 'verification.banner.needsReview', ctaKey: null, href: null } as const;
-    case VerificationStatus.REJECTED:
-      return { tone: 'danger', key: 'verification.banner.rejected', ctaKey: 'verification.banner.rejectedCta', href: VERIFICATION_SETTINGS_HREF } as const;
-    default:
-      return null;
-  }
-}

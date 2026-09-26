@@ -398,19 +398,6 @@ export async function createComment(params: {
 }
 
 /**
- * Soft-deletes a comment.
- *
- * Soft, not hard, for the same reason the SQL model has `isDeleted`: replies
- * point at their parent, and removing the row would orphan a thread.
- */
-export async function softDeleteComment(id: string, postId: string): Promise<void> {
-  const batch = adminDb().batch();
-  batch.update(comments().doc(id), forFirestore({ isDeleted: true }));
-  batch.update(posts().doc(postId), { commentCount: FieldValue.increment(-1) });
-  await batch.commit();
-}
-
-/**
  * Soft delete. `isDeleted` is what every feed query filters on, so the post
  * disappears everywhere at once; likes and comments stay intact for
  * moderation history.

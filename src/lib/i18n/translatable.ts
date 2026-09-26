@@ -83,6 +83,3 @@ export function normalizeTargetLang(value: unknown): TargetLang | null {
   return ALIASES[base] ?? null;
 }
 
-export function isTargetLang(value: unknown): value is TargetLang {
-  return typeof value === 'string' && (TRANSLATION_TARGETS as readonly string[]).includes(value);
-}

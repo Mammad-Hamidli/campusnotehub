@@ -45,10 +45,6 @@ function bareAddress(value: string | undefined): string {
   return (/<([^>]+)>/.exec(raw)?.[1] ?? raw).trim().toLowerCase();
 }
 
-export function isRoleMailbox(value: string | undefined): boolean {
-  return allowed.has(bareAddress(value));
-}
-
 /**
  * Validates one configured address against the allowlist.
  *

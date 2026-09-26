@@ -11,6 +11,7 @@ installer only needs rebuilding when something in `desktop/` changes.
 ```
 desktop/
   package.json              Tauri CLI + scripts; "version" is the app/installer version
+  scripts/version.mjs       bumps / checks the version in every file that carries it
   src-tauri/
     tauri.conf.json         window, remote URL, NSIS installer settings
     src/main.rs             link / popup handling, single instance
@@ -33,6 +34,7 @@ desktop/
 | Second launch | Focuses the running window instead of opening another. |
 | Tauri APIs | None exposed to the site: there is no capabilities file, so the remote page cannot call into the shell. |
 | Offline | WebView2's "can't reach this page" screen; reload with F5. |
+| Updates | The site deploys continuously, so page changes need nothing. When a newer *installer* is released, the app shows a "new version available" card (on start, when the window comes back into view, hourly while open). *Download* saves the installer; *Later* hides it for 3 days. The shell injects `window.__CAMPUSNOTEHUB_DESKTOP__ = { version }` on the site's origin only; 1.0.0 and 1.0.1 inject nothing and are treated as 1.0.1. Browsers never see the card or make the request. |
 
 The installer is per-user (no admin prompt): it installs to
 `%LOCALAPPDATA%\campusnotehub`, adds a Start menu entry and an entry under
@@ -84,13 +86,19 @@ opens no console (`windows_subsystem` in `src/main.rs`; `tauri.conf.json` has no
 
 - **Actions → "Desktop - Windows installer" → Run workflow**, or any PR touching `desktop/`:
   the setup `.exe` is uploaded as the `campusnotehub-windows-installer` artifact.
-- **Release:** bump `"version"` in `desktop/package.json`, commit, then
+- **Release:** Actions → "Desktop - Windows installer" → Run workflow on `main`, with
+  *release* = `patch`, `minor` or `major`. The workflow bumps every version file, commits
+  the bump to `main`, tags it `desktop-vX.Y.Z`, builds and publishes the GitHub Release.
+  To release by hand instead:
   ```powershell
-  git tag desktop-v1.0.1
-  git push origin desktop-v1.0.1
+  cd desktop
+  npm run version:bump -- minor        # or patch / major / 1.4.0
+  git commit -am "Release campusnotehub for Windows 1.1.0"
+  git tag desktop-v1.1.0
+  git push origin main desktop-v1.1.0
   ```
-  The workflow checks that the tag matches the version and attaches the installer to a
-  GitHub Release named after the tag.
+  Every build runs `npm run version:check`, so a hand-edited version that disagrees
+  across files, or a tag that disagrees with the files, fails before compiling.
 
 The site's "Download for Windows" button (landing page, header, footer, and the stable link
 `https://www.campusnotehub.com/download/windows`) picks up the newest `desktop-v*` release
@@ -139,5 +147,7 @@ prompt), submit it as a false positive at https://www.microsoft.com/wdsi/filesub
   `api/auth/desktop`) is appended to it.
 - **Icon:** replace `public/brand/campus-hub-app-icon.svg`, run `npm run icons`, then delete
   the non-Windows outputs (`android/`, `ios/`, `icon.icns`, `Square*Logo.png`, `StoreLogo.png`).
-- **Version:** `desktop/package.json` only (the installer and the .exe's file version read it).
-  The version in `Cargo.toml` is the Rust crate's and is not shown anywhere.
+- **Version:** never by hand - `npm run version:bump -- <patch|minor|major|X.Y.Z>`.
+  `package.json` is the source of truth (the installer name, the .exe's file version and the
+  version the app reports to the site all come from it); `package-lock.json`, `Cargo.toml`
+  and `Cargo.lock` mirror it.

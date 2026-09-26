@@ -202,23 +202,6 @@ export async function claimMediaAssets(ids: string[], ownerId: string): Promise<
 /** Internal sentinel: aborts the claim transaction without a retry loop. */
 class ClaimRejected extends Error {}
 
-/**
- * Abandoned uploads, for the sweep.
- *
- * An asset still unattached after the window is an upload whose author closed
- * the tab, and must not become a permanent orphan blob.
- */
-export async function listAbandonedAssets(olderThan: Date, take = 500) {
-  const snap = await assets()
-    .where('attachedAt', '==', null)
-    .where('createdAt', '<', olderThan)
-    .limit(take)
-    .get();
-  return snap.docs
-    .map((doc) => docToObject<MediaAssetRecord>(doc))
-    .filter((a): a is MediaAssetRecord => a !== null);
-}
-
 export async function deleteMediaAsset(asset: MediaAssetRecord): Promise<void> {
   // The file first: a document with no file is a broken image, a file with no
   // document is merely unreferenced. Delete in the order that never leaves

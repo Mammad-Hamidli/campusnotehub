@@ -74,8 +74,6 @@ export const adminUserListSchema = z.object({
     .transform((v) => v === 'true'),
 });
 
-export type AdminUserListInput = z.infer<typeof adminUserListSchema>;
-
 /**
  * Account status changes an admin may make.
  *
@@ -166,26 +164,6 @@ export const adminFreezeSchema = z.object({
 });
 
 /**
- * Approving a pending account and assigning its role in one step.
- *
- * The role is REQUIRED rather than defaulted to STUDENT: an admin approving an
- * account has the applicant's documents in front of them and is the only party
- * who knows whether they are a student, a lecturer or an alumnus. Defaulting
- * silently would mean every approval quietly asserts "student", and the
- * mistake would only surface when a lecturer could not offer mentoring.
- */
-export const adminApproveWithRoleSchema = z.object({
-  role: z.enum(ASSIGNABLE_ROLES),
-  reason: z.string().trim().min(10).max(1000).optional(),
-  /**
-   * Echoed back by the client for a privileged grant, mirroring the delete
-   * endpoint's confirmNickname. A client that skips the dialog must not skip
-   * the safeguard.
-   */
-  confirmPrivileged: z.boolean().optional(),
-});
-
-/**
  * Setting an account's verification outcome directly from the users list.
  *
  * This is NOT a shortcut around the moderation console, and the difference
@@ -236,18 +214,6 @@ export const adminMfaResetSchema = z
   })
   .strict()
   .refine((d) => !!d.code !== !!d.recoveryCode, { message: 'errors.validationFailed' });
-
-export const adminNoteSchema = z.object({
-  note: z.string().trim().min(1).max(2000),
-});
-
-export const VERIFICATION_QUEUE_STATUSES = [
-  VerificationStatus.NEEDS_REVIEW,
-  VerificationStatus.PROCESSING,
-  VerificationStatus.REJECTED,
-  VerificationStatus.VERIFIED,
-  VerificationStatus.BANNED,
-] as const;
 
 export const adminVerificationListSchema = z.object({
   ...pagination,

@@ -19,7 +19,6 @@ import {
   User,
 } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
-import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 import { useTheme, type ThemePreference } from '@/lib/theme/ThemeProvider';

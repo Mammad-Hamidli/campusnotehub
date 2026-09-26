@@ -1,6 +1,3 @@
-import { createHmac } from 'node:crypto';
-import { piiHash } from '@/lib/crypto/hash';
-
 /**
  * Device fingerprinting - the replacement for IP-based blocking.
  *
@@ -41,69 +38,6 @@ import { piiHash } from '@/lib/crypto/hash';
  * docs/SECURITY.md section 4.
  */
 
-/** Signals the browser reports. Individually weak, jointly discriminating. */
-export type ClientSignals = {
-  /** Hash of a rendered canvas - the highest-entropy single signal. */
-  canvas?: string;
-  /** WebGL vendor + renderer, e.g. "Google Inc. (Intel)". */
-  webgl?: string;
-  /** Which of a probe list of fonts are present. */
-  fonts?: string[];
-  screen?: { width: number; height: number; colorDepth: number; pixelRatio: number };
-  timezone?: string;
-  languages?: string[];
-  platform?: string;
-  hardwareConcurrency?: number;
-  deviceMemory?: number;
-  touchPoints?: number;
-};
-
-/**
- * Signals only the server can observe. These are the valuable half: a script
- * running in the page cannot alter the TLS handshake or the HTTP/2 frame
- * ordering, so spoofing the client signals alone does not move the fingerprint.
- */
-export type ServerSignals = {
-  /** JA4 TLS client fingerprint, from the CDN/edge. */
-  ja4?: string;
-  /** HTTP/2 SETTINGS + header-order hash. */
-  http2Fingerprint?: string;
-  acceptLanguage?: string;
-  userAgent?: string;
-};
-
-/**
- * Combines both sides into one stable identifier.
- *
- * Weighted deliberately: the TLS fingerprint is included verbatim because it
- * is hard to forge, while the volatile client signals are bucketed so a minor
- * browser update does not produce a brand-new device.
- */
-export function computeFingerprint(client: ClientSignals, server: ServerSignals): string {
-  const parts = [
-    // Server-observed, hard to spoof.
-    server.ja4 ?? '',
-    server.http2Fingerprint ?? '',
-
-    // Client-reported, bucketed for stability.
-    client.canvas ?? '',
-    client.webgl ?? '',
-    bucketFonts(client.fonts),
-    client.screen ? `${client.screen.width}x${client.screen.height}@${client.screen.colorDepth}` : '',
-    client.timezone ?? '',
-    client.platform ?? '',
-    // Exact core counts differ across reporting quirks; buckets do not.
-    bucketNumber(client.hardwareConcurrency),
-    bucketNumber(client.deviceMemory),
-    client.touchPoints && client.touchPoints > 0 ? 'touch' : 'notouch',
-
-    // Major browser version only - a patch bump must not reset the device.
-    majorBrowserVersion(server.userAgent),
-  ];
-
-  return piiHash(parts.join('|'), 'device');
-}
-
 /**
  * Coarse label for the "your devices" screen.
  * Never store or display a full user-agent string: it is both identifying and
@@ -129,72 +63,4 @@ export function deviceLabel(userAgent: string | undefined): string {
     : 'Unknown OS';
 
   return `${browser} on ${os}`;
-}
-
-/**
- * Similarity between two fingerprints.
- *
- * Because fingerprints drift, an exact-match-only check under-counts returning
- * devices. The blocklist still matches exactly (a near-match must not trigger
- * a ban), but the moderator's ring-detection view uses this to group devices
- * that are probably the same machine after an update.
- */
-export function fingerprintDistance(a: string, b: string): number {
-  if (a === b) return 0;
-  if (a.length !== b.length) return Number.POSITIVE_INFINITY;
-  let differing = 0;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) differing++;
-  return differing;
-}
-
-/**
- * Extracts server-side signals from the incoming request.
- *
- * NOTE what is absent: there is no IP address here, and no function in this
- * module accepts one. That is structural, not an oversight - see the schema
- * header comment.
- */
-export function readServerSignals(headers: Headers): ServerSignals {
-  return {
-    // Set by the edge/CDN. Cloudflare exposes JA4 on Enterprise; otherwise the
-    // reverse proxy computes it. Absent in dev, which is fine - the client
-    // signals still produce a usable (weaker) fingerprint.
-    ja4: headers.get('cf-ja4') ?? headers.get('x-ja4') ?? undefined,
-    http2Fingerprint: headers.get('x-http2-fingerprint') ?? undefined,
-    acceptLanguage: headers.get('accept-language') ?? undefined,
-    userAgent: headers.get('user-agent') ?? undefined,
-  };
-}
-
-/**
- * Short-lived token binding a fingerprint to a session, so a client cannot
- * simply post someone else's fingerprint string to evade a device block.
- */
-export function signFingerprint(fingerprint: string, sessionId: string): string {
-  return createHmac('sha256', process.env.PII_HASH_PEPPER ?? 'dev-only-pepper')
-    .update(`fp:${fingerprint}:${sessionId}`)
-    .digest('base64url');
-}
-
-// --- bucketing helpers -----------------------------------------------------
-
-function bucketFonts(fonts: string[] | undefined): string {
-  if (!fonts?.length) return '';
-  // Sorted and counted, not listed: the exact set is noisy across OS updates,
-  // while the presence of distinctive families is stable.
-  return `${fonts.length}:${[...fonts].sort().slice(0, 12).join(',')}`;
-}
-
-function bucketNumber(value: number | undefined): string {
-  if (!value) return '';
-  if (value <= 2) return 'low';
-  if (value <= 4) return 'mid';
-  if (value <= 8) return 'high';
-  return 'veryhigh';
-}
-
-function majorBrowserVersion(userAgent: string | undefined): string {
-  if (!userAgent) return '';
-  const match = userAgent.match(/(Chrome|Firefox|Safari|Edg|OPR)\/(\d+)/);
-  return match ? `${match[1]}${match[2]}` : '';
 }

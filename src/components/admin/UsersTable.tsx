@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { BadgeCheck, Loader2, ShieldX, Snowflake, Sun, Search, Trash2, X } from 'lucide-react';
+import { BadgeCheck, ShieldX, Snowflake, Sun, Search, Trash2, X } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { PageHeader } from './AdminShell';
 import {
