@@ -5,7 +5,7 @@ import { writeAuditLog } from '@/lib/firebase/repositories/audit';
 import { recordDeviceDetailed } from '@/lib/security/blocklist';
 import { deviceLabel } from '@/lib/security/fingerprint';
 import { sendEmailAsync } from '@/lib/email/send';
-import { issueSession, sessionHasMfa } from '@/lib/auth/session';
+import { issueSession, sessionClientOf, sessionHasMfa } from '@/lib/auth/session';
 import { browserOrigin, flowOrigin } from '@/lib/app-url';
 
 /**
@@ -78,6 +78,7 @@ export async function completeLogin(params: {
     deviceId: device?.id,
     amr: params.amr,
     mfaAt: params.mfaAt,
+    client: sessionClientOf(request.cookies),
   });
 
   await writeAuditLog({

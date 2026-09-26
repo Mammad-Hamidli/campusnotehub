@@ -6,9 +6,12 @@
 //!
 //! Auth needs nothing special: the page is loaded top-level from its real
 //! origin, so CH_AT / CH_RT are first-party cookies to WebView2 exactly as they
-//! are to a browser. They are session cookies on purpose (src/lib/auth/session.ts),
-//! which means quitting the app signs the user out, the same as quitting a
-//! browser. Do not "fix" that here.
+//! are to a browser. The window opens on /api/auth/desktop (tauri.conf.json),
+//! which marks this WebView2 profile as the desktop app; sessions signed in
+//! here get persistent cookies and a 7-day sliding lifetime, decided by the
+//! server (DESKTOP_SESSION_DAYS in src/lib/auth/session.ts). So staying signed
+//! in across restarts needs nothing here either - just never clear the
+//! profile on exit.
 
 // Release builds (the installer's exe) link as a GUI program, so Windows opens no
 // console window behind the app. It is a linker setting: tauri.conf.json has no

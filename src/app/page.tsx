@@ -1,12 +1,14 @@
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SiteHeader } from '@/components/marketing/SiteHeader';
 import { Hero } from '@/components/marketing/Hero';
 import { FeatureGrid } from '@/components/marketing/FeatureGrid';
 import { CallToAction } from '@/components/marketing/CallToAction';
 import { SiteFooter } from '@/components/marketing/SiteFooter';
+import { DesktopAppRedirect } from '@/components/marketing/DesktopAppRedirect';
 import { getPublicStats } from '@/lib/stats/public';
 import { getWindowsInstaller } from '@/lib/desktop/windowsInstaller';
-import { getViewer } from '@/lib/auth/session';
+import { COOKIE_REFRESHED, getViewer, sessionClientOf } from '@/lib/auth/session';
 import { UserRole } from '@/lib/enums';
 
 /**
@@ -32,10 +34,25 @@ export default async function HomePage() {
     redirect(viewer.role === UserRole.ADMIN || viewer.role === UserRole.MODERATOR ? '/admin' : '/dashboard');
   }
 
+  /**
+   * Nor does the desktop app, signed in or out: it opens on sign-in. This is
+   * where it arrives after signing out (/logout sends everyone to "/") or from
+   * a logo click. It goes through /api/auth/desktop rather than straight to
+   * /login because an expired access token is not a signed-out user there: the
+   * refresh token, which only /api/auth/* can see, may still be good. CH_RF
+   * means that route has just renewed the session, so a second bounce would
+   * be a loop; /login is the safe answer then.
+   */
+  const jar = await cookies();
+  if (sessionClientOf(jar) === 'desktop') {
+    redirect(jar.has(COOKIE_REFRESHED) ? '/login' : '/api/auth/desktop');
+  }
+
   const [stats, installer] = await Promise.all([getPublicStats(), getWindowsInstaller()]);
 
   return (
     <>
+      <DesktopAppRedirect />
       <SiteHeader />
       <main id="main">
         <Hero stats={stats} installer={installer} />

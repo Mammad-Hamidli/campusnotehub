@@ -14,6 +14,7 @@ import {
   revokeSessionById as revokeSessionRecord,
   revokeUserSessions,
   touchSession,
+  type SessionClient,
 } from '@/lib/firebase/repositories/sessions';
 import { findUserById, updateUser } from '@/lib/firebase/repositories/users';
 import type { Viewer } from '@/lib/permissions';
@@ -81,9 +82,45 @@ const REFRESH_REUSE_GRACE_MS = 60_000;
 const IDLE_TIMEOUT_MINUTES = Number(process.env.SESSION_IDLE_TIMEOUT_MINUTES ?? 30);
 const IDLE_TIMEOUT_MS = Math.max(0, IDLE_TIMEOUT_MINUTES) * 60_000;
 
-/** True when a session row has sat unused past the idle ceiling. */
-function isIdle(lastSeenAt: Date, now: Date): boolean {
-  return IDLE_TIMEOUT_MS > 0 && now.getTime() - lastSeenAt.getTime() > IDLE_TIMEOUT_MS;
+/**
+ * Lifetime of a session signed in from the Windows app, in days. Default 7.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THE DESKTOP APP IS THE ONE EXCEPTION TO EVERYTHING ABOVE
+ * ---------------------------------------------------------------------------
+ * "Closing the browser signs you out" is right for a browser: it may be a
+ * library machine, and the next person opens the same profile. The desktop app
+ * (desktop/) is installed per Windows user into that user's own profile, and
+ * people expect it to behave like every other installed app - still signed in
+ * tomorrow. Applied to it, the web rules signed people out every time they
+ * closed the window and after half an hour of reading.
+ *
+ * So a session whose row says client === 'desktop' gets, instead:
+ *   - cookies WITH Max-Age, so they survive the app closing (see applyCookies);
+ *   - this many days as both its lifetime and its idle ceiling. Every refresh
+ *     re-issues the row with a fresh expiresAt, so the window slides: someone
+ *     who opens the app at least once a week is never signed out by a timer.
+ *
+ * What does NOT change: logout, admin revocation, bans and refresh-token reuse
+ * detection all revoke the row and take effect on the next request; the access
+ * token keeps its 15-minute TTL; re-authentication for sensitive actions still
+ * reads authAt. The client is decided at sign-in (sessionClientOf) and copied
+ * on rotation, so a web session can never turn into a desktop one mid-flight.
+ *
+ * `||`, not `??`: an empty DESKTOP_SESSION_TTL_DAYS= line in .env reads as ""
+ * and would otherwise become a zero-day session.
+ */
+const DESKTOP_SESSION_DAYS = Number(process.env.DESKTOP_SESSION_TTL_DAYS) || 7;
+const DESKTOP_SESSION_MS = DESKTOP_SESSION_DAYS * 86_400_000;
+
+function lifetimeMs(client: SessionClient): number {
+  return client === 'desktop' ? DESKTOP_SESSION_MS : REFRESH_TTL_DAYS * 86_400_000;
+}
+
+/** True when a session row has sat unused past its client's idle ceiling. */
+function isIdle(row: { lastSeenAt: Date; client?: SessionClient }, now: Date): boolean {
+  const ceiling = row.client === 'desktop' ? DESKTOP_SESSION_MS : IDLE_TIMEOUT_MS;
+  return ceiling > 0 && now.getTime() - row.lastSeenAt.getTime() > ceiling;
 }
 
 /**
@@ -92,10 +129,10 @@ function isIdle(lastSeenAt: Date, now: Date): boolean {
  * request to be revoked is not shown as a signed-in device.
  */
 export function sessionIsLive(
-  row: { revokedAt: Date | null; expiresAt: Date; lastSeenAt: Date },
+  row: { revokedAt: Date | null; expiresAt: Date; lastSeenAt: Date; client?: SessionClient },
   now = new Date(),
 ): boolean {
-  return !row.revokedAt && row.expiresAt > now && !isIdle(row.lastSeenAt, now);
+  return !row.revokedAt && row.expiresAt > now && !isIdle(row, now);
 }
 
 const STAFF_ROLES: ReadonlySet<UserRole> = new Set([UserRole.ADMIN, UserRole.MODERATOR]);
@@ -125,12 +162,43 @@ export const COOKIE_REFRESHED = 'CH_RF';
 /** The refresh token is never sent to page requests. */
 export const REFRESH_COOKIE_PATH = '/api/auth';
 
+/**
+ * Marks a WebView2 profile as the desktop app's. Written only by GET
+ * /api/auth/desktop (the app's start page) and read at sign-in by
+ * sessionClientOf(). It is not auth state, so signing out leaves it: the app's
+ * next screen is still its own sign-in page, not the marketing site.
+ */
+export const COOKIE_CLIENT = 'CH_CLIENT';
+
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax' as const, // 'lax' not 'strict': OAuth-style returns and email links must work
   path: '/',
 };
+
+type CookieReader = { get(name: string): { value: string } | undefined };
+
+/** The client a NEW sign-in on this request belongs to. Rotation copies the row's instead. */
+export function sessionClientOf(jar: CookieReader): SessionClient {
+  return jar.get(COOKIE_CLIENT)?.value === 'desktop' ? 'desktop' : 'web';
+}
+
+/** 400 days is the longest Max-Age Chromium keeps; the app re-sets it on every launch. */
+export function markDesktopClient(response: NextResponse): NextResponse {
+  response.cookies.set(COOKIE_CLIENT, 'desktop', { ...cookieOptions, maxAge: 400 * 86_400 });
+  return response;
+}
+
+/**
+ * Short-lived marker the middleware and the landing page read to avoid a
+ * redirect loop if a freshly issued token somehow still fails verification.
+ * Written after a successful refresh (/api/auth/refresh, /api/auth/desktop).
+ */
+export function markRefreshed(response: NextResponse): NextResponse {
+  response.cookies.set(COOKIE_REFRESHED, '1', { ...cookieOptions, maxAge: 15 });
+  return response;
+}
 
 let privateKey: Promise<CryptoKey> | null = null;
 let publicKey: Promise<CryptoKey> | null = null;
@@ -159,9 +227,16 @@ export async function issueSession(params: {
   mfaAt: Date | null;
   /** Original sign-in time. Omitted for a new sign-in; passed on rotation. */
   authAt?: Date;
+  /**
+   * Required for the same reason as amr: it decides how long the session
+   * lives and whether it survives a restart. sessionClientOf(request) for a
+   * new sign-in, the existing row's value on rotation.
+   */
+  client: SessionClient;
 }) {
   const refreshToken = newOpaqueToken();
-  const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 86_400_000);
+  const lifetime = lifetimeMs(params.client);
+  const expiresAt = new Date(Date.now() + lifetime);
 
   /**
    * The session row is created BEFORE the access token is signed, because the
@@ -187,6 +262,7 @@ export async function issueSession(params: {
     amr: params.amr,
     mfaAt: params.mfaAt,
     authAt: params.authAt ?? new Date(),
+    client: params.client,
   });
 
   const ttl = accessTtlFor(params.user.role);
@@ -228,12 +304,23 @@ export async function issueSession(params: {
      * (ttl, below) and the session row carries `expiresAt` (REFRESH_TTL_DAYS)
      * plus the idle ceiling above. Dropping the cookie attribute removes the
      * browser's copy of the deadline, not the deadline.
+     *
+     * The one exception is a desktop-app session (see DESKTOP_SESSION_DAYS):
+     * there, surviving a restart IS the requirement, so both cookies carry a
+     * Max-Age equal to their server-side deadline. CH_AT still dies with its
+     * 15-minute token; CH_RT lasts as long as the row and is re-set, with a
+     * fresh Max-Age, on every rotation.
      */
     applyCookies(response: NextResponse) {
-      response.cookies.set(COOKIE_ACCESS, accessToken, cookieOptions);
+      const persist = params.client === 'desktop';
+      response.cookies.set(COOKIE_ACCESS, accessToken, {
+        ...cookieOptions,
+        ...(persist ? { maxAge: ttl } : {}),
+      });
       response.cookies.set(COOKIE_REFRESH, refreshToken, {
         ...cookieOptions,
         path: REFRESH_COOKIE_PATH,
+        ...(persist ? { maxAge: Math.floor(lifetime / 1000) } : {}),
       });
       return response;
     },
@@ -428,7 +515,7 @@ async function loadSession(request?: NextRequest, passive = false): Promise<Sess
    * which is the restored-cookie case this is here to stop. Writing revokedAt
    * kills both halves of the pair at once.
    */
-  if (isIdle(session.lastSeenAt, now)) {
+  if (isIdle(session, now)) {
     await revokeSessionRecord(session.id);
     throw new UnauthorizedError();
   }
@@ -573,7 +660,7 @@ export async function rotateSession(refreshToken: string, userAgent: string) {
    * after a restart actually meets: the access token is long expired, so the
    * only thing it can present is CH_RT, and it arrives here.
    */
-  if (isIdle(existing.lastSeenAt, new Date())) {
+  if (isIdle(existing, new Date())) {
     await revokeSessionRecord(existing.id);
     throw new UnauthorizedError();
   }
@@ -606,6 +693,8 @@ export async function rotateSession(refreshToken: string, userAgent: string) {
     amr: existing.amr,
     mfaAt: existing.mfaAt,
     authAt: existing.authAt,
+    // Same sign-in, same client: its lifetime rules come from where it began.
+    client: existing.client,
   });
 }
 

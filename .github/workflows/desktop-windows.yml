@@ -6,6 +6,10 @@
 #   same build, then the .exe is attached to a GitHub Release for that tag.
 #
 # The web app is not built here: the desktop shell loads https://www.campusnotehub.com.
+#
+# Code signing (Azure Artifact Signing) switches on once the repository has the
+# variable AZURE_SIGNING_ACCOUNT - see desktop/README.md "Code signing". Tauri then
+# signs the app exe, the uninstaller and the installer with the same command.
 name: Desktop - Windows installer
 
 on:
@@ -54,8 +58,49 @@ jobs:
 
       - run: npm ci
 
+      - name: Configure code signing
+        id: signing
+        if: vars.AZURE_SIGNING_ACCOUNT != ''
+        shell: pwsh
+        env:
+          SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          if (-not (Get-Command artifact-signing-cli -ErrorAction SilentlyContinue)) {
+            cargo install artifact-signing-cli --locked
+          }
+          # An overlay merged with --config, so local builds stay unsigned and need no tooling.
+          $command = "artifact-signing-cli -e $env:SIGNING_ENDPOINT -a $env:SIGNING_ACCOUNT -c $env:SIGNING_PROFILE -d campusnotehub %1"
+          $path = Join-Path $env:RUNNER_TEMP 'tauri.signing.json'
+          @{ bundle = @{ windows = @{ signCommand = $command } } } | ConvertTo-Json -Depth 4 | Set-Content -Path $path -Encoding utf8NoBOM
+          "config=$path" >> $env:GITHUB_OUTPUT
+
+      - name: Warn about an unsigned release
+        if: startsWith(github.ref, 'refs/tags/desktop-v') && steps.signing.outcome != 'success'
+        run: echo "::warning::This release is UNSIGNED - Windows SmartScreen will show 'Unknown publisher'. See desktop/README.md, Code signing."
+
       - name: Build installer
-        run: npm run build
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          SIGNING_CONFIG: ${{ steps.signing.outputs.config }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ($env:SIGNING_CONFIG) { npx tauri build --config $env:SIGNING_CONFIG } else { npx tauri build }
+
+      - name: Verify signature
+        if: steps.signing.outcome == 'success'
+        shell: pwsh
+        run: |
+          foreach ($file in Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe) {
+            $signature = Get-AuthenticodeSignature $file.FullName
+            if ($signature.Status -ne 'Valid') { throw "$($file.Name): signature is $($signature.Status)" }
+            "$($file.Name): signed by $($signature.SignerCertificate.Subject)"
+          }
 
       - uses: actions/upload-artifact@v7
         with:

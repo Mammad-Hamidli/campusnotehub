@@ -42,7 +42,8 @@
     "explore": "Kəşf et",
     "admin": "Admin",
     "saved": "Saxlanılanlar",
-    "mentorSchedule": "Mentor cədvəli"
+    "mentorSchedule": "Mentor cədvəli",
+    "backToAdmin": "Admin panelinə qayıt"
   },
   "auth": {
     "register": {

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { rotateSession, UnauthorizedError } from '@/lib/auth/session';
+import { markRefreshed, rotateSession, UnauthorizedError } from '@/lib/auth/session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,21 +38,6 @@ async function refresh(request: NextRequest) {
     if (error instanceof UnauthorizedError) return null;
     throw error;
   }
-}
-
-/**
- * Short-lived marker the middleware reads to avoid a redirect loop if a freshly
- * issued token somehow still fails verification at the edge.
- */
-function markRefreshed(response: NextResponse) {
-  response.cookies.set('CH_RF', '1', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 15,
-  });
-  return response;
 }
 
 export async function POST(request: NextRequest) {

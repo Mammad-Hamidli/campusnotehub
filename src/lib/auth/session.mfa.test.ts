@@ -96,6 +96,7 @@ async function signIn(role: UserRole, amr: string[]) {
     userAgent: 'test',
     amr,
     mfaAt: amr.includes('otp') || amr.includes('recovery') ? new Date() : null,
+    client: 'web',
   });
   const request = new NextRequest('http://localhost:3000/api/admin/users', {
     headers: { cookie: `CH_AT=${issued.accessToken}` },

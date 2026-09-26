@@ -13,6 +13,7 @@
       {
         "label": "main",
         "create": false,
+        "url": "api/auth/desktop",
         "title": "campusnotehub",
         "width": 1280,
         "height": 832,

@@ -8,6 +8,7 @@ import {
   BookOpen,
   Bookmark,
   CalendarClock,
+  LayoutDashboard,
   LogOut,
   Menu as MenuIcon,
   MessagesSquare,
@@ -22,6 +23,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Menu, MenuItem, MenuSeparator } from '@/components/ui/Menu';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useLiveNotifications } from '@/components/notifications/LiveNotifications';
+import { UserRole } from '@/lib/enums';
 
 export type DashboardTab = 'feed' | 'notes' | 'saved' | 'mentors';
 
@@ -52,9 +54,18 @@ export function Sidebar({
 }: {
   active: DashboardTab;
   onSelect: (tab: DashboardTab) => void;
-  user: { nickname: string; university: string; verified: boolean; initials: string; isMentor?: boolean };
+  user: {
+    nickname: string;
+    university: string;
+    verified: boolean;
+    initials: string;
+    isMentor?: boolean;
+    /** The account's real role (from /api/me); staff get a way back to the panel. */
+    role?: string;
+  };
 }) {
   const t = useT();
+  const isStaff = user.role === UserRole.ADMIN || user.role === UserRole.MODERATOR;
   const [mobileOpen, setMobileOpen] = useState(false);
   const live = useLiveNotifications();
   const pending = live.unread + live.followRequests;
@@ -179,6 +190,15 @@ export function Sidebar({
             </MenuItem>
           )}
           <MenuSeparator />
+          {/* The mirror of the panel's "Back to app" row, in the same place.
+              Shown to both staff tiers, like the panel itself. A staff member
+              still owed a second factor is sent on by the /admin layout to set
+              one up, which is where they need to go anyway. */}
+          {isStaff && (
+            <MenuItem href="/admin" icon={<LayoutDashboard className="h-4 w-4" />} onSelect={close}>
+              {t('nav.backToAdmin')}
+            </MenuItem>
+          )}
           <MenuItem
             href="/logout"
             reloadDocument

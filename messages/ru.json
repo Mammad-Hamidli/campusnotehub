@@ -42,7 +42,8 @@
     "explore": "Обзор",
     "admin": "Админка",
     "saved": "Сохранённое",
-    "mentorSchedule": "Расписание ментора"
+    "mentorSchedule": "Расписание ментора",
+    "backToAdmin": "Вернуться в админ-панель"
   },
   "auth": {
     "register": {

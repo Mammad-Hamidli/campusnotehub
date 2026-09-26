@@ -42,7 +42,8 @@
     "explore": "Explore",
     "admin": "Admin",
     "saved": "Saved items",
-    "mentorSchedule": "Mentor schedule"
+    "mentorSchedule": "Mentor schedule",
+    "backToAdmin": "Back to admin dashboard"
   },
   "auth": {
     "register": {

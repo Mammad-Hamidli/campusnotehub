@@ -2,6 +2,7 @@ import { hashToken, newOpaqueToken } from '@/lib/crypto/hash';
 import { adminDb } from '../admin.core';
 import { COLLECTIONS } from '../collections';
 import { docToObject, forFirestore } from '../convert';
+import type { SessionClient } from './sessions';
 
 /**
  * QR sign-in ("link a device"): `deviceLinks/{hash(token)}`.
@@ -47,7 +48,8 @@ export type DeviceLinkStatus =
   | { state: 'linked'; linkedAt: Date; userAgent: string }
   | { state: 'expired' };
 
-type IssuerRow = { revokedAt: Date | null; expiresAt: Date; lastSeenAt: Date };
+// `client` is absent on rows written before it existed (web sessions).
+type IssuerRow = { revokedAt: Date | null; expiresAt: Date; lastSeenAt: Date; client?: SessionClient };
 
 const links = () => adminDb().collection(COLLECTIONS.deviceLinks);
 

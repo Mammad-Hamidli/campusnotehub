@@ -14,7 +14,7 @@ import { hashPassword, hashEmail, hashPhone } from '@/lib/crypto/hash';
 import { checkSignupBlocked, recordDevice } from '@/lib/security/blocklist';
 import { deviceLabel } from '@/lib/security/fingerprint';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
-import { issueSession } from '@/lib/auth/session';
+import { issueSession, sessionClientOf } from '@/lib/auth/session';
 import { sendEmailAsync } from '@/lib/email/send';
 import { sendVerificationEmail } from '@/lib/auth/email-verification';
 
@@ -303,6 +303,7 @@ export async function POST(request: NextRequest) {
       // A brand-new account has proven one factor: its password.
       amr: ['pwd'],
       mfaAt: null,
+      client: sessionClientOf(request.cookies),
     });
 
     /**

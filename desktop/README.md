@@ -21,7 +21,8 @@ desktop/
 
 | | |
 |---|---|
-| Sign-in and cookies | Unchanged. The page is loaded top-level from its real origin, so `CH_AT` / `CH_RT` are first-party cookies exactly as in Edge. They are session cookies by design (`src/lib/auth/session.ts`), so **closing the app signs the user out**, like closing a browser. |
+| Start screen | The window opens on `/api/auth/desktop`, never on the landing page: signed in → dashboard (staff → admin panel), otherwise → sign-in. Signing out also lands on sign-in. |
+| Sign-in and cookies | The page is loaded top-level from its real origin, so `CH_AT` / `CH_RT` are first-party cookies exactly as in Edge. The start route marks the app's cookie jar (`CH_CLIENT=desktop`), and sessions signed in here are **desktop sessions**: persistent cookies and a 7-day sliding lifetime (`DESKTOP_SESSION_TTL_DAYS`), so **closing the app does not sign the user out** — only *Log out*, revocation, or a week without opening the app does. Web sessions are unchanged. |
 | Google sign-in | Runs inside the window (top-level redirect to accounts.google.com and back). Google serves its normal sign-in page, not the embedded-webview block: WebView2 presents itself as Chrome on accounts.google.com. |
 | Links with `target="_blank"`, `window.open`, Ctrl/middle-click | Open in the default browser. Only `http`, `https`, `mailto`, `tel` are passed on. |
 | `mailto:` / `tel:` links | Open the default mail / phone app. |
@@ -98,16 +99,44 @@ it shows "coming soon". Drafts and pre-releases are ignored, so publishing a rel
 pre-release is a way to test it before the site links to it. It is hidden inside the desktop
 app itself.
 
-## Before public distribution: code signing
+## Code signing (SmartScreen / "Unknown publisher")
 
-The installer is unsigned, so Windows SmartScreen shows "Windows protected your PC"
-(users click *More info → Run anyway*). To remove that, sign with an EV/OV code-signing
-certificate or Azure Trusted Signing and configure `bundle.windows.certificateThumbprint`
-or `bundle.windows.signCommand` in `tauri.conf.json`.
+An unsigned installer gets "Windows protected your PC" and "Unknown publisher", and
+Windows 11 Smart App Control can block the unsigned app outright. No setting in the app
+can prevent that; the only fix is an Authenticode signature from a publicly trusted
+certificate. Signing removes "Unknown publisher" at once. The SmartScreen warning fades
+as the certificate earns download reputation: EV certificates stopped skipping that
+in 2024, so expect warnings on the first releases whichever certificate you buy.
+
+CI signs with **Azure Artifact Signing** (formerly Trusted Signing; a monthly
+subscription, no hardware token). Microsoft only accepts some countries (check the
+current eligibility rules before you pay). One-time setup:
+
+1. In Azure: create an Artifact Signing account and complete identity validation. Then
+   create a *Public Trust* certificate profile and an app registration (client secret)
+   that has the *Artifact Signing Certificate Profile Signer* role on the account.
+2. In GitHub → Settings → Secrets and variables → Actions:
+   - **Variables:** `AZURE_SIGNING_ENDPOINT` (e.g. `https://weu.codesigning.azure.net`),
+     `AZURE_SIGNING_ACCOUNT`, `AZURE_SIGNING_PROFILE`
+   - **Secrets:** `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`
+3. Tag a release as usual. The workflow merges a `signCommand` into the config, so Tauri
+   signs the app exe, the uninstaller and the installer, and the build fails if the
+   installer does not come out signed. Until step 2 is done, releases stay unsigned and
+   the workflow prints a warning.
+
+Using an OV certificate from another CA instead: since 2023 the private keys live on a
+hardware token or a cloud HSM, not in a `.pfx` file. With a token, build on the machine
+it is plugged into, after adding `certificateThumbprint`, `"digestAlgorithm": "sha256"` and
+`timestampUrl` under `bundle.windows`. With a cloud HSM, set `signCommand` to the vendor's
+signing CLI, the same way the workflow does for Azure.
+
+If Microsoft Defender itself flags the file (a named detection, not the SmartScreen
+prompt), submit it as a false positive at https://www.microsoft.com/wdsi/filesubmission.
 
 ## Changing things
 
-- **Site URL:** `build.frontendDist` in `tauri.conf.json`.
+- **Site URL:** `build.frontendDist` in `tauri.conf.json`; the start path (`app.windows[0].url`,
+  `api/auth/desktop`) is appended to it.
 - **Icon:** replace `public/brand/campus-hub-app-icon.svg`, run `npm run icons`, then delete
   the non-Windows outputs (`android/`, `ios/`, `icon.icns`, `Square*Logo.png`, `StoreLogo.png`).
 - **Version:** `desktop/package.json` only (the installer and the .exe's file version read it).

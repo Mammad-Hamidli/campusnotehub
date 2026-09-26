@@ -19,6 +19,18 @@ import { docToObject, docsToObjects, forFirestore } from '../convert';
 
 const SESSION_SECRETS = 'sessionSecrets';
 
+/**
+ * Which app the session was signed in from. 'desktop' is the Windows app
+ * (desktop/), which gets a longer, restart-surviving session; everything else
+ * is 'web'. The policy itself lives in src/lib/auth/session.ts.
+ */
+export type SessionClient = 'web' | 'desktop';
+
+/** Rows written before `client` existed are web sessions. */
+function clientOf(row: { client?: unknown }): SessionClient {
+  return row.client === 'desktop' ? 'desktop' : 'web';
+}
+
 export type SessionRecord = {
   id: string;
   userId: string;
@@ -48,6 +60,8 @@ export type SessionRecord = {
    * minutes" a meaningful re-authentication test (see lib/auth/reauth.ts).
    */
   authAt: Date;
+  /** Fixed at sign-in and carried across rotation, like authAt. */
+  client: SessionClient;
 };
 
 const sessions = () => adminDb().collection(COLLECTIONS.sessions);
@@ -63,6 +77,7 @@ export async function createSession(params: {
   amr: string[];
   mfaAt: Date | null;
   authAt: Date;
+  client: SessionClient;
 }): Promise<SessionRecord> {
   const now = new Date();
   const record = {
@@ -76,6 +91,7 @@ export async function createSession(params: {
     amr: params.amr,
     mfaAt: params.mfaAt,
     authAt: params.authAt,
+    client: params.client,
   };
 
   const batch = adminDb().batch();
@@ -97,6 +113,7 @@ export async function findSessionById(id: string): Promise<SessionRecord | null>
         // Legacy rows: createdAt is the best available (and an over-estimate
         // of recency never happens - it can only be later than the sign-in).
         authAt: row.authAt ?? row.createdAt,
+        client: clientOf(row),
       }
     : null;
 }
@@ -181,6 +198,7 @@ export async function listOpenUserSessions(userId: string): Promise<SessionRecor
   return (docsToObjects<SessionRecord>(snap.docs) as SessionRecord[]).map((row) => ({
     ...row,
     authAt: row.authAt ?? row.createdAt,
+    client: clientOf(row),
   }));
 }
 
