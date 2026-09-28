@@ -6,7 +6,7 @@ import { CONTACT } from '@/content/site/contact';
 
 export const metadata: Metadata = {
   title: 'Contact',
-  description: 'How to reach the campusnotehub team for support, privacy, security and partnerships.',
+  description: 'How to reach the CampusNoteHub team for support, privacy, security and partnerships.',
   alternates: { canonical: '/contact' },
 };
 

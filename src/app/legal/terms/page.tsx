@@ -6,7 +6,7 @@ import { TERMS } from '@/content/legal/terms';
 
 export const metadata: Metadata = {
   title: 'Terms of Service',
-  description: 'The rules for using campusnotehub: accounts, verification, acceptable use, UniNotes, PocketMentor and the wallet.',
+  description: 'The rules for using CampusNoteHub: accounts, verification, acceptable use, UniNotes and PocketMentor.',
   alternates: { canonical: '/legal/terms' },
 };
 

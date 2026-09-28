@@ -7,7 +7,7 @@ import { HELP } from '@/content/site/help';
 export const metadata: Metadata = {
   title: 'Help',
   description:
-    'Answers about accounts, verification, the feed, UniNotes, PocketMentor and privacy on campusnotehub.',
+    'Answers about accounts, verification, the feed, UniNotes, PocketMentor and privacy on CampusNoteHub.',
   alternates: { canonical: '/help' },
 };
 

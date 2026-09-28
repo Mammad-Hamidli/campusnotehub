@@ -9,14 +9,9 @@ import { useToast } from '@/components/ui/Feedback';
 type Reauth = 'code' | 'password' | 'recent_sign_in';
 
 const INCLUDED = [
-  'settings.export.included.account',
-  'settings.export.included.security',
-  'settings.export.included.content',
-  'settings.export.included.social',
-  'settings.export.included.notes',
-  'settings.export.included.mentoring',
-  'settings.export.included.notifications',
-  'settings.export.included.verification',
+  'settings.export.included.profile',
+  'settings.export.included.contact',
+  'settings.export.included.academic',
 ] as const;
 
 /** Falls back to a generic name if the header is missing or unreadable. */
@@ -27,7 +22,7 @@ function fileNameFrom(disposition: string | null): string {
 /**
  * Settings -> Account -> Download my data.
  *
- * One button that hands over a JSON file of everything the account holds
+ * One button that hands over a JSON file of the account's profile details
  * (POST /api/me/export; the contents are defined in src/lib/account/export.ts).
  * The account's strongest factor is asked for first, exactly like filing a
  * deletion request - the file carries email, phone and date of birth, and a

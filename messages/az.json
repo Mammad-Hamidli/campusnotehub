@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "campusnotehub",
+    "appName": "CampusNoteHub",
     "save": "Yadda saxla",
     "cancel": "Ləğv et",
     "continue": "Davam et",
@@ -47,8 +47,8 @@
   },
   "auth": {
     "register": {
-      "title": "campusnotehub-a qoşul 🎉",
-      "subtitle": "Bir dəqiqə — və kampusun ən canlı icmasındasan.",
+      "title": "CampusNoteHub-a qoşul",
+      "subtitle": "Hesab yarat və kurs yoldaşlarını tap.",
       "fullName": "Ad",
       "fullNameHint": "Şəxsiyyət vəsiqənizdəki kimi yazın",
       "email": "E-poçt",
@@ -250,7 +250,7 @@
         "failed": "Bu hesabla daxil olmaq mümkün olmadı. Yenidən cəhd edin.",
         "unavailable": "Bu giriş üsulu hazırda mövcud deyil.",
         "link_required": "Bu e-poçtla hesab artıq mövcuddur. Şifrənizlə daxil olun və Parametrlər → Təhlükəsizlik bölməsində e-poçtunuzu təsdiqləyin - bundan sonra {provider} avtomatik qoşulacaq - və ya {provider} hesabını orada birbaşa qoşun.",
-        "identity_in_use": "Bu hesab artıq başqa campusnotehub hesabına qoşulub.",
+        "identity_in_use": "Bu hesab artıq başqa CampusNoteHub hesabına qoşulub.",
         "provider_already_linked": "Başqa {provider} hesabı artıq qoşulub. Əvvəlcə onu ayırın.",
         "rate_limited": "Çox sayda cəhd. Bir neçə dəqiqə gözləyib yenidən cəhd edin.",
         "signup_expired": "Qeydiyyat sessiyasının vaxtı bitdi. Giriş səhifəsindən yenidən başlayın.",
@@ -912,10 +912,9 @@
       "about": "Haqqımızda"
     },
     "hero": {
-      "badge": "Tələbələrin sosial məkanı",
       "titleLead": "Dərs notlarını pulsuz paylaş,",
       "titleAccent": "kampusun ən canlı icmasına qoşul",
-      "subtitle": "Kurs yoldaşlarını izlə, lentdə paylaş, sual ver və cavabla, dərs notlarını paylaş, mentorlarla tanış ol — hamısı bir yerdə, doğrulanmış tələbələrlə.",
+      "subtitle": "Azərbaycanın müxtəlif universitetlərindən tələbələrlə tanış ol, dost qazan və mentorlardan öyrən, hamısı vahid tələbə şəbəkəsində.",
       "ctaNotes": "Dərs notlarına bax",
       "trust": "Saxta profil yoxdur — hər hesab doğrulanır",
       "ctaJoin": "Pulsuz qoşul"
@@ -932,13 +931,12 @@
       "students": "Aktiv tələbə",
       "notes": "Paylaşılan dərs notu",
       "hours": "Mentorluq saatı",
-      "universities": "Universitet",
-      "live": "Canlı"
+      "universities": "Universitet"
     },
     "features": {
-      "eyebrow": "Bir hesab, üç dünya",
-      "title": "Dərs, dostluq və karyera — hamısı bir yerdə",
-      "subtitle": "Lentdə danış, dərs notlarını paylaş, mentor tap. Bir dəfə qoşul, hər yerdə istifadə et.",
+      "eyebrow": "Platformada nələr var",
+      "title": "Dərslərin, dostların və karyeran üçün",
+      "subtitle": "Lentdə danış, dərs notlarını paylaş və mentorla görüş təyin et.",
       "notes": {
         "title": "UniNotes",
         "body": "Dərs notları hamı üçün pulsuzdur. Özününkünü yüklə və ya imtahandan əvvəl lazım olanı tap.",
@@ -957,24 +955,16 @@
       },
       "feed": {
         "title": "Kampus lenti",
-        "body": "İmtahan xəbərləri, təqaüd elanları, memlər və sual-cavab — universitetinin ritmi burada.",
+        "body": "İmtahan xəbərləri, təqaüd elanları, memlər və universitetindən gələn suallar.",
         "p1": "Universitetə görə filtr",
         "p2": "Etiketlərlə mövzu axtarışı",
         "p3": "Şəkil və qeyd paylaşımı",
         "cta": "Lentə keç"
       }
     },
-    "ticker": {
-      "title": "Kampusda indi",
-      "joined": "{name} qoşuldu",
-      "verified": "{name} doğrulandı",
-      "uploaded": "{name} yeni dərs notu yüklədi",
-      "booked": "{name} mentor görüşü təyin etdi",
-      "popular": "{title} bu gün {count} dəfə alındı"
-    },
     "cta": {
-      "title": "Kampus səni gözləyir 🎉",
-      "body": "Qeydiyyat bir dəqiqə çəkir. Qoşul, izlə, paylaş, dərs notlarını bölüş.",
+      "title": "Qoşulmağa hazırsan?",
+      "body": "Qeydiyyat təxminən bir dəqiqə çəkir və pulsuzdur.",
       "button": "Pulsuz hesab yarat",
       "secondary": "Əvvəlcə dərs notlarına bax"
     },
@@ -999,6 +989,9 @@
         "mentor": "Mentorlarla tanış ol",
         "campus": "Universitetinə görə kəşf et"
       }
+    },
+    "universities": {
+      "title": "Qoşulan universitetlər"
     }
   },
   "register": {
@@ -1055,7 +1048,7 @@
       "humanReview": "Şübhəli hallarda moderator baxa bilər",
       "window": "Belə hallarda şəkil ən çox 24 saat şifrələnmiş qalır"
     },
-    "created": "Hesabınız uğurla yaradıldı. campusnotehub-a xoş gəlmisiniz!"
+    "created": "Hesabınız uğurla yaradıldı. CampusNoteHub-a xoş gəlmisiniz!"
   },
   "dashboard": {
     "greeting": "Salam, {name}",
@@ -1507,7 +1500,7 @@
       "description": "Təhlükəsizlik və hesabın idarə edilməsi",
       "changePassword": "Şifrəni dəyiş",
       "exportData": "Məlumatlarımı yüklə",
-      "exportHint": "Bütün məlumatlarınızın JSON kopyası",
+      "exportHint": "Profil məlumatlarınızın JSON surəti",
       "deleteAccount": "Hesabı sil",
       "security": "İki mərhələli doğrulama",
       "securityHint": "Autentifikator tətbiqi və bərpa kodları"
@@ -1652,24 +1645,19 @@
     "export": {
       "back": "Parametrlər",
       "title": "Məlumatlarınızı yükləyin",
-      "intro": "Hesabınız haqqında campusnotehub-da saxlanılan məlumatların surətini istənilən mətn redaktorunda aça biləcəyiniz tək JSON faylı şəklində əldə edin.",
+      "intro": "CampusNoteHub profil məlumatlarınızın surətini istənilən mətn redaktorunda aça biləcəyiniz JSON faylı şəklində əldə edin.",
       "includedTitle": "Faylda nələr var",
       "included": {
-        "account": "Hesab və profil məlumatlarınız, məxfilik tənzimləmələriniz",
-        "security": "Giriş üsulları, iki mərhələli doğrulamanın vəziyyəti, sessiyalar və tanınmış cihazlar",
-        "content": "Paylaşımlarınız və şərhləriniz",
-        "social": "İzlədikləriniz, izləyiciləriniz və izləmə sorğuları",
-        "notes": "Yüklədiyiniz, qiymətləndirdiyiniz və yadda saxladığınız konspektlər",
-        "mentoring": "Mentor profiliniz və ya müraciətiniz, sifarişlər və rəylər",
-        "notifications": "Bildirişləriniz və bildiriş tənzimləmələri",
-        "verification": "Hər şəxsiyyət doğrulamasının nəticəsi və hesabın silinməsi sorğusu (varsa)"
+        "profile": "Adınız, istifadəçi adınız, qısa təqdimat, haqqımda və profil şəkli",
+        "contact": "E-poçt ünvanı, telefon nömrəsi və doğum tarixi",
+        "academic": "Universitet, fakültə, kafedra və məzuniyyət ili"
       },
-      "excluded": "Daxil edilmir: şifrəniz və iki mərhələli doğrulama açarları (onları yalnız geri oxuna bilməyən formada saxlayırıq), şəxsiyyət sənədlərinin şəkilləri (yoxlamadan sonra silinir), verdiyiniz bəyənmələr və konspekt fayllarının özü — onları UniNotes-dan endirin.",
+      "excluded": "Daxil edilmir: paylaşımlar, şərhlər, izləyicilər, konspektlər, sifarişlər və giriş tarixçəsi. Şifrəniz və iki mərhələli doğrulama açarlarınız heç vaxt ixrac edilmir.",
       "confirmHint": "Məlumatlarınızı qorumaq üçün əvvəlcə bunun siz olduğunuzu təsdiqləyin.",
       "submit": "Yüklə (.json)",
       "preparing": "Fayl hazırlanır…",
       "started": "Yükləmə başladı",
-      "done": "Hazırdır. Faylı etibarlı yerdə saxlayın — orada şəxsi məlumatlarınız var."
+      "done": "Hazırdır. Faylda şəxsi məlumatlarınız var, onu etibarlı yerdə saxlayın."
     }
   },
   "stub": {
@@ -1769,11 +1757,11 @@
   "site": {
     "contactCta": {
       "title": "Hələ də sualınız var?",
-      "body": "Bizə yazın — hər mesajı oxuyuruq."
+      "body": "Bizə yazın, sizə cavab verəcəyik."
     }
   },
   "desktopUpdate": {
-    "title": "campusnotehub-un yeni versiyası çıxıb",
+    "title": "CampusNoteHub-un yeni versiyası çıxıb",
     "body": "Versiya {version} hazırdır. Yeniləmək üçün onu yükləyin və quraşdırıcını işə salın.",
     "download": "Yeniləməni yüklə",
     "later": "Sonra"

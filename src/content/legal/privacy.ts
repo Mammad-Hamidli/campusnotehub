@@ -23,13 +23,13 @@ export const PRIVACY: LocalizedLegalDocument = {
     en: {
       title: 'Privacy Policy',
       summary:
-        'This policy explains what personal data campusnotehub collects, why we collect it, how long we keep it, and the choices and rights you have.',
+        'This policy explains what personal data CampusNoteHub collects, why we collect it, how long we keep it, and the choices and rights you have.',
       sections: [
         {
           id: 'overview',
           heading: '1. Who we are',
           body: [
-            'campusnotehub (the "Platform", "we", "us") is a platform for university students and graduates in Azerbaijan. We are responsible for the personal data processed through the Platform and handle it in accordance with the Law of the Republic of Azerbaijan "On Personal Data" and other applicable law.',
+            'CampusNoteHub (the "Platform", "we", "us") is a platform for university students and graduates in Azerbaijan. We are responsible for the personal data processed through the Platform and handle it in accordance with the Law of the Republic of Azerbaijan "On Personal Data" and other applicable law.',
           ],
         },
         {
@@ -161,13 +161,13 @@ export const PRIVACY: LocalizedLegalDocument = {
     az: {
       title: 'Məxfilik Siyasəti',
       summary:
-        'Bu siyasət campusnotehub-ın hansı şəxsi məlumatları topladığını, bunu nə üçün etdiyini, məlumatları nə qədər saxladığını, həmçinin sizin seçim imkanlarınızı və hüquqlarınızı izah edir.',
+        'Bu siyasət CampusNoteHub-ın hansı şəxsi məlumatları topladığını, bunu nə üçün etdiyini, məlumatları nə qədər saxladığını, həmçinin sizin seçim imkanlarınızı və hüquqlarınızı izah edir.',
       sections: [
         {
           id: 'overview',
           heading: '1. Biz kimik',
           body: [
-            'campusnotehub ("Platforma", "biz") Azərbaycandakı universitet tələbələri və məzunları üçün platformadır. Platforma vasitəsilə emal olunan şəxsi məlumatlara görə biz məsuliyyət daşıyırıq və onları Azərbaycan Respublikasının "Fərdi məlumatlar haqqında" Qanununa və digər qüvvədə olan qanunvericiliyə uyğun emal edirik.',
+            'CampusNoteHub ("Platforma", "biz") Azərbaycandakı universitet tələbələri və məzunları üçün platformadır. Platforma vasitəsilə emal olunan şəxsi məlumatlara görə biz məsuliyyət daşıyırıq və onları Azərbaycan Respublikasının "Fərdi məlumatlar haqqında" Qanununa və digər qüvvədə olan qanunvericiliyə uyğun emal edirik.',
           ],
         },
         {
@@ -299,13 +299,13 @@ export const PRIVACY: LocalizedLegalDocument = {
     ru: {
       title: 'Политика конфиденциальности',
       summary:
-        'Эта политика объясняет, какие персональные данные собирает campusnotehub, зачем, как долго мы их храним, а также какие у вас есть возможности выбора и права.',
+        'Эта политика объясняет, какие персональные данные собирает CampusNoteHub, зачем, как долго мы их храним, а также какие у вас есть возможности выбора и права.',
       sections: [
         {
           id: 'overview',
           heading: '1. Кто мы',
           body: [
-            'campusnotehub («Платформа», «мы») — платформа для студентов и выпускников университетов Азербайджана. Мы отвечаем за персональные данные, обрабатываемые через Платформу, и обрабатываем их в соответствии с Законом Азербайджанской Республики «О персональных данных» и иным применимым законодательством.',
+            'CampusNoteHub («Платформа», «мы») — платформа для студентов и выпускников университетов Азербайджана. Мы отвечаем за персональные данные, обрабатываемые через Платформу, и обрабатываем их в соответствии с Законом Азербайджанской Республики «О персональных данных» и иным применимым законодательством.',
           ],
         },
         {

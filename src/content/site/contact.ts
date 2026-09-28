@@ -45,7 +45,7 @@ export const CONTACT: LocalizedSitePage = {
       {
         id: 'location',
         heading: 'Where we are',
-        body: ['campusnotehub is based in Baku, Azerbaijan.'],
+        body: ['CampusNoteHub is based in Baku, Azerbaijan.'],
       },
     ],
   },
@@ -88,7 +88,7 @@ export const CONTACT: LocalizedSitePage = {
       {
         id: 'location',
         heading: 'Harada yerləşirik',
-        body: ['campusnotehub Bakıda, Azərbaycanda yerləşir.'],
+        body: ['CampusNoteHub Bakıda, Azərbaycanda yerləşir.'],
       },
     ],
   },
@@ -131,7 +131,7 @@ export const CONTACT: LocalizedSitePage = {
       {
         id: 'location',
         heading: 'Где мы находимся',
-        body: ['campusnotehub находится в Баку, Азербайджан.'],
+        body: ['CampusNoteHub находится в Баку, Азербайджан.'],
       },
     ],
   },

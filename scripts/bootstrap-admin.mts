@@ -188,7 +188,7 @@ batch.set(
   ref,
   forFirestore({
     email,
-    fullName: 'campusnotehub Admin',
+    fullName: 'CampusNoteHub Admin',
     firstName: null,
     lastName: null,
     dateOfBirth: null,

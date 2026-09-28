@@ -32,14 +32,14 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.campusnotehub.com'),
   title: {
-    default: 'campusnotehub — Notes, mentors and campus life',
-    template: '%s · campusnotehub',
+    default: 'CampusNoteHub — Notes, mentors and campus life',
+    template: '%s · CampusNoteHub',
   },
   description:
     'The verified platform for Azerbaijani university students: peer study notes, 1-on-1 mentorship with working professionals, and a campus feed.',
   openGraph: {
     type: 'website',
-    siteName: 'campusnotehub',
+    siteName: 'CampusNoteHub',
     locale: 'az_AZ',
     alternateLocale: ['en_US', 'ru_RU'],
     images: ['/brand/campus-hub-logo.svg'],

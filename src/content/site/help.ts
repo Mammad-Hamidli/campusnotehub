@@ -57,7 +57,7 @@ export const HELP: LocalizedSitePage = {
               },
               {
                 q: 'How do I download or delete my data?',
-                a: '[Download my data](/settings/data) gives you a copy of everything we hold about your account. To close your account, choose Delete account in [Settings → Account](/settings?tab=account); an administrator reviews the request.',
+                a: '[Download my data](/settings/data) gives you a copy of your profile details. To close your account, choose Delete account in [Settings → Account](/settings?tab=account); an administrator reviews the request.',
               },
             ],
           },
@@ -197,7 +197,7 @@ export const HELP: LocalizedSitePage = {
               },
               {
                 q: 'Məlumatlarımı necə yükləyə və ya silə bilərəm?',
-                a: '[Məlumatlarımı yüklə](/settings/data) hesabınız haqqında saxladığımız bütün məlumatların surətini verir. Hesabınızı bağlamaq üçün [Tənzimləmələr → Hesab](/settings?tab=account) bölməsində "Hesabı sil" seçin; sorğunu administrator nəzərdən keçirir.',
+                a: '[Məlumatlarımı yüklə](/settings/data) profil məlumatlarınızın surətini verir. Hesabınızı bağlamaq üçün [Tənzimləmələr → Hesab](/settings?tab=account) bölməsində "Hesabı sil" seçin; sorğunu administrator nəzərdən keçirir.',
               },
             ],
           },
@@ -337,7 +337,7 @@ export const HELP: LocalizedSitePage = {
               },
               {
                 q: 'Как скачать или удалить свои данные?',
-                a: '[Скачать мои данные](/settings/data) - копия всего, что мы храним о вашем аккаунте. Чтобы закрыть аккаунт, выберите «Удалить аккаунт» в разделе [Настройки → Аккаунт](/settings?tab=account); запрос рассматривает администратор.',
+                a: '[Скачать мои данные](/settings/data) - копия данных вашего профиля. Чтобы закрыть аккаунт, выберите «Удалить аккаунт» в разделе [Настройки → Аккаунт](/settings?tab=account); запрос рассматривает администратор.',
               },
             ],
           },

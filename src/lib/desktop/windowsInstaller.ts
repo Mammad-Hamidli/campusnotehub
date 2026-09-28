@@ -72,32 +72,62 @@ function configuredInstallerUrl(): string | null {
   return null;
 }
 
+const GITHUB_TIMEOUT_MS = 5000;
+
+async function fetchLatestGitHubInstaller(): Promise<WindowsInstaller | null> {
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'campusnotehub',
+  };
+  // Optional. Unauthenticated calls share 60 an hour per IP with everything
+  // else on a serverless egress IP; a token gets 5,000. A fine-grained token
+  // with no permissions is enough to read a public repo's releases.
+  const token = process.env.GITHUB_TOKEN?.trim();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetch(`https://api.github.com/repos/${RELEASES_REPO}/releases?per_page=20`, {
+    headers,
+    // The landing page awaits this on a cold cache; GitHub being slow must
+    // not make the page slow. The signal also bounds reading the body.
+    signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return pickWindowsInstaller((await response.json()) as GitHubRelease[]);
+}
+
+/** GitHub's last answer to this server process; undefined until it gives one. */
+let lastKnownInstaller: WindowsInstaller | null | undefined;
+
 /**
  * Cached for 10 minutes across all visitors, so the landing page costs at most
- * a handful of unauthenticated GitHub API calls an hour (the limit is 60 per
- * IP). A failed call THROWS, which unstable_cache never stores: once a release
- * has been seen, a GitHub outage or rate limit keeps serving it (stale while
- * revalidate) instead of hiding the button. "No desktop release yet" is a real
- * answer and is cached like any other.
+ * a handful of GitHub API calls an hour. A failure must not be cached as
+ * "nothing to download" - that would hide the button for 10 minutes over one
+ * slow response - so:
+ *  - once this process has seen an answer, a failure (timeout, rate limit,
+ *    outage) re-serves that answer instead;
+ *  - before that, it THROWS, which unstable_cache never stores, and
+ *    getWindowsInstaller falls back to null for this request only.
+ * "No desktop release yet" is a real answer and is cached like any other.
  */
 const latestGitHubInstaller = unstable_cache(
   async (): Promise<WindowsInstaller | null> => {
-    const response = await fetch(`https://api.github.com/repos/${RELEASES_REPO}/releases?per_page=20`, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'campusnotehub',
-      },
-      // The landing page awaits this on a cold cache; GitHub being slow must
-      // not make the page slow.
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!response.ok) throw new Error(`GitHub releases: HTTP ${response.status}`);
-    return pickWindowsInstaller((await response.json()) as GitHubRelease[]);
+    try {
+      lastKnownInstaller = await fetchLatestGitHubInstaller();
+      return lastKnownInstaller;
+    } catch (error) {
+      if (lastKnownInstaller !== undefined) return lastKnownInstaller;
+      throw error;
+    }
   },
   ['windows-installer'],
   { revalidate: 600 },
 );
+
+function describeFailure(error: unknown): string {
+  if (error instanceof Error && error.name === 'TimeoutError') return `no answer within ${GITHUB_TIMEOUT_MS} ms`;
+  return error instanceof Error ? error.message : String(error);
+}
 
 /** The current Windows installer, or null when there is nothing to download. */
 export async function getWindowsInstaller(): Promise<WindowsInstaller | null> {
@@ -107,7 +137,10 @@ export async function getWindowsInstaller(): Promise<WindowsInstaller | null> {
   try {
     return await latestGitHubInstaller();
   } catch (error) {
-    console.error('[desktop] installer lookup failed', error);
+    // Expected and handled (the button says "coming soon"), so a one-line
+    // warning: console.error would surface in the Next dev overlay as if the
+    // page had crashed.
+    console.warn(`[desktop] GitHub releases lookup failed (${describeFailure(error)}); hiding the download`);
     return null;
   }
 }

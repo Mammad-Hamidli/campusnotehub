@@ -8,15 +8,15 @@ import type { LocalizedSitePage } from './types';
 export const ABOUT: LocalizedSitePage = {
   en: {
     eyebrow: 'About us',
-    title: 'About campusnotehub',
+    title: 'About CampusNoteHub',
     summary:
-      'campusnotehub is the social platform for university students and graduates in Azerbaijan: one place to follow classmates, share class notes and get career advice from people who do the job.',
+      'CampusNoteHub is the social platform for university students and graduates in Azerbaijan: one place to follow classmates, share class notes and get career advice from people who do the job.',
     sections: [
       {
         id: 'who',
         heading: 'Who we are',
         body: [
-          'campusnotehub is built in Baku for the students of Azerbaijani universities. The idea is simple: the most useful things at university - good class notes, honest advice and news from your campus - should be easy to find and free to share.',
+          'CampusNoteHub is built in Baku for the students of Azerbaijani universities. The idea is simple: the most useful things at university - good class notes, honest advice and news from your campus - should be easy to find and free to share.',
           'Students can confirm their student status with their documents, and a verified badge shows who has. Mentors are verified before they can offer sessions.',
         ],
       },
@@ -51,7 +51,7 @@ export const ABOUT: LocalizedSitePage = {
         id: 'languages',
         heading: 'Made for Azerbaijan',
         body: [
-          'campusnotehub works in Azerbaijani, English and Russian - switch at any time from the language menu. A post written in another language can be translated with one tap.',
+          'CampusNoteHub works in Azerbaijani, English and Russian - switch at any time from the language menu. A post written in another language can be translated with one tap.',
         ],
       },
       {
@@ -66,15 +66,15 @@ export const ABOUT: LocalizedSitePage = {
 
   az: {
     eyebrow: 'Haqqımızda',
-    title: 'campusnotehub haqqında',
+    title: 'CampusNoteHub haqqında',
     summary:
-      'campusnotehub Azərbaycanda universitet tələbələri və məzunları üçün sosial platformadır: qrup yoldaşlarınızı izləmək, konspekt paylaşmaq və bu işi görən insanlardan karyera məsləhəti almaq üçün bir məkan.',
+      'CampusNoteHub Azərbaycanda universitet tələbələri və məzunları üçün sosial platformadır: qrup yoldaşlarınızı izləmək, konspekt paylaşmaq və bu işi görən insanlardan karyera məsləhəti almaq üçün bir məkan.',
     sections: [
       {
         id: 'who',
         heading: 'Biz kimik',
         body: [
-          'campusnotehub Bakıda, Azərbaycan universitetlərinin tələbələri üçün yaradılır. İdeya sadədir: universitetdə ən faydalı şeylər - yaxşı konspektlər, səmimi məsləhət və kampusdan xəbərlər - asan tapılmalı və pulsuz paylaşılmalıdır.',
+          'CampusNoteHub Bakıda, Azərbaycan universitetlərinin tələbələri üçün yaradılır. İdeya sadədir: universitetdə ən faydalı şeylər - yaxşı konspektlər, səmimi məsləhət və kampusdan xəbərlər - asan tapılmalı və pulsuz paylaşılmalıdır.',
           'Tələbələr sənədləri ilə tələbə statuslarını təsdiqləyə bilər, doğrulanmış nişan isə bunu kimin etdiyini göstərir. Mentorlar sessiya təklif etməzdən əvvəl doğrulanır.',
         ],
       },
@@ -109,7 +109,7 @@ export const ABOUT: LocalizedSitePage = {
         id: 'languages',
         heading: 'Azərbaycan üçün yaradılıb',
         body: [
-          'campusnotehub Azərbaycan, ingilis və rus dillərində işləyir - dili istənilən vaxt dil menyusundan dəyişə bilərsiniz. Başqa dildə yazılmış paylaşımı bir toxunuşla tərcümə etmək olar.',
+          'CampusNoteHub Azərbaycan, ingilis və rus dillərində işləyir - dili istənilən vaxt dil menyusundan dəyişə bilərsiniz. Başqa dildə yazılmış paylaşımı bir toxunuşla tərcümə etmək olar.',
         ],
       },
       {
@@ -124,15 +124,15 @@ export const ABOUT: LocalizedSitePage = {
 
   ru: {
     eyebrow: 'О нас',
-    title: 'О campusnotehub',
+    title: 'О CampusNoteHub',
     summary:
-      'campusnotehub - социальная платформа для студентов и выпускников университетов Азербайджана: здесь можно следить за однокурсниками, делиться конспектами и получать советы о карьере от тех, кто уже работает в профессии.',
+      'CampusNoteHub - социальная платформа для студентов и выпускников университетов Азербайджана: здесь можно следить за однокурсниками, делиться конспектами и получать советы о карьере от тех, кто уже работает в профессии.',
     sections: [
       {
         id: 'who',
         heading: 'Кто мы',
         body: [
-          'campusnotehub создаётся в Баку для студентов азербайджанских университетов. Идея простая: самое полезное в университете - хорошие конспекты, честные советы и новости кампуса - должно легко находиться и бесплатно передаваться другим.',
+          'CampusNoteHub создаётся в Баку для студентов азербайджанских университетов. Идея простая: самое полезное в университете - хорошие конспекты, честные советы и новости кампуса - должно легко находиться и бесплатно передаваться другим.',
           'Студенты могут подтвердить свой статус документами, а значок верификации показывает, кто это сделал. Менторы проходят проверку, прежде чем смогут предлагать сессии.',
         ],
       },
@@ -167,7 +167,7 @@ export const ABOUT: LocalizedSitePage = {
         id: 'languages',
         heading: 'Сделано для Азербайджана',
         body: [
-          'campusnotehub работает на азербайджанском, английском и русском языках - язык можно сменить в любой момент в меню языка. Публикацию на другом языке можно перевести одним нажатием.',
+          'CampusNoteHub работает на азербайджанском, английском и русском языках - язык можно сменить в любой момент в меню языка. Публикацию на другом языке можно перевести одним нажатием.',
         ],
       },
       {

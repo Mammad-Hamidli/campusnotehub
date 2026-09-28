@@ -48,7 +48,7 @@ export const SAFETY: LocalizedSitePage = {
               'Sessions end after a period of inactivity, and signing out ends the session on our servers, not only in your browser.',
               'Identity documents uploaded for verification are used only for that check and are deleted after review. We keep only the outcome.',
               'Note files are stored privately and can be downloaded only by signed-in members.',
-              'All traffic to campusnotehub is encrypted in transit (HTTPS).',
+              'All traffic to CampusNoteHub is encrypted in transit (HTTPS).',
             ],
           },
         ],
@@ -74,7 +74,7 @@ export const SAFETY: LocalizedSitePage = {
         body: [
           {
             list: [
-              'Book sessions through campusnotehub, so there is a record of who you met and when.',
+              'Book sessions through CampusNoteHub, so there is a record of who you met and when.',
               'Never share passwords, codes or bank card details with a mentor or with anyone else.',
               'If a session makes you uncomfortable, end it and tell us at supportcampushub@gmail.com.',
             ],
@@ -125,7 +125,7 @@ export const SAFETY: LocalizedSitePage = {
               'Sessiyalar müəyyən müddət fəaliyyət olmadıqda başa çatır, hesabdan çıxış isə sessiyanı təkcə brauzerinizdə deyil, serverlərimizdə də bitirir.',
               'Doğrulama üçün yüklənən şəxsiyyət sənədləri yalnız həmin yoxlama üçün istifadə olunur və yoxlamadan sonra silinir. Biz yalnız nəticəni saxlayırıq.',
               'Konspekt faylları qapalı saxlanılır və onları yalnız hesaba daxil olmuş üzvlər endirə bilər.',
-              'campusnotehub ilə bütün əlaqə ötürülmə zamanı şifrələnir (HTTPS).',
+              'CampusNoteHub ilə bütün əlaqə ötürülmə zamanı şifrələnir (HTTPS).',
             ],
           },
         ],
@@ -151,7 +151,7 @@ export const SAFETY: LocalizedSitePage = {
         body: [
           {
             list: [
-              'Görüşləri campusnotehub vasitəsilə sifariş edin ki, kiminlə və nə vaxt görüşdüyünüzün qeydi qalsın.',
+              'Görüşləri CampusNoteHub vasitəsilə sifariş edin ki, kiminlə və nə vaxt görüşdüyünüzün qeydi qalsın.',
               'Şifrə, kod və ya bank kartı məlumatlarını heç vaxt mentorla və ya başqası ilə bölüşməyin.',
               'Görüş sizi narahat edirsə, onu bitirin və supportcampushub@gmail.com ünvanına bizə yazın.',
             ],
@@ -201,7 +201,7 @@ export const SAFETY: LocalizedSitePage = {
               'Сеанс завершается после периода неактивности, а выход из аккаунта завершает сеанс на наших серверах, а не только в браузере.',
               'Документы, загруженные для верификации, используются только для этой проверки и удаляются после неё. Мы храним только результат.',
               'Файлы конспектов хранятся закрыто, и скачать их могут только участники, вошедшие в аккаунт.',
-              'Всё соединение с campusnotehub шифруется при передаче (HTTPS).',
+              'Всё соединение с CampusNoteHub шифруется при передаче (HTTPS).',
             ],
           },
         ],
@@ -227,7 +227,7 @@ export const SAFETY: LocalizedSitePage = {
         body: [
           {
             list: [
-              'Записывайтесь на встречи через campusnotehub, чтобы оставалась запись о том, с кем и когда вы встречались.',
+              'Записывайтесь на встречи через CampusNoteHub, чтобы оставалась запись о том, с кем и когда вы встречались.',
               'Никогда не сообщайте пароли, коды или данные банковской карты ни ментору, ни кому-либо ещё.',
               'Если встреча вызывает у вас дискомфорт, завершите её и напишите нам на supportcampushub@gmail.com.',
             ],

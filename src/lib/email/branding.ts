@@ -47,7 +47,7 @@ const trim = (value: string | undefined) => value?.trim() || undefined;
  * environment happened to be when the first email module was imported.
  */
 export function emailBranding(): EmailBranding {
-  const companyName = trim(process.env.EMAIL_COMPANY_NAME) ?? 'campusnotehub';
+  const companyName = trim(process.env.EMAIL_COMPANY_NAME) ?? 'CampusNoteHub';
 
   /**
    * Always the platform mailbox - resolved through ./identity.ts, which

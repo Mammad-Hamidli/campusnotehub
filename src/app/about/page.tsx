@@ -7,7 +7,7 @@ import { ABOUT } from '@/content/site/about';
 export const metadata: Metadata = {
   title: 'About',
   description:
-    'campusnotehub is the social platform for university students and graduates in Azerbaijan: the campus feed, free class notes and mentoring.',
+    'CampusNoteHub is the social platform for university students and graduates in Azerbaijan: the campus feed, free class notes and mentoring.',
   alternates: { canonical: '/about' },
 };
 

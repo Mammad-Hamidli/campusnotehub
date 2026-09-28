@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowUpRight, BookOpen, MessagesSquare, UserRoundSearch, type LucideIcon } from 'lucide-react';
+import { ArrowUpRight, BookOpen, Check, MessagesSquare, UserRoundSearch, type LucideIcon } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 
 type Feature = {
@@ -106,9 +106,7 @@ function FeatureCard({ feature, t }: { feature: Feature; t: (key: string) => str
       <ul className="relative mt-5 space-y-2">
         {(['p1', 'p2', 'p3'] as const).map((point) => (
           <li key={point} className="flex gap-2 text-sm leading-snug text-fg">
-            <span className="mt-0.5 text-xs" aria-hidden="true">
-              ✦
-            </span>
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
             <span className="min-w-0">{t(`${base}.${point}`)}</span>
           </li>
         ))}

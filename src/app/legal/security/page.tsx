@@ -7,7 +7,7 @@ import { SAFETY } from '@/content/site/safety';
 export const metadata: Metadata = {
   title: 'Safety and security',
   description:
-    'How campusnotehub protects accounts and personal data, and how to stay safe and report a problem.',
+    'How CampusNoteHub protects accounts and personal data, and how to stay safe and report a problem.',
   alternates: { canonical: '/legal/security' },
 };
 

@@ -4,7 +4,7 @@ vi.mock('server-only', () => ({}));
 // No Next incremental cache outside a request: call straight through.
 vi.mock('next/cache', () => ({ unstable_cache: <T>(fn: T) => fn }));
 
-import { getWindowsInstaller, pickWindowsInstaller, type GitHubRelease } from './windowsInstaller';
+import { pickWindowsInstaller, type GitHubRelease } from './windowsInstaller';
 
 function release(tag: string, assets: string[], extra: Partial<GitHubRelease> = {}): GitHubRelease {
   return {
@@ -54,8 +54,12 @@ describe('pickWindowsInstaller', () => {
 
 describe('getWindowsInstaller', () => {
   const fetchMock = vi.fn();
+  // Re-imported per test: the module remembers GitHub's last answer.
+  let getWindowsInstaller: typeof import('./windowsInstaller').getWindowsInstaller;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.resetModules();
+    ({ getWindowsInstaller } = await import('./windowsInstaller'));
     vi.stubGlobal('fetch', fetchMock);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -92,5 +96,35 @@ describe('getWindowsInstaller', () => {
   it('is null when GitHub fails', async () => {
     fetchMock.mockResolvedValue(new Response('rate limited', { status: 403 }));
     expect(await getWindowsInstaller()).toBeNull();
+  });
+
+  it('is null, with a one-line warning, when GitHub times out', async () => {
+    fetchMock.mockRejectedValue(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
+    expect(await getWindowsInstaller()).toBeNull();
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('no answer within 5000 ms'));
+    expect(console.error).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('keeps serving the last installer it saw when GitHub fails later', async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json([release('desktop-v1.0.0', ['campusnotehub_1.0.0_x64-setup.exe'])]),
+    );
+    expect((await getWindowsInstaller())?.version).toBe('1.0.0');
+
+    fetchMock.mockRejectedValueOnce(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
+    expect((await getWindowsInstaller())?.version).toBe('1.0.0');
+  });
+
+  it('sends GITHUB_TOKEN only when it is set', async () => {
+    fetchMock.mockImplementation(async () => Response.json([]));
+
+    vi.stubEnv('GITHUB_TOKEN', '');
+    await getWindowsInstaller();
+    expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty('Authorization');
+
+    vi.stubEnv('GITHUB_TOKEN', ' github_pat_x ');
+    await getWindowsInstaller();
+    expect(fetchMock.mock.calls[1][1].headers).toHaveProperty('Authorization', 'Bearer github_pat_x');
   });
 });

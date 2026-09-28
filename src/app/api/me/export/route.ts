@@ -17,9 +17,9 @@ export const dynamic = 'force-dynamic';
  *
  * POST rather than GET because it takes a proof of identity in the body, and
  * a GET would put the file one link away from any page that can make the
- * browser follow one. The file is everything src/lib/account/export.ts
- * gathers: email, phone, date of birth, every post and message. A session
- * cookie proves a browser is signed in, not that its owner is at it, so the
+ * browser follow one. The file is the profile src/lib/account/export.ts
+ * builds, which includes email, phone and date of birth. A session cookie
+ * proves a browser is signed in, not that its owner is at it, so the
  * account's strongest factor is asked for again - the same rule as filing a
  * deletion request.
  */
@@ -81,10 +81,10 @@ export async function POST(request: NextRequest) {
     entityType: 'user',
     entityId: userId,
     userAgent: request.headers.get('user-agent')?.slice(0, 512),
-    after: { method: proof.method, truncated: data.truncated },
+    after: { method: proof.method, version: data.version },
   });
 
-  const handle = data.account.nickname.replace(/[^A-Za-z0-9_.-]/g, '_');
+  const handle = data.profile.nickname.replace(/[^A-Za-z0-9_.-]/g, '_');
   const day = data.generatedAt.toISOString().slice(0, 10);
 
   return new NextResponse(JSON.stringify(data, null, 2), {

@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "campusnotehub",
+    "appName": "CampusNoteHub",
     "save": "Save",
     "cancel": "Cancel",
     "continue": "Continue",
@@ -47,8 +47,8 @@
   },
   "auth": {
     "register": {
-      "title": "Join campusnotehub 🎉",
-      "subtitle": "One minute — and you are in the liveliest crowd on campus.",
+      "title": "Join CampusNoteHub",
+      "subtitle": "Create your account and find your classmates.",
       "fullName": "Name",
       "fullNameHint": "Exactly as it appears on your national ID",
       "email": "Email",
@@ -250,7 +250,7 @@
         "failed": "We could not sign you in with that account. Please try again.",
         "unavailable": "This sign-in method is not available right now.",
         "link_required": "An account with this email already exists. Sign in with your password and confirm your email in Settings → Security - {provider} will then connect automatically - or connect {provider} there directly.",
-        "identity_in_use": "That account is already connected to a different campusnotehub account.",
+        "identity_in_use": "That account is already connected to a different CampusNoteHub account.",
         "provider_already_linked": "A different {provider} account is already connected. Disconnect it first.",
         "rate_limited": "Too many attempts. Please wait a few minutes and try again.",
         "signup_expired": "Your sign-up session expired. Start again from the sign-in page.",
@@ -912,10 +912,9 @@
       "about": "About"
     },
     "hero": {
-      "badge": "The social space for students",
       "titleLead": "Share class notes for free,",
       "titleAccent": "and join the liveliest crowd on campus",
-      "subtitle": "Follow classmates, post to the feed, ask and answer, share class notes, meet mentors — all in one place, with verified students only.",
+      "subtitle": "Meet students from universities across Azerbaijan, make friends and learn from mentors, all in one student network.",
       "ctaNotes": "Browse class notes",
       "trust": "No fake profiles — every account is verified",
       "ctaJoin": "Join for free"
@@ -932,13 +931,12 @@
       "students": "Active students",
       "notes": "Class notes shared",
       "hours": "Mentorship hours",
-      "universities": "Universities",
-      "live": "Live"
+      "universities": "Universities"
     },
     "features": {
-      "eyebrow": "One account, three worlds",
-      "title": "Classes, friends and careers — together",
-      "subtitle": "Chat in the feed, share class notes, find a mentor. Join once, use it everywhere.",
+      "eyebrow": "What's inside",
+      "title": "For your classes, your friends and your career",
+      "subtitle": "Talk in the feed, swap class notes and book time with a mentor.",
       "notes": {
         "title": "UniNotes",
         "body": "Class notes, free for everyone. Upload yours, or find what you need before the exam.",
@@ -957,24 +955,16 @@
       },
       "feed": {
         "title": "Campus feed",
-        "body": "Exam news, scholarship calls, memes and Q&A — the pulse of your university.",
+        "body": "Exam news, scholarship calls, memes and questions from your university.",
         "p1": "Filter by university",
         "p2": "Follow topics through tags",
         "p3": "Share images and notes inline",
         "cta": "Open the feed"
       }
     },
-    "ticker": {
-      "title": "Happening on campus",
-      "joined": "{name} joined",
-      "verified": "{name} got verified",
-      "uploaded": "{name} uploaded new class notes",
-      "booked": "{name} booked a mentor session",
-      "popular": "{title} bought {count} times today"
-    },
     "cta": {
-      "title": "Campus is waiting for you 🎉",
-      "body": "Signing up takes a minute. Join, follow, post, share class notes.",
+      "title": "Ready to join?",
+      "body": "Sign-up takes about a minute, and it's free.",
       "button": "Create a free account",
       "secondary": "Browse class notes first"
     },
@@ -999,6 +989,9 @@
         "mentor": "Meet mentors",
         "campus": "Explore by university"
       }
+    },
+    "universities": {
+      "title": "Participating universities"
     }
   },
   "register": {
@@ -1055,7 +1048,7 @@
       "humanReview": "A moderator may look if the check is inconclusive",
       "window": "In that case the image is held encrypted for at most 24 hours"
     },
-    "created": "Your account was created. Welcome to campusnotehub!"
+    "created": "Your account was created. Welcome to CampusNoteHub!"
   },
   "dashboard": {
     "greeting": "Hi, {name}",
@@ -1507,7 +1500,7 @@
       "description": "Security and account management",
       "changePassword": "Change password",
       "exportData": "Download my data",
-      "exportHint": "A JSON copy of everything we hold",
+      "exportHint": "A JSON copy of your profile details",
       "deleteAccount": "Delete account",
       "security": "Two-factor authentication",
       "securityHint": "Authenticator app and recovery codes"
@@ -1652,29 +1645,24 @@
     "export": {
       "back": "Settings",
       "title": "Download your data",
-      "intro": "Get a copy of the information campusnotehub holds about your account, as one JSON file you can open in any text editor.",
+      "intro": "Get a copy of your CampusNoteHub profile details as a JSON file you can open in any text editor.",
       "includedTitle": "What the file contains",
       "included": {
-        "account": "Your account and profile details, and your privacy settings",
-        "security": "Sign-in methods, two-factor status, sessions and recognised devices",
-        "content": "Your posts and comments",
-        "social": "Who you follow, your followers and follow requests",
-        "notes": "Notes you uploaded, rated or saved",
-        "mentoring": "Your mentor profile or application, bookings and reviews",
-        "notifications": "Your notifications and notification settings",
-        "verification": "The outcome of each identity verification, and any account deletion request"
+        "profile": "Your name, nickname, headline, bio and profile picture",
+        "contact": "Email address, phone number and date of birth",
+        "academic": "University, faculty, department and graduation year"
       },
-      "excluded": "Not included: your password and two-factor secrets (we store them only in a form that cannot be read back), identity document images (deleted after review), the likes you have given, and the note files themselves — download those from UniNotes.",
+      "excluded": "Not included: posts, comments, followers, notes, bookings and sign-in history. Your password and two-factor secrets are never exported.",
       "confirmHint": "To protect your data, confirm it's you first.",
       "submit": "Download (.json)",
       "preparing": "Preparing your file…",
       "started": "Your download has started",
-      "done": "Done. Keep the file somewhere safe — it contains your personal details."
+      "done": "Done. The file contains your personal details, so keep it somewhere safe."
     }
   },
   "stub": {
     "title": "This section is under construction",
-    "body": "We are still building this part of campusnotehub. It will be available soon.",
+    "body": "We are still building this part of CampusNoteHub. It will be available soon.",
     "back": "Go back",
     "toFeed": "Go to the feed"
   },
@@ -1769,11 +1757,11 @@
   "site": {
     "contactCta": {
       "title": "Still have a question?",
-      "body": "Write to us — we read every message."
+      "body": "Send us a message and we'll get back to you."
     }
   },
   "desktopUpdate": {
-    "title": "A new version of campusnotehub is available",
+    "title": "A new version of CampusNoteHub is available",
     "body": "Version {version} is ready. Download it and run the installer to update.",
     "download": "Download update",
     "later": "Later"
