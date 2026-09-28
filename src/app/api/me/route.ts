@@ -18,6 +18,7 @@ import { clientIp, rateLimit } from '@/lib/security/ratelimit';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { creatorStatsFor } from '@/lib/firebase/repositories/notes';
 import { findMentorByUserId } from '@/lib/firebase/repositories/mentors';
+import { can, type Viewer } from '@/lib/permissions';
 import { sendEmailAsync } from '@/lib/email/send';
 import { freezeState } from '@/lib/auth/freeze';
 import { FACULTY_OTHER, facultyLabel, isFacultySlug } from '@/lib/faculties';
@@ -105,8 +106,9 @@ function selfProjection(user: UserRecord) {
 
 export async function GET(request: NextRequest) {
   let userId: string;
+  let viewer: Viewer;
   try {
-    ({ userId } = await requireSession(request));
+    ({ userId, viewer } = await requireSession(request));
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
@@ -175,6 +177,12 @@ export async function GET(request: NextRequest) {
         creatorStats: stats.get(userId) ?? null,
         /** Approved mentor profile exists: drives the schedule-settings link. */
         isMentor: Boolean(mentor?.isApproved),
+        /**
+         * The mentor panel is open to this viewer - a MENTOR account from
+         * signup on, approved or not. Drives the "Mentor panel" nav link;
+         * the panel re-checks can() itself.
+         */
+        mentorConsole: can(viewer, 'mentors:console'),
         /**
          * The resolved faculty label, so no consumer has to re-implement the
          * "catalogue slug, or the typed value when it is `other`" rule. Null

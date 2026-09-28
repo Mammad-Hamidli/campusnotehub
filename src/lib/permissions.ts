@@ -12,6 +12,8 @@ export type Capability =
   | 'mentors:browse'
   | 'mentors:book'
   | 'mentors:offer'
+  /** The mentor panel (/mentors/dashboard) and the /api/mentors/me data behind it. */
+  | 'mentors:console'
   | 'moderation:review';
 
 export type Viewer = {
@@ -46,6 +48,12 @@ export type Viewer = {
    * an incomplete profile, until it is set at /set-password.
    */
   passwordSetupRequired?: boolean;
+  /**
+   * When the account became a mentor (users.mentorSince). Opens the mentor
+   * panel to an ALUMNI or TEACHER mentor, whose role an approval does not
+   * overwrite - see src/lib/mentors/membership.ts.
+   */
+  mentorSince?: Date | null;
 };
 
 /**
@@ -91,6 +99,15 @@ export function can(viewer: Viewer | null, capability: Capability): boolean {
 
   if (capability === 'moderation:review') {
     return viewer.role === UserRole.MODERATOR || viewer.role === UserRole.ADMIN;
+  }
+  /**
+   * NOT verification-gated, unlike mentors:offer: the panel is where an
+   * unverified mentor is told to verify, apply and wait for approval. What it
+   * shows is the mentor's own data; offering sessions stays behind
+   * mentors:offer and an approved profile.
+   */
+  if (capability === 'mentors:console') {
+    return viewer.role === UserRole.MENTOR || viewer.mentorSince != null;
   }
   if (capability === 'mentors:offer') {
     return (

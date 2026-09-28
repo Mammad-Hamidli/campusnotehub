@@ -50,8 +50,10 @@ export async function PATCH(
     const { decision, reason } = parsed.data;
 
     let profileId: string | null = null;
+    // Set when the approval changed the applicant's role (STUDENT -> MENTOR).
+    let promotedTo: string | null = null;
     if (decision === 'APPROVE') {
-      profileId = await approveMentorApplication(application, actor.id);
+      ({ profileId, promotedTo } = await approveMentorApplication(application, actor.id));
     } else {
       await rejectMentorApplication(userId, actor.id, reason!);
     }
@@ -68,7 +70,7 @@ export async function PATCH(
       action: decision === 'APPROVE' ? 'MENTOR_APPLICATION_APPROVED' : 'MENTOR_APPLICATION_REJECTED',
       entityType: 'mentor_application',
       entityId: userId,
-      after: { profileId, reason: reason ?? null },
+      after: { profileId, reason: reason ?? null, ...(promotedTo ? { roleBefore: applicant?.role, role: promotedTo } : {}) },
     });
 
     await enqueueNotification({

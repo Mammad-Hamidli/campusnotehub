@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify, importSPKI } from 'jose';
+import { configuredAppOrigin } from '@/lib/app-url';
+import { MENTOR_JOIN_PATH } from '@/lib/site';
 
 /**
  * Edge middleware: CSP nonce + auth gating.
@@ -13,6 +15,9 @@ import { jwtVerify, importSPKI } from 'jose';
 const PROTECTED = [
   /^\/(dashboard|settings|notifications|profile|bookmarks|bookings|verify|onboarding|set-password)/,
   /^\/notes\/new/,
+  // The mentor panel and schedule. Anchored so a mentor profile id can never
+  // be mistaken for one of them; /mentors/[mentorId] stays public.
+  /^\/mentors\/(dashboard|schedule)(\/|$)/,
   /**
    * /mentors/apply is deliberately NOT here.
    *
@@ -20,7 +25,7 @@ const PROTECTED = [
    * anyone without an account: a signed-out visitor clicking "Become a mentor"
    * was bounced to /api/auth/refresh and on to /login, which offers no way to
    * create the mentor account they came for. The page now renders its own
-   * signed-out state pointing at the mentors site (MENTORS_URL).
+   * signed-out state pointing at the mentor signup (/mentors/join).
    *
    * This removes NO authorization. Submitting an application is POST
    * /api/mentors/apply, which independently requires a session, an active
@@ -61,6 +66,9 @@ const PROTECTED = [
 const NO_STORE = [
   /^\/(admin|dashboard|settings|notifications|profile|bookmarks|bookings|verify)/,
   /^\/notes\/new/,
+  // The panel shows the mentor's own data; /mentors/join, like /register,
+  // answers differently for a signed-in visitor (it redirects them).
+  /^\/mentors\/(dashboard|schedule|join)(\/|$)/,
   /**
    * The auth screens are here too, and that is not cosmetic.
    *
@@ -108,6 +116,38 @@ function clearAuthCookies(response: NextResponse): NextResponse {
   return response;
 }
 
+/**
+ * The mentors subdomain. It was meant to be a separate mentor site, which was
+ * never built; mentor signup lives in this app at /mentors/join. Pointing the
+ * host at this deployment and redirecting here keeps every link already
+ * printed or shared working. MENTORS_HOST overrides it (e.g. for a staging
+ * domain).
+ */
+const MENTORS_HOST = (process.env.MENTORS_HOST?.trim() || 'mentors.campusnotehub.com').toLowerCase();
+
+/**
+ * The permanent redirect for a request that arrived on the mentors host, or
+ * null. The target is the canonical app origin (APP_URL), never the request's
+ * own Host header, so a spoofed header cannot steer it anywhere else. A
+ * misconfiguration that made APP_URL the mentors host itself would loop, so
+ * it is refused rather than followed.
+ */
+function mentorsHostRedirect(request: NextRequest): NextResponse | null {
+  const host = (request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? '')
+    .split(',')[0]
+    .trim()
+    .split(':')[0]
+    .toLowerCase();
+  if (host !== MENTORS_HOST) return null;
+
+  const target = new URL(MENTOR_JOIN_PATH, configuredAppOrigin() ?? 'https://www.campusnotehub.com');
+  if (target.hostname === MENTORS_HOST) return null;
+  // Campaign parameters (utm_*) survive the hop; the path does not - every
+  // page of the old site maps to the one signup page.
+  target.search = request.nextUrl.search;
+  return NextResponse.redirect(target, 308);
+}
+
 let publicKeyPromise: Promise<CryptoKey> | null = null;
 const getPublicKey = () => {
   publicKeyPromise ??= importSPKI(process.env.JWT_PUBLIC_KEY_PEM!, 'EdDSA');
@@ -115,6 +155,10 @@ const getPublicKey = () => {
 };
 
 export async function middleware(request: NextRequest) {
+  // Before anything else: nothing on the mentors host is served from it.
+  const toMentorSignup = mentorsHostRedirect(request);
+  if (toMentorSignup) return toMentorSignup;
+
   // Per-request CSP nonce. Generated in middleware rather than a layout so the
   // header and the rendered HTML agree on streaming responses.
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');

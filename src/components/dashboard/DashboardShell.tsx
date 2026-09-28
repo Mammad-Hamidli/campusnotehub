@@ -50,6 +50,8 @@ type Viewer = {
   graduationYear?: number;
   graduationMonth?: number;
   isMentor: boolean;
+  /** The mentor panel is open to this viewer (can 'mentors:console'). */
+  mentorConsole: boolean;
   /** Quick-login account still on its temporary handle: view-only. */
   profileIncomplete: boolean;
   /** Composer quick-tags; see Composer. */
@@ -151,6 +153,7 @@ export function DashboardShell({
             graduationYear: user.graduationYear ?? undefined,
             graduationMonth: user.graduationMonth ?? undefined,
             isMentor: Boolean(user.isMentor),
+            mentorConsole: Boolean(user.mentorConsole),
             profileIncomplete: Boolean(user.profileIncomplete),
             hashtagTemplates: Array.isArray(user.hashtagTemplates) ? user.hashtagTemplates : [],
           });

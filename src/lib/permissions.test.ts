@@ -65,3 +65,26 @@ describe('an unfinished quick-login profile is view-only', () => {
     expect(denialKey(incomplete, 'users:follow')).toBe('onboarding.restricted');
   });
 });
+
+describe('mentors:console - the mentor panel', () => {
+  it('opens to a MENTOR account before verification, while offering stays closed', () => {
+    const mentor = viewer({ role: UserRole.MENTOR });
+    expect(can(mentor, 'mentors:console')).toBe(true);
+    expect(can(mentor, 'mentors:offer')).toBe(false);
+  });
+
+  it('opens to an ALUMNI or TEACHER mentor through mentorSince', () => {
+    const since = new Date('2026-01-10T10:00:00Z');
+    expect(can(viewer({ role: UserRole.ALUMNI, mentorSince: since }), 'mentors:console')).toBe(true);
+    expect(can(viewer({ role: UserRole.TEACHER, mentorSince: since }), 'mentors:console')).toBe(true);
+  });
+
+  it.each([UserRole.STUDENT, UserRole.ALUMNI, UserRole.TEACHER])('stays closed to a %s who is not a mentor', (role) => {
+    expect(can(viewer({ role, mentorSince: null }), 'mentors:console')).toBe(false);
+  });
+
+  it('is closed to a suspended mentor and to a signed-out visitor', () => {
+    expect(can(viewer({ role: UserRole.MENTOR, accountStatus: AccountStatus.SUSPENDED }), 'mentors:console')).toBe(false);
+    expect(can(null, 'mentors:console')).toBe(false);
+  });
+});

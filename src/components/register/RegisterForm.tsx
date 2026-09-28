@@ -3,40 +3,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowUpRight, GraduationCap, Loader2, ShieldAlert, ShieldCheck, UserPlus } from 'lucide-react';
+import { GraduationCap, Loader2, ShieldAlert, ShieldCheck, UserPlus } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
-import { MENTORS_URL } from '@/lib/site';
+import { MENTOR_JOIN_PATH } from '@/lib/site';
 import { ProfileFields } from './ProfileFields';
 import { ErrorSummary } from './ErrorSummary';
 import { useUniversityAutoDetect } from './useUniversityAutoDetect';
-import { EMPTY_PROFILE, collectFingerprint, validateProfile, type ProfileErrors, type ProfileForm } from './types';
+import { EMPTY_PROFILE, collectFingerprint, fieldErrorsFrom, validateProfile, type ProfileErrors, type ProfileForm } from './types';
 import { normalizeAzPhone } from '@/lib/auth/phone';
 import { GoogleMark } from '@/components/auth/GoogleMark';
 
 const PROVIDER_LABELS: Record<string, string> = { google: 'Google' };
-
-/**
- * Reads the server's per-field errors into the form's error state.
- *
- * Both the 400 (validation) and 409 (uniqueness) responses use
- * `{ fields: { <formKey>: [<localeKey>, ...] } }`. Keys the form does not
- * render are dropped rather than silently swallowing the whole response -
- * the caller falls back to a form-level message when nothing survives.
- */
-function fieldErrorsFrom(body: unknown): ProfileErrors {
-  const fields = (body as { fields?: unknown } | null)?.fields;
-  if (!fields || typeof fields !== 'object') return {};
-
-  const errors: ProfileErrors = {};
-  for (const [key, messages] of Object.entries(fields as Record<string, unknown>)) {
-    const first = Array.isArray(messages) ? messages[0] : messages;
-    if (key in EMPTY_PROFILE && typeof first === 'string' && first) {
-      errors[key as keyof ProfileForm] = first;
-    }
-  }
-  return errors;
-}
 
 /**
  * Student registration: ONE step.
@@ -47,7 +25,7 @@ function fieldErrorsFrom(body: unknown): ProfileErrors {
  * gone. Identity is still proven later at /verify, and the capability table
  * in src/lib/permissions.ts is unchanged, so nothing that moves money opens
  * before verification. Mentors do not register here at all: the button at the
- * bottom sends them to their own site (MENTORS_URL).
+ * bottom sends them to the mentor signup (/mentors/join).
  *
  * Quick login (Google) sits above the form. Those
  * accounts are created by the OAuth callback with a temporary handle and
@@ -272,19 +250,14 @@ export function RegisterForm({ providers }: { providers: string[] }) {
         </Link>
       </p>
 
-      {/* Mentors apply on their own site. A plain external link: the
-          subdomain is a separate app with its own flow. */}
+      {/* Mentors have their own signup: same account, MENTOR role, and the
+          mentor panel afterwards instead of the student feed. */}
       <div className="mt-8 rounded-2xl border border-dashed border-edge-strong p-4 text-center">
         <p className="text-xs text-fg-muted">{t('auth.register.mentorHint')}</p>
-        <a
-          href={MENTORS_URL}
-          className="btn-secondary mt-3 w-full py-2.5 font-semibold"
-          rel="noopener"
-        >
+        <Link href={MENTOR_JOIN_PATH} className="btn-secondary mt-3 w-full py-2.5 font-semibold">
           <GraduationCap className="h-4 w-4" aria-hidden="true" />
           {t('auth.register.mentorCta')}
-          <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-        </a>
+        </Link>
       </div>
     </div>
   );

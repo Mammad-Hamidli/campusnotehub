@@ -43,6 +43,7 @@
     "admin": "Admin",
     "saved": "Saved items",
     "mentorSchedule": "Mentor schedule",
+    "mentorPanel": "Mentor panel",
     "backToAdmin": "Back to admin dashboard"
   },
   "auth": {
@@ -793,6 +794,101 @@
         "self": "You cannot review yourself.",
         "sessionRequired": "You can review a mentor once you have had a session with them."
       }
+    },
+    "join": {
+      "badge": "For mentors",
+      "title": "Create your mentor account",
+      "subtitle": "Share your experience with students. Your account is ready right away; your mentor profile goes live after a moderator reviews it.",
+      "universityHint": "Optional. Leave it empty if you are not affiliated with a university.",
+      "nextSteps": "Next, from your mentor panel: confirm your email, verify your identity (national ID only), then submit your mentor profile for review.",
+      "submit": "Create mentor account",
+      "haveAccount": "Already have an account?",
+      "signInToApply": "Sign in and apply",
+      "student": "Are you a student?",
+      "aside": {
+        "title": "Mentor with CampusNoteHub",
+        "b1": "Verify your identity once — mentors are asked for a national ID only, never a student card.",
+        "b2": "Tell students about your experience. A moderator reviews every mentor profile before it is listed.",
+        "b3": "Your mentor panel tracks your onboarding, upcoming sessions and your monthly membership date."
+      }
+    }
+  },
+  "mentorDashboard": {
+    "title": "Mentor panel",
+    "subtitle": "Signed in as @{nickname}",
+    "backToFeed": "Back to feed",
+    "viewProfile": "View public profile",
+    "checklist": {
+      "title": "Getting listed",
+      "progress": "{done} of {total} done",
+      "moderatorNote": "Moderator’s note: {reason}",
+      "state": {
+        "done": "Done",
+        "current": "To do",
+        "waiting": "In review",
+        "locked": "Not available yet"
+      },
+      "account": {
+        "title": "Create your mentor account"
+      },
+      "email": {
+        "title": "Confirm your email",
+        "current": "Open the link we emailed you. You can request a new one in Settings → Security.",
+        "cta": "Resend link"
+      },
+      "identity": {
+        "title": "Verify your identity",
+        "current": "Upload your national ID. Mentors are not asked for a student card.",
+        "waiting": "Your documents are being reviewed.",
+        "cta": "Open verification"
+      },
+      "application": {
+        "title": "Submit your mentor profile",
+        "current": "Tell students about your experience and set your weekly availability.",
+        "waiting": "A moderator is reviewing your application. We will email you the decision.",
+        "locked": "Available once your identity is verified.",
+        "cta": "Open application"
+      },
+      "listing": {
+        "title": "Go live in the mentor directory",
+        "current": "Your profile is approved but not taking bookings. Turn bookings on in your schedule.",
+        "locked": "Your profile appears in the directory once your application is approved.",
+        "cta": "Open schedule"
+      }
+    },
+    "fee": {
+      "title": "Monthly membership",
+      "nextDue": "Next payment date",
+      "dueToday": "Today",
+      "dueTomorrow": "Tomorrow",
+      "dueInDays": "In {count} days",
+      "joined": "Joined",
+      "cycle": "Payment",
+      "cycleValue": "No. {count}",
+      "disclaimer": "The monthly fee is paid directly to CampusNoteHub, outside the platform. This is a reminder only — no payment is taken or recorded here."
+    },
+    "stats": {
+      "title": "Your numbers",
+      "sessions": "Sessions completed",
+      "rating": "Rating",
+      "reviews": "Reviews: {count}",
+      "upcoming": "Upcoming sessions"
+    },
+    "sessions": {
+      "title": "Upcoming sessions",
+      "empty": "Nothing booked yet. New bookings will appear here.",
+      "notLive": "Sessions appear here once your mentor profile is approved.",
+      "status": {
+        "REQUESTED": "Requested",
+        "CONFIRMED": "Confirmed",
+        "RESCHEDULED": "Rescheduled"
+      }
+    },
+    "links": {
+      "title": "Mentor shortcuts",
+      "schedule": "Schedule & availability",
+      "application": "Mentor application",
+      "feed": "Feed"
     }
   },
   "notifications": {

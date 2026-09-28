@@ -24,6 +24,7 @@ export function ProfileFields({
   onEmailChange,
   onUniversityPicked,
   universityHint,
+  universityOptional = false,
 }: {
   value: ProfileForm;
   errors: ProfileErrors;
@@ -38,6 +39,8 @@ export function ProfileFields({
   /** A manual university pick - latches auto-detection off. */
   onUniversityPicked?: () => void;
   universityHint?: string;
+  /** Mentor signup: a mentor need not belong to a university. */
+  universityOptional?: boolean;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -96,8 +99,8 @@ export function ProfileFields({
       >
         <select
           id="university"
-          required
-          aria-required="true"
+          required={!universityOptional}
+          aria-required={!universityOptional}
           value={value.universityId}
           onChange={(e) => {
             onChange({ universityId: e.target.value });

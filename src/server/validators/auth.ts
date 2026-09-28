@@ -126,10 +126,11 @@ export const phoneSchema = z
  * The email is a PERSONAL address. A university address is not required (it
  * may be lost at graduation) - it only speeds up verification when given.
  *
- * Only students register here. Mentors apply on their own site (MENTORS_URL),
- * and quick-login accounts are created by the OAuth callback and finished at
- * /onboarding, so neither `accountType` nor `social` exists in this body any
- * more - an unknown key is stripped, never trusted.
+ * Only students register here. Mentors register at /mentors/join
+ * (mentorRegisterSchema below), and quick-login accounts are created by the
+ * OAuth callback and finished at /onboarding, so neither `accountType` nor
+ * `social` exists in this body any more - an unknown key is stripped, never
+ * trusted.
  */
 export const registerSchema = z
   .object({
@@ -144,6 +145,19 @@ export const registerSchema = z
     /** Client-side signal only; never trusted on its own. */
     deviceFingerprint: z.string().max(128).optional(),
   });
+
+/**
+ * Mentor registration (POST /api/auth/register/mentor, from /mentors/join).
+ *
+ * The same fields as a student's, with the university OPTIONAL: a mentor is
+ * often a working professional with no current university, and forcing a pick
+ * would only fill the field with noise. The role is never read from the body -
+ * the endpoint decides it - so this schema, like registerSchema, strips any
+ * `role` or `accountType` a client sends.
+ */
+export const mentorRegisterSchema = registerSchema.extend({
+  universityId: universityCodeSchema.optional(),
+});
 
 /**
  * Finishing a quick-login account at /onboarding. The same identity fields as

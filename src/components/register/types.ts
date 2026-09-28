@@ -98,7 +98,7 @@ export const EMPTY_DOCUMENTS: DocumentMap = {
  */
 export function validateProfile(
   form: ProfileForm,
-  options: { requirePassword: boolean; requireEmail: boolean; requirePhone?: boolean },
+  options: { requirePassword: boolean; requireEmail: boolean; requirePhone?: boolean; requireUniversity?: boolean },
 ): ProfileErrors {
   const errors: ProfileErrors = {};
 
@@ -112,7 +112,8 @@ export function validateProfile(
   else if (!/^[a-zA-Z0-9_]{3,24}$/.test(nickname)) errors.nickname = 'auth.errors.nicknameInvalid';
   else if (isReservedUsername(nickname)) errors.nickname = 'auth.errors.nicknameReserved';
 
-  if (!form.universityId) errors.universityId = 'errors.fieldRequired';
+  // Optional only for a mentor signup (mentorRegisterSchema).
+  if (!form.universityId && options.requireUniversity !== false) errors.universityId = 'errors.fieldRequired';
 
   if (options.requireEmail) {
     const email = form.email.trim();
@@ -140,6 +141,28 @@ export function validateProfile(
   }
 
   if (!form.acceptTerms) errors.acceptTerms = 'auth.errors.termsRequired';
+  return errors;
+}
+
+/**
+ * Reads the server's per-field errors into the form's error state.
+ *
+ * Both the 400 (validation) and 409 (uniqueness) responses use
+ * `{ fields: { <formKey>: [<localeKey>, ...] } }`. Keys the form does not
+ * render are dropped rather than silently swallowing the whole response -
+ * the caller falls back to a form-level message when nothing survives.
+ */
+export function fieldErrorsFrom(body: unknown): ProfileErrors {
+  const fields = (body as { fields?: unknown } | null)?.fields;
+  if (!fields || typeof fields !== 'object') return {};
+
+  const errors: ProfileErrors = {};
+  for (const [key, messages] of Object.entries(fields as Record<string, unknown>)) {
+    const first = Array.isArray(messages) ? messages[0] : messages;
+    if (key in EMPTY_PROFILE && typeof first === 'string' && first) {
+      errors[key as keyof ProfileForm] = first;
+    }
+  }
   return errors;
 }
 

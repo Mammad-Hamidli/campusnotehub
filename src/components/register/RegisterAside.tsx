@@ -1,16 +1,31 @@
 'use client';
 
-import { Lock, ShieldCheck, UserCheck, Users } from 'lucide-react';
+import { CalendarClock, ClipboardCheck, Lock, ShieldCheck, UserCheck, Users } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useT } from '@/lib/i18n/LocaleProvider';
 
-const REASONS = [
-  { key: 'b1', icon: ShieldCheck },
-  { key: 'b2', icon: UserCheck },
-  { key: 'b3', icon: Users },
-] as const;
+const REASONS = {
+  student: {
+    prefix: 'register.aside',
+    items: [
+      { key: 'b1', icon: ShieldCheck },
+      { key: 'b2', icon: UserCheck },
+      { key: 'b3', icon: Users },
+    ],
+  },
+  // /mentors/join: what happens after the account exists - ID check,
+  // moderated application, then the mentor panel.
+  mentor: {
+    prefix: 'mentors.join.aside',
+    items: [
+      { key: 'b1', icon: ShieldCheck },
+      { key: 'b2', icon: ClipboardCheck },
+      { key: 'b3', icon: CalendarClock },
+    ],
+  },
+} as const;
 
 /**
  * The left column of the registration screen.
@@ -25,8 +40,9 @@ const REASONS = [
  * on the same screen as the request. Burying "why we need this" behind a
  * tooltip is how you get a 40% drop-off at step two.
  */
-export function RegisterAside() {
+export function RegisterAside({ variant = 'student' }: { variant?: keyof typeof REASONS }) {
   const t = useT();
+  const { prefix, items } = REASONS[variant];
 
   return (
     <aside className="flex flex-col justify-between border-edge px-4 py-5 lg:w-[22rem] lg:shrink-0 lg:border-r lg:px-8 lg:py-8">
@@ -42,14 +58,14 @@ export function RegisterAside() {
           the fold, and the form is what the user came for. The one essential
           line (the privacy note) is repeated on the review step. */}
       <div className="mt-12 hidden lg:block">
-        <h2 className="text-md font-medium leading-snug text-fg">{t('register.aside.title')}</h2>
+        <h2 className="text-md font-medium leading-snug text-fg">{t(`${prefix}.title`)}</h2>
 
         <ul className="mt-5 space-y-4">
-          {REASONS.map(({ key, icon: Icon }) => (
+          {items.map(({ key, icon: Icon }) => (
             <li key={key} className="flex items-start gap-3">
               <Icon className="mt-0.5 h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
               <p className="min-w-0 text-sm leading-relaxed text-fg-muted">
-                {t(`register.aside.${key}`)}
+                {t(`${prefix}.${key}`)}
               </p>
             </li>
           ))}

@@ -7,6 +7,8 @@ import { deviceLabel } from '@/lib/security/fingerprint';
 import { sendEmailAsync } from '@/lib/email/send';
 import { issueSession, sessionClientOf, sessionHasMfa } from '@/lib/auth/session';
 import { browserOrigin, flowOrigin } from '@/lib/app-url';
+import { can } from '@/lib/permissions';
+import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
 
 /**
  * The last step of every successful sign-in: device bookkeeping, the session,
@@ -102,10 +104,25 @@ export async function completeLogin(params: {
    * Staff who signed in without a second factor are sent to set one up: the
    * panel would refuse them (requireSession withholds the role), and landing
    * on the student feed instead reads as "my admin access disappeared".
+   *
+   * A mentor lands on the mentor panel, where what is still outstanding
+   * (verification, the application, the next fee date) is shown first.
    */
   const isStaff = user.role === UserRole.ADMIN || user.role === UserRole.MODERATOR;
+  const memberHome = can(
+    {
+      id: user.id,
+      role: user.role,
+      accountStatus: user.accountStatus,
+      verificationStatus: user.verificationStatus,
+      mentorSince: user.mentorSince ?? null,
+    },
+    'mentors:console',
+  )
+    ? MENTOR_DASHBOARD_PATH
+    : '/dashboard';
   const href = !isStaff
-    ? '/dashboard'
+    ? memberHome
     : sessionHasMfa(params.amr)
       ? '/admin'
       : '/settings/security?mfa=required';

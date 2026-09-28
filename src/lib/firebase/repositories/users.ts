@@ -77,6 +77,14 @@ export type UserRecord = {
    * (undefined) on documents written before the field existed.
    */
   mentorAvailability?: WeeklyRule[] | null;
+  /**
+   * When the account became a mentor: its signup for a mentor signup, the
+   * approval for a promoted one. The join date on the mentor panel and the
+   * anchor of the monthly fee reminder; also what opens the panel to an
+   * ALUMNI/TEACHER mentor - see src/lib/mentors/membership.ts. Absent on
+   * documents written before the field existed.
+   */
+  mentorSince?: Date | null;
   frozenUntil: Date | null;
   frozenReason: string | null;
   frozenById: string | null;
@@ -496,6 +504,7 @@ export function newUserDefaults(): Omit<
     alumniTransitionedAt: null,
     graduationPromptedAt: null,
     mentorAvailability: null,
+    mentorSince: null,
     frozenUntil: null,
     frozenReason: null,
     frozenById: null,

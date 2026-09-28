@@ -28,6 +28,7 @@ import { sendEmailAsync } from '@/lib/email/send';
 import { hashEmail, hashPhone } from '@/lib/crypto/hash';
 import { shortFingerprint } from '@/lib/admin/redact';
 import { AccountDeletionError, softDeleteAccount } from '@/lib/accounts/softDelete';
+import { mentorSincePatchForRoleChange } from '@/lib/mentors/membership';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -547,7 +548,7 @@ export async function PATCH(
         // account keeps asserting its ID was checked.
         studentStatusConfirmed: approving,
         identityConfirmed: approving,
-        ...(role ? { role } : {}),
+        ...(role ? { role, ...mentorSincePatchForRoleChange(target, role, now) } : {}),
       });
 
       if (role && PRIVILEGED_ROLES.has(role) !== PRIVILEGED_ROLES.has(target.role)) {
@@ -653,7 +654,8 @@ export async function PATCH(
         PRIVILEGED_ROLES.has(role) !== PRIVILEGED_ROLES.has(target.role);
 
       // The act, then the record - see the note in the status branch above.
-      await updateUser(userId, { role });
+      // Granting or removing MENTOR also sets or clears the mentor join date.
+      await updateUser(userId, { role, ...mentorSincePatchForRoleChange(target, role, new Date()) });
 
       if (crossesStaffBoundary) {
         await revokeUserSessions(userId);

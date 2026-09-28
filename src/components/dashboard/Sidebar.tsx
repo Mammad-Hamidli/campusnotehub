@@ -8,6 +8,7 @@ import {
   BookOpen,
   Bookmark,
   CalendarClock,
+  GraduationCap,
   LayoutDashboard,
   LogOut,
   Menu as MenuIcon,
@@ -24,6 +25,7 @@ import { Menu, MenuItem, MenuSeparator } from '@/components/ui/Menu';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useLiveNotifications } from '@/components/notifications/LiveNotifications';
 import { UserRole } from '@/lib/enums';
+import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
 
 export type DashboardTab = 'feed' | 'notes' | 'saved' | 'mentors';
 
@@ -60,6 +62,8 @@ export function Sidebar({
     verified: boolean;
     initials: string;
     isMentor?: boolean;
+    /** Opens the "Mentor panel" link; see mentorConsole in /api/me. */
+    mentorConsole?: boolean;
     /** The account's real role (from /api/me); staff get a way back to the panel. */
     role?: string;
   };
@@ -69,6 +73,9 @@ export function Sidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
   const live = useLiveNotifications();
   const pending = live.unread + live.followRequests;
+  const links = user.mentorConsole
+    ? [{ href: MENTOR_DASHBOARD_PATH, icon: GraduationCap, labelKey: 'nav.mentorPanel' }, ...LINKS]
+    : LINKS;
 
   const nav = (
     <nav className="space-y-0.5" aria-label="Dashboard">
@@ -104,7 +111,7 @@ export function Sidebar({
 
       <div className="my-2 h-px bg-edge" aria-hidden="true" />
 
-      {LINKS.map(({ href, icon: Icon, labelKey }) => (
+      {links.map(({ href, icon: Icon, labelKey }) => (
         <Link
           key={href}
           href={href}

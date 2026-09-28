@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { getViewer } from '@/lib/auth/session';
-import { UserRole } from '@/lib/enums';
+import { homePathFor } from '@/lib/auth/home';
 import { enabledProviders } from '@/lib/auth/oauth/providers';
 
 export const metadata: Metadata = { title: 'Log in', robots: { index: false, follow: false } };
@@ -54,9 +54,7 @@ export default async function LoginPage({
   if (viewer) {
     /** Same-origin paths only - `//host` and `/\host` would be open redirects. */
     const safeNext = next && /^\/(?![/\\])/.test(next) ? next : null;
-    const home =
-      viewer.role === UserRole.ADMIN || viewer.role === UserRole.MODERATOR ? '/admin' : '/dashboard';
-    redirect(safeNext ?? home);
+    redirect(safeNext ?? homePathFor(viewer));
   }
 
   return (

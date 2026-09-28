@@ -593,6 +593,7 @@ async function loadSession(request?: NextRequest, passive = false): Promise<Sess
       mfaRequired,
       profileIncomplete: user.profileIncomplete === true,
       passwordSetupRequired: user.passwordSetupRequired === true,
+      mentorSince: user.mentorSince ?? null,
     },
   };
 }

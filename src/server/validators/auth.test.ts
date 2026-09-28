@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { completeProfileSchema, registerSchema, splitFullName } from './auth';
+import { completeProfileSchema, mentorRegisterSchema, registerSchema, splitFullName } from './auth';
 
 const student = {
   fullName: 'Aysel Mammadova',
@@ -144,5 +144,37 @@ describe('splitFullName', () => {
 
   it('allows a single name', () => {
     expect(splitFullName('Aysel')).toEqual({ firstName: 'Aysel', lastName: null });
+  });
+});
+
+describe('mentorRegisterSchema - mentor sign-up at /mentors/join', () => {
+  it('accepts the student fields', () => {
+    expect(mentorRegisterSchema.safeParse(student).success).toBe(true);
+  });
+
+  it('makes the university optional', () => {
+    const rest: Record<string, unknown> = { ...student };
+    delete rest.universityId;
+    const parsed = mentorRegisterSchema.safeParse(rest);
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.universityId).toBeUndefined();
+  });
+
+  it('still refuses an unknown university code when one is given', () => {
+    expect(mentorRegisterSchema.safeParse({ ...student, universityId: 'NOPE' }).success).toBe(false);
+  });
+
+  it('never takes the role from the body', () => {
+    const parsed = mentorRegisterSchema.safeParse({ ...student, role: 'ADMIN', accountType: 'TEACHER' });
+    expect(parsed.success && 'role' in parsed.data).toBe(false);
+    expect(parsed.success && 'accountType' in parsed.data).toBe(false);
+  });
+
+  it('keeps every other field required', () => {
+    for (const key of ['fullName', 'nickname', 'email', 'phone', 'password'] as const) {
+      const rest: Record<string, unknown> = { ...student };
+      delete rest[key];
+      expect(mentorRegisterSchema.safeParse(rest).success).toBe(false);
+    }
   });
 });

@@ -3,6 +3,8 @@ import { COLLECTIONS } from '../collections';
 import { docToObject, docsToObjects, forFirestore } from '../convert';
 import { findMentorByUserId, mentorCollections, replaceRulesInBatch } from './mentors';
 import type { WeeklyRule } from '@/lib/mentors/schedule';
+import type { UserRole } from '@/lib/enums';
+import { roleAfterMentorApproval } from '@/lib/mentors/membership';
 
 /**
  * PocketMentor applications.
@@ -118,13 +120,23 @@ export async function rejectMentorApplication(
  * An existing profile (a previously approved mentor re-applying with updated
  * details) keeps its rating, sessions and booking settings; only the
  * application-sourced fields are refreshed.
+ *
+ * The applicant's ACCOUNT changes in the same batch: a STUDENT becomes a
+ * MENTOR, and `mentorSince` is stamped unless it is already set (a mentor who
+ * signed up as one, or is re-applying, keeps the original join date - the fee
+ * reminder is anchored on it). See src/lib/mentors/membership.ts for why
+ * ALUMNI and TEACHER keep their role.
  */
 export async function approveMentorApplication(
   application: MentorApplicationRecord,
   actorId: string,
-): Promise<string> {
+): Promise<{ profileId: string; promotedTo: UserRole | null }> {
   const db = adminDb();
-  const existing = await findMentorByUserId(application.userId);
+  const applicantRef = db.collection(COLLECTIONS.users).doc(application.userId);
+  const [existing, applicantSnap] = await Promise.all([
+    findMentorByUserId(application.userId),
+    applicantRef.get(),
+  ]);
   const profileRef = existing
     ? db.collection(COLLECTIONS.mentorProfiles).doc(existing.id)
     : db.collection(COLLECTIONS.mentorProfiles).doc();
@@ -185,6 +197,24 @@ export async function approveMentorApplication(
     applications().doc(application.userId),
     forFirestore({ status: 'APPROVED', decidedAt: now, decidedById: actorId, rejectionReason: null }),
   );
+
+  // A deleted applicant has no account to promote; the profile is still
+  // written, exactly as before this step existed.
+  let promotedTo: UserRole | null = null;
+  if (applicantSnap.exists) {
+    const role = applicantSnap.get('role') as UserRole;
+    const nextRole = roleAfterMentorApproval(role);
+    if (nextRole !== role) promotedTo = nextRole;
+    batch.update(
+      applicantRef,
+      forFirestore({
+        ...(promotedTo ? { role: promotedTo } : {}),
+        ...(applicantSnap.get('mentorSince') ? {} : { mentorSince: now }),
+        updatedAt: now,
+      }),
+    );
+  }
+
   await batch.commit();
-  return profileRef.id;
+  return { profileId: profileRef.id, promotedTo };
 }

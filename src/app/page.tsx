@@ -9,7 +9,7 @@ import { DesktopAppRedirect } from '@/components/marketing/DesktopAppRedirect';
 import { getPublicStats } from '@/lib/stats/public';
 import { getWindowsInstaller } from '@/lib/desktop/windowsInstaller';
 import { COOKIE_REFRESHED, getViewer, sessionClientOf } from '@/lib/auth/session';
-import { UserRole } from '@/lib/enums';
+import { homePathFor } from '@/lib/auth/home';
 
 /**
  * Landing page.
@@ -31,7 +31,7 @@ import { UserRole } from '@/lib/enums';
 export default async function HomePage() {
   const viewer = await getViewer();
   if (viewer) {
-    redirect(viewer.role === UserRole.ADMIN || viewer.role === UserRole.MODERATOR ? '/admin' : '/dashboard');
+    redirect(homePathFor(viewer));
   }
 
   /**

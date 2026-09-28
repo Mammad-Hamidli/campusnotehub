@@ -323,6 +323,28 @@ export async function bookingsOverlapping(
   );
 }
 
+/**
+ * Every session of the mentor's that has not ended, soonest first - the
+ * mentor panel counts them and lists the first few.
+ *
+ * Equality on mentorId ONLY, then filtered and ordered in memory. Adding a
+ * range or order on startsAt would need the composite index that
+ * firestore.indexes.json declares but nothing guarantees is deployed, and a
+ * missing index is a FAILED_PRECONDITION that would take the whole panel
+ * down. `scan` bounds the read; one mentor's bookings stay far below it.
+ */
+export async function listUpcomingMentorBookings(
+  mentorId: string,
+  now: Date,
+  scan = 500,
+): Promise<BookingRecord[]> {
+  const active = new Set<string>(ACTIVE_BOOKING_STATUSES);
+  const snap = await bookings().where('mentorId', '==', mentorId).limit(scan).get();
+  return (docsToObjects<BookingRecord>(snap.docs) as BookingRecord[])
+    .filter((b) => active.has(b.status) && b.endsAt > now)
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+}
+
 // ---------------------------------------------------------------- reviews
 //
 // The same mechanics as note reviews (upsertNoteReview in notes.ts), with a

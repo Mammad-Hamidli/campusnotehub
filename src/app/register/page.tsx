@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getViewer } from '@/lib/auth/session';
-import { UserRole } from '@/lib/enums';
+import { homePathFor } from '@/lib/auth/home';
+import { MENTOR_JOIN_PATH } from '@/lib/site';
 import { RegisterAside } from '@/components/register/RegisterAside';
 import { RegisterForm } from '@/components/register/RegisterForm';
 import { enabledProviders } from '@/lib/auth/oauth/providers';
@@ -19,7 +20,11 @@ export const dynamic = 'force-dynamic';
  * Two-pane registration: the aside (logo, language, why we verify) and the
  * single-step form. The aside collapses to a compact strip on mobile.
  */
-export default async function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ as?: string }>;
+}) {
   /**
    * The middleware used to bounce a signed-in visitor away from here on the
    * strength of the JWT signature alone. It cannot see a revoked session, so
@@ -29,13 +34,11 @@ export default async function RegisterPage() {
    * signed out of.
    */
   const viewer = await getViewer();
-  if (viewer) {
-    redirect(
-      viewer.role === UserRole.ADMIN || viewer.role === UserRole.MODERATOR
-        ? '/admin'
-        : '/dashboard',
-    );
-  }
+  if (viewer) redirect(homePathFor(viewer));
+
+  // This form creates student accounts only. A link or campaign that says
+  // "sign up as a mentor" lands on the mentor flow instead of here.
+  if ((await searchParams).as === 'mentor') redirect(MENTOR_JOIN_PATH);
 
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">

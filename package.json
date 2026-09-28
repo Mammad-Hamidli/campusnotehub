@@ -24,6 +24,7 @@
     "seed:e2e": "tsx scripts/seed-e2e.mts",
     "seed:universities": "tsx scripts/seed-universities.mts",
     "auth:backfill-usernames": "tsx scripts/backfill-usernames.mts",
+    "mentors:backfill-since": "tsx scripts/backfill-mentor-since.mts",
     "db:purge-non-admin": "tsx scripts/purge-non-admin.mts",
     "audit:vault-keys": "tsx scripts/audit-vault-keys.mts",
     "firebase:emulators": "firebase emulators:start --project campusnotehub-local",
