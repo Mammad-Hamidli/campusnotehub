@@ -10,6 +10,7 @@ import {
 } from '@/lib/firebase/repositories/users';
 import { identityData, identityKey, identityRef } from '@/lib/firebase/repositories/identities';
 import { checkSignupBlocked } from '@/lib/security/blocklist';
+import { importProviderAvatarAsync } from '@/lib/media/import-avatar';
 import { PLACEHOLDER_EMAIL_DOMAIN, temporaryHandle } from './username';
 import type { ProviderProfile } from './oauth/providers';
 
@@ -35,6 +36,10 @@ export type QuickSignupResult =
  * are unchanged from the old flow: only a provider-VERIFIED address is stored
  * as verified; an address that already belongs to another account is never
  * merged here (that is the callback's rule 2 / nOAuth - see callback.ts).
+ *
+ * The provider's photo, if any, is copied in AFTER the response (see
+ * import-avatar.ts) - only here, at creation, and only onto an account with
+ * no picture. A later sign-in never touches the avatar again.
  */
 export async function createQuickAccount(
   profile: ProviderProfile,
@@ -74,6 +79,7 @@ export async function createQuickAccount(
           data: identityData(profile),
         },
       });
+      importProviderAvatarAsync(user.id, profile.picture);
       return { ok: true, user };
     } catch (error) {
       if (!(error instanceof DuplicateUserError)) throw error;

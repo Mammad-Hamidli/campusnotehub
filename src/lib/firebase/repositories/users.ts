@@ -216,6 +216,34 @@ export async function findUserByUsername(key: string): Promise<UserRecord | null
   return snap.size === 1 ? (docToObject<UserRecord>(snap.docs[0]) as UserRecord) : null;
 }
 
+/**
+ * Which of these handle keys are already held - by any claim (live, deleted
+ * or stale alike) or by a legacy account that predates claims.
+ *
+ * Deliberately conservative: it feeds a SUGGESTION (nickname-suggestion.ts),
+ * where skipping a name that was technically free costs nothing and offering
+ * one that is not costs the person a "nickname taken" error. The claim
+ * transaction in completeProfile() still decides. Two round trips for up to
+ * 30 keys (Firestore's `in` limit); extra keys are ignored.
+ */
+export async function findTakenUsernames(keys: string[]): Promise<Set<string>> {
+  const unique = [...new Set(keys)].slice(0, 30);
+  if (unique.length === 0) return new Set();
+
+  const [claims, legacy] = await Promise.all([
+    adminDb().getAll(...unique.map((key) => usernames().doc(key))),
+    users().where('nicknameLower', 'in', unique).select('nicknameLower').get(),
+  ]);
+
+  const taken = new Set<string>();
+  for (const claim of claims) if (claim.exists) taken.add(claim.id);
+  for (const doc of legacy.docs) {
+    const key = doc.get('nicknameLower');
+    if (typeof key === 'string') taken.add(key);
+  }
+  return taken;
+}
+
 export async function findUsersByIds(ids: string[]): Promise<Map<string, UserRecord>> {
   const unique = [...new Set(ids)].filter(Boolean);
   if (unique.length === 0) return new Map();
@@ -674,6 +702,22 @@ export async function updateUser(id: string, patch: Record<string, unknown>): Pr
     throw new Error('updateUser cannot change a nickname: it is a claimed login identifier');
   }
   await users().doc(id).update(forFirestore({ ...patch, updatedAt: new Date() }));
+}
+
+/**
+ * Sets the profile picture ONLY while the account has none. For the Google
+ * photo import, which runs after the sign-in response: by then the owner may
+ * already have uploaded a picture, and a background task must never replace
+ * it. False when the account is gone or already has an avatar.
+ */
+export async function setAvatarIfEmpty(id: string, avatarUrl: string): Promise<boolean> {
+  return adminDb().runTransaction(async (tx) => {
+    const ref = users().doc(id);
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.get('avatarUrl')) return false;
+    tx.update(ref, forFirestore({ avatarUrl, updatedAt: new Date() }));
+    return true;
+  });
 }
 
 /**

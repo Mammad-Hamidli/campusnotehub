@@ -1760,6 +1760,27 @@
       "body": "Bizə yazın, sizə cavab verəcəyik."
     }
   },
+  "contact": {
+    "form": {
+      "title": "Bizə mesaj göndərin",
+      "subtitle": "Cavabı aşağıda qeyd etdiyiniz e-poçt ünvanına göndərəcəyik.",
+      "name": "Adınız",
+      "email": "E-poçt",
+      "subject": "Mövzu",
+      "message": "Mesaj",
+      "messageHint": "Ən azı {min} simvol. Mesaja heç vaxt şifrə və ya kod yazmayın.",
+      "submit": "Mesajı göndər",
+      "sending": "Göndərilir…",
+      "successTitle": "Mesaj göndərildi",
+      "successBody": "Təşəkkür edirik - ən qısa zamanda e-poçtunuza cavab yazacağıq.",
+      "sendAnother": "Başqa mesaj göndər",
+      "failed": "Mesaj göndərilmədi. Yenidən cəhd edin və ya birbaşa e-poçtla yazın.",
+      "errors": {
+        "tooLong": "Bu mətn çox uzundur",
+        "tooShort": "Bir az daha ətraflı yazın"
+      }
+    }
+  },
   "desktopUpdate": {
     "title": "CampusNoteHub-un yeni versiyası çıxıb",
     "body": "Versiya {version} hazırdır. Yeniləmək üçün onu yükləyin və quraşdırıcını işə salın.",

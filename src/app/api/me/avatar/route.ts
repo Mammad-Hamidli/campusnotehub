@@ -1,24 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createHash } from 'node:crypto';
 import { AccountStatus } from '@/lib/enums';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { findUserById, updateUser } from '@/lib/firebase/repositories/users';
-import {
-  createMediaAsset,
-  deleteMediaAsset,
-  findMediaAsset,
-  newMediaId,
-} from '@/lib/firebase/repositories/media';
 import { IMAGE_REJECTION_KEY, MAX_IMAGE_BYTES, processAvatar } from '@/lib/media/images';
+import { avatarUrlFor, releaseAvatar, storeAvatar } from '@/lib/media/avatars';
 import { clientIp, rateLimit } from '@/lib/security/ratelimit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
-
-/** Avatars are served by the ordinary media route - see /api/media/[mediaId]. */
-const AVATAR_URL = /^\/api\/media\/([A-Za-z0-9_-]{1,64})$/;
-const avatarUrlFor = (mediaId: string) => `/api/media/${mediaId}`;
 
 async function session(request: NextRequest) {
   try {
@@ -27,19 +17,6 @@ async function session(request: NextRequest) {
     if (error instanceof UnauthorizedError) return null;
     throw error;
   }
-}
-
-/**
- * Deletes the previous picture once the profile no longer points at it.
- * Only an asset this user OWNS - a hand-edited avatarUrl can never be used to
- * delete somebody else's image. Best effort: an orphan blob is harmless, a
- * failed profile update is not, so this never fails the request.
- */
-async function releasePrevious(userId: string, previousUrl: string | null) {
-  const id = previousUrl?.match(AVATAR_URL)?.[1];
-  if (!id) return;
-  const asset = await findMediaAsset(id);
-  if (asset && asset.ownerId === userId) await deleteMediaAsset(asset).catch(() => {});
 }
 
 /**
@@ -88,26 +65,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: IMAGE_REJECTION_KEY[verdict.reason] }, { status: 400 });
     }
 
-    const { bytes, mime, width, height } = verdict.image;
     const user = await findUserById(userId);
     if (!user) return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
 
-    const asset = await createMediaAsset({
-      id: newMediaId(),
-      ownerId: userId,
-      mime,
-      width,
-      height,
-      sizeBytes: bytes.length,
-      sha256: createHash('sha256').update(bytes).digest('hex'),
-      altText: null,
-      bytes,
-      attached: true,
-    });
-
+    const asset = await storeAvatar(userId, verdict.image);
     const avatarUrl = avatarUrlFor(asset.id);
     await updateUser(userId, { avatarUrl });
-    await releasePrevious(userId, user.avatarUrl);
+    // The previous picture, once the profile no longer points at it.
+    await releaseAvatar(userId, user.avatarUrl);
 
     return NextResponse.json({ avatarUrl }, { status: 201, headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
@@ -127,6 +92,6 @@ export async function DELETE(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
 
   await updateUser(auth.userId, { avatarUrl: null });
-  await releasePrevious(auth.userId, user.avatarUrl);
+  await releaseAvatar(auth.userId, user.avatarUrl);
   return NextResponse.json({ avatarUrl: null });
 }

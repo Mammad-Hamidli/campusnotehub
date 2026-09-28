@@ -65,7 +65,8 @@ export type TemplateName =
   | 'followRequest'
   | 'emailChangeConfirm'
   | 'emailChangeRequested'
-  | 'emailChanged';
+  | 'emailChanged'
+  | 'contactMessage';
 
 /** Greeting line. Nickname, never the legal name - see the User model. */
 const hi = (nickname: string) => `Hi @${nickname},`;
@@ -755,6 +756,42 @@ export const TEMPLATES = {
       },
     ],
   }),
+
+  /**
+   * A /contact form submission, delivered to the team (CONTACT_INBOX) - the
+   * one template addressed to staff rather than to an account holder.
+   *
+   * Every value was typed by an anonymous visitor. The layout escapes all of
+   * them; the subject is plain text, flattened to one line here as a second
+   * guard on top of the validator. The route sends it with Reply-To set to
+   * the visitor, so "Reply" answers them directly.
+   */
+  contactMessage: (p: { name: string; email: string; subject: string; message: string; locale?: string | null }): EmailContent => {
+    const oneLine = (value: string) => value.replace(/\s+/g, ' ').trim();
+    return {
+      subject: `Contact form: ${oneLine(p.subject)}`,
+      heading: 'New message from the contact form',
+      preheader: `${oneLine(p.name)}: ${oneLine(p.message).slice(0, 90)}`,
+      blocks: [
+        {
+          kind: 'facts',
+          rows: [
+            { label: 'Name', value: p.name },
+            { label: 'Email', value: p.email },
+            { label: 'Subject', value: oneLine(p.subject) },
+            ...(p.locale ? [{ label: 'Language', value: p.locale }] : []),
+          ],
+        },
+        { kind: 'quote', text: p.message },
+        {
+          kind: 'callout',
+          tone: 'neutral',
+          title: 'Reply to answer them',
+          body: 'Replying to this email writes to the address above. It was typed into a public form and has not been verified.',
+        },
+      ],
+    };
+  },
 } satisfies Record<TemplateName, (params: never) => EmailContent>;
 
 /**

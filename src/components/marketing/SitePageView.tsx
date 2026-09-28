@@ -19,10 +19,13 @@ import { INLINE_LINK, INLINE_MARKUP, type LocalizedSitePage, type SiteBlock } fr
 export function SitePageView({
   page,
   showContactCta = true,
+  children,
 }: {
   page: LocalizedSitePage;
   /** Off on /contact itself, where "contact us" would point at the same page. */
   showContactCta?: boolean;
+  /** Page-specific content between the header and the sections (the /contact form). */
+  children?: ReactNode;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -50,6 +53,8 @@ export function SitePageView({
             ))}
           </nav>
         )}
+
+        {children}
 
         {sections.map((section) => (
           <section

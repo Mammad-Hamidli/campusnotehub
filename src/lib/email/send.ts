@@ -69,6 +69,12 @@ export type SendResult =
 export type SendOptions = {
   dedupeKey?: string;
   /**
+   * Overrides the default Reply-To (the support mailbox). ONLY for mail that
+   * goes to the team, never to a user: the contact form sets it to the
+   * visitor, so replying answers them. Kept with the message if it is queued.
+   */
+  replyTo?: string;
+  /**
    * Internal: set by the outbox retrier so a failed retry updates its own
    * outbox row instead of queueing a second copy.
    */
@@ -295,9 +301,10 @@ export async function sendEmail<K extends TemplateName>(
     if (!transport) return { ok: true, id: null, skipped: 'not-configured' };
 
     const from = fromAddress(transport);
-    // Every message invites a reply to the monitored mailbox - never to the
-    // sending one, and never to a person.
-    const replyTo = replyToHeader();
+    // Every message to a user invites a reply to the monitored mailbox - never
+    // to the sending one, and never to a person. The one exception is mail TO
+    // the team (see SendOptions.replyTo).
+    const replyTo = options.replyTo ?? replyToHeader();
 
     if (options.dedupeKey) {
       if (!(await claim(options.dedupeKey, name))) return { ok: true, id: null, skipped: 'duplicate' };
@@ -343,7 +350,7 @@ export async function sendEmail<K extends TemplateName>(
     if (queue) {
       // The dedupe claim is KEPT: the outbox now owns delivery of this event,
       // and a re-run of the same event must not send a second copy.
-      await queueForRetry(to, name, params, message).catch((error) =>
+      await queueForRetry(to, name, params, message, options.replyTo).catch((error) =>
         console.error('[email] could not queue "' + name + '" for retry', error),
       );
     } else if (claimed && options.dedupeKey) {
@@ -415,12 +422,19 @@ function isPermanent(error: unknown): boolean {
   return typeof e.responseCode === 'number' && e.responseCode >= 500 && e.responseCode !== 521;
 }
 
-async function queueForRetry(to: string, name: TemplateName, params: unknown, error: string): Promise<void> {
+async function queueForRetry(
+  to: string,
+  name: TemplateName,
+  params: unknown,
+  error: string,
+  replyTo?: string,
+): Promise<void> {
   await adminDb()
     .collection(COLLECTIONS.emailOutbox)
     .add({
       to,
       template: name,
+      ...(replyTo ? { replyTo } : {}),
       params: JSON.parse(JSON.stringify(params ?? {})),
       attempts: 1,
       lastError: error.slice(0, 500),
@@ -467,8 +481,17 @@ export async function retryQueuedEmails(
   let failed = 0;
   for (const doc of due.docs) {
     if (!(await leaseOutboxRow(doc.ref))) continue;
-    const item = doc.data() as { to: string; template: TemplateName; params: unknown; attempts?: number };
-    const result = await sendEmail(item.to, item.template, item.params as never, { noQueue: true });
+    const item = doc.data() as {
+      to: string;
+      template: TemplateName;
+      params: unknown;
+      replyTo?: string;
+      attempts?: number;
+    };
+    const result = await sendEmail(item.to, item.template, item.params as never, {
+      noQueue: true,
+      replyTo: item.replyTo,
+    });
     if (result.ok) {
       await doc.ref.delete();
       sent += 1;

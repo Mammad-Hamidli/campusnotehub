@@ -127,6 +127,12 @@ export type EmailBlock =
    * deliberately do not carry one.
    */
   | { kind: 'hero'; image: string; alt: string }
+  /**
+   * Free text somebody else wrote (the contact form), line breaks kept. It is
+   * escaped like every other value BEFORE the breaks become <br />, so the
+   * only markup in it is markup this function added.
+   */
+  | { kind: 'quote'; text: string }
   | { kind: 'divider' };
 
 export type EmailContent = {
@@ -225,6 +231,11 @@ function renderBlock(block: EmailBlock, attach: EmailAttachment[]): string {
         </td></tr>
       </table>`;
     }
+
+    case 'quote':
+      return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 16px;border-collapse:separate;">
+        <tr><td style="background-color:${C.canvas};border-left:3px solid ${C.brand};border-radius:6px;padding:12px 16px;font-family:${FONT};font-size:15px;line-height:1.6;color:${C.fg};word-break:break-word;">${escapeHtml(block.text).replace(/\r?\n/g, '<br />')}</td></tr>
+      </table>`;
 
     case 'divider':
       return `<div style="height:1px;background-color:${C.edge};margin:0 0 20px;line-height:1px;font-size:0;">&nbsp;</div>`;
@@ -423,6 +434,9 @@ function renderText(content: EmailContent): string {
         break;
       case 'button':
         lines.push(`${block.label}: ${block.href}`, '');
+        break;
+      case 'quote':
+        lines.push(...block.text.split(/\r?\n/).map((line) => `> ${line}`), '');
         break;
       case 'hero':
         // Images carry no information the body does not also state, so the

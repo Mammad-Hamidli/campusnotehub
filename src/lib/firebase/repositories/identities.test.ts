@@ -15,6 +15,7 @@ const profile = (subject: string): ProviderProfile => ({
   linkableByEmail: true,
   firstName: null,
   lastName: null,
+  picture: null,
 });
 
 beforeEach(() => fake.store.clear());

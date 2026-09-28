@@ -111,3 +111,21 @@ export function fromHeader(): string {
 export function replyToHeader(): string {
   return supportAddress();
 }
+
+/** Loose on purpose; the strict check is zod's .email() wherever input arrives. */
+const EMAIL_SHAPE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
+export const isEmailShaped = (value: string) => EMAIL_SHAPE.test(value);
+
+/**
+ * Where /contact form messages are delivered: CONTACT_INBOX, else the support
+ * mailbox.
+ *
+ * A RECIPIENT, so it is not held to the allowlist above. That rule is about
+ * who the platform sends AS and whose mailbox it reads; delivering the team's
+ * own form to an inbox of the team's choosing is neither. A malformed value
+ * falls back to the support mailbox, and env-check reports it.
+ */
+export function contactInbox(): string {
+  const configured = process.env.CONTACT_INBOX?.trim();
+  return configured && isEmailShaped(configured) ? configured.toLowerCase() : supportAddress();
+}

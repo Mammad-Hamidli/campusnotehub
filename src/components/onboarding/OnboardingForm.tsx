@@ -18,17 +18,24 @@ import { EMPTY_PROFILE, validateProfile, type ProfileErrors, type ProfileForm } 
 export function OnboardingForm({
   temporaryHandle,
   initialName,
+  initialNickname,
   needsEmail,
 }: {
   temporaryHandle: string;
   initialName: string;
+  /** A free handle suggested from the Google name; editable like any value. */
+  initialNickname: string;
   needsEmail: boolean;
 }) {
   const t = useT();
   const toast = useToast();
   const router = useRouter();
 
-  const [form, setForm] = useState<ProfileForm>({ ...EMPTY_PROFILE, fullName: initialName });
+  const [form, setForm] = useState<ProfileForm>({
+    ...EMPTY_PROFILE,
+    fullName: initialName,
+    nickname: initialNickname,
+  });
   const [errors, setErrors] = useState<ProfileErrors>({});
   const [showSummary, setShowSummary] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);

@@ -91,9 +91,17 @@ export type ProviderProfile = {
   linkableByEmail: boolean;
   firstName: string | null;
   lastName: string | null;
+  /**
+   * The provider's profile photo URL, UNTRUSTED and transient. Read once, when
+   * a sign-in creates an account, to import a re-encoded copy (see
+   * lib/media/import-avatar.ts, which applies the host allowlist). Never
+   * stored and never rendered: hotlinking it would leak every viewer's address
+   * to the provider and break the day the person changes their photo.
+   */
+  picture: string | null;
 };
 
-const str = (v: unknown) => (typeof v === 'string' && v.length > 0 ? v : null);
+const str =(v: unknown) => (typeof v === 'string' && v.length > 0 ? v : null);
 
 function cleanEmail(v: unknown): string | null {
   const email = str(v)?.trim().toLowerCase() ?? null;
@@ -131,6 +139,7 @@ export function profileFromClaims(
         linkableByEmail: emailVerified,
         firstName: str(claims.given_name),
         lastName: str(claims.family_name),
+        picture: str(claims.picture),
       };
     }
   }

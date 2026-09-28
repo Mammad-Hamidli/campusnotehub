@@ -8,7 +8,7 @@
  * Degraded: the app runs, but a feature is off (email) or falls back
  * (verification without the doc-verifier goes to human review).
  */
-import { MAIL_ACCOUNT, roleMailbox } from '@/lib/email/identity';
+import { MAIL_ACCOUNT, isEmailShaped, roleMailbox } from '@/lib/email/identity';
 
 type Env = Record<string, string | undefined>;
 
@@ -50,6 +50,15 @@ export function checkEnvironment(env: Env = process.env): { missing: string[]; d
     } catch (error) {
       missing.push(`${key} (${(error as Error).message})`);
     }
+  }
+
+  /**
+   * Optional, and a RECIPIENT rather than a sending identity, so it is not
+   * allowlisted like the addresses above (see contactInbox()). Unset is fine;
+   * a malformed value is a typo worth knowing about.
+   */
+  if (has('CONTACT_INBOX') && !isEmailShaped(env.CONTACT_INBOX!.trim())) {
+    degraded.push('CONTACT_INBOX (not an email address; contact form mail goes to EMAIL_SUPPORT_ADDRESS)');
   }
 
   /**

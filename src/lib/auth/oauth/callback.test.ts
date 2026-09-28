@@ -140,6 +140,7 @@ function google(patch: Partial<ProviderProfile> = {}): ProviderProfile {
     linkableByEmail: true,
     firstName: 'Aysel',
     lastName: 'M',
+    picture: null,
     ...patch,
   };
 }

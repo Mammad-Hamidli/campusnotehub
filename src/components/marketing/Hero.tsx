@@ -8,6 +8,7 @@ import type { WindowsInstaller } from '@/lib/desktop/windowsInstaller';
 import { StatsRow } from './StatsBanner';
 import { UniversityMarquee } from './UniversityMarquee';
 import { WindowsDownloadButton } from './WindowsDownload';
+import { GradCap } from '@/components/ui/GradCap';
 
 /**
  * The social features, each in its own floating bubble.
@@ -43,7 +44,10 @@ export function Hero({ stats, installer }: { stats: PublicStats; installer: Wind
       <div className="relative mx-auto max-w-shell px-4 pb-16 pt-12 sm:px-6 sm:pb-20 sm:pt-16 lg:px-8">
         <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:gap-12">
           <div className="max-w-2xl">
-            <h1 className="text-balance text-[clamp(2.25rem,5vw,3.75rem)] font-extrabold leading-[1.05] tracking-tight text-fg">
+            <h1 className="relative text-balance text-[clamp(2.25rem,5vw,3.75rem)] font-extrabold leading-[1.05] tracking-tight text-fg">
+              {/* Perched on the first letter. Absolutely positioned and sized in
+                  em, so it follows the headline's size and moves nothing. */}
+              <GradCap className="absolute -top-[0.3em] left-[-0.12em] w-[1.1em] -rotate-[14deg] opacity-80" />
               {t('landing.hero.titleLead')}{' '}
               <span className="fun-gradient-text">{t('landing.hero.titleAccent')}</span>
             </h1>

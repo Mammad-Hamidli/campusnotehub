@@ -82,6 +82,13 @@ export const SAMPLE_PARAMS = {
   emailChangeConfirm: { nickname: 'aysel', url: 'https://campusnotehub.com/confirm-email-change#token=example', minutes: 60 },
   emailChangeRequested: { nickname: 'aysel', newEmail: 'aysel.new@example.com' },
   emailChanged: { nickname: 'aysel', newEmail: 'aysel.new@example.com' },
+  contactMessage: {
+    name: 'Aysel Məmmədova',
+    email: 'aysel@example.com',
+    subject: 'Qeydlər bölməsi haqqında',
+    message: 'Salam!\n\nUniNotes-da fayl yükləyə bilmirəm - "Şəkil yüklənmədi" yazır.\nTəşəkkürlər.',
+    locale: 'az',
+  },
 } satisfies SampleMap;
 
 /** Every template name, for iterating in the preview route and the tests. */
