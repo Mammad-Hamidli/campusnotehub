@@ -70,9 +70,7 @@ export async function POST(
   const { mentorId } = await params;
 
   /**
-   * `can`, not `assertCan`.
-   *
-   * assertCan THROWS a ForbiddenError and nothing here caught it, so an
+   * Answered, never thrown: a thrown ForbiddenError that nothing caught meant an
    * UNVERIFIED student pressing Book - the single most likely refusal on this
    * endpoint, since booking is exactly what verification gates - got a 500
    * with a stack trace instead of a message telling them to verify. Same

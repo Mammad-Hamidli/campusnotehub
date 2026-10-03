@@ -1,8 +1,7 @@
 import { BlocklistType } from '@/lib/enums';
 import { adminDb } from '@/lib/firebase/admin.core';
 import { COLLECTIONS } from '@/lib/firebase/collections';
-import { docsToObjects, forFirestore } from '@/lib/firebase/convert';
-import { findUsersByIds } from '@/lib/firebase/repositories/users';
+import { forFirestore } from '@/lib/firebase/convert';
 import { upsertDevice, listUserDevices, revokeUserSessions } from '@/lib/firebase/repositories/sessions';
 import { getCredentials } from '@/lib/firebase/repositories/users';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -265,44 +264,6 @@ export async function liftBan(params: {
   );
 
   await batch.commit();
-}
-
-export async function relatedAccounts(fingerprint: string) {
-  const snap = await adminDb()
-    .collection(COLLECTIONS.userDevices)
-    .where('fingerprint', '==', fingerprint)
-    .limit(50)
-    .get();
-
-  const devices = docsToObjects<{
-    id: string;
-    userId: string;
-    firstSeenAt: Date;
-    lastSeenAt: Date;
-  }>(snap.docs);
-
-  // The user decoration that Prisma did with a relation include becomes one
-  // batched read here, not a query per device.
-  const users = await findUsersByIds(devices.map((d) => d.userId));
-
-  return devices
-    .sort((a, b) => a.firstSeenAt.getTime() - b.firstSeenAt.getTime())
-    .map((device) => {
-      const user = users.get(device.userId);
-      return {
-        firstSeenAt: device.firstSeenAt,
-        lastSeenAt: device.lastSeenAt,
-        user: user
-          ? {
-              id: user.id,
-              fullName: user.fullName,
-              accountStatus: user.accountStatus,
-              verificationStatus: user.verificationStatus,
-              createdAt: user.createdAt,
-            }
-          : null,
-      };
-    });
 }
 
 /** Records or refreshes a device against an account. */

@@ -8,6 +8,18 @@ import { FieldVisibility, VerificationStatus } from '@/lib/enums';
  */
 export type VisibilityViewer = { id: string; verificationStatus: string } | null | undefined;
 
+/**
+ * Whether an account's content may be shown at all: not deleted, and not
+ * suspended or banned. Firestore cannot filter one collection by a field of
+ * another, so every listing (feed, comments, mentors, the feed ad) applies
+ * this after loading the authors - and this is the one definition of it.
+ */
+export function isPubliclyVisible(
+  user: { deletedAt?: Date | null; accountStatus: string } | null | undefined,
+): user is NonNullable<typeof user> {
+  return Boolean(user && !user.deletedAt && (user.accountStatus === 'ACTIVE' || user.accountStatus === 'RESTRICTED'));
+}
+
 export function visibleTo(setting: string, viewer: VisibilityViewer, isSelf: boolean): boolean {
   if (isSelf || setting === FieldVisibility.PUBLIC) return true;
   if (setting === FieldVisibility.VERIFIED_ONLY) return viewer?.verificationStatus === VerificationStatus.VERIFIED;

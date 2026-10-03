@@ -14,7 +14,7 @@ import {
 } from '@/lib/firebase/repositories/posts';
 import { findUserById, findUsersByIds } from '@/lib/firebase/repositories/users';
 import { createNotification } from '@/lib/firebase/repositories/notifications';
-import { visibleAvatar } from '@/lib/profile/visibility';
+import { isPubliclyVisible, visibleAvatar } from '@/lib/profile/visibility';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -140,14 +140,7 @@ export async function GET(
    * matching how the feed listing treats posts. Applied after the read because
    * Firestore cannot filter one collection by a field on another.
    */
-  const visible = rows.filter((row) => {
-    const author = authors.get(row.authorId);
-    return Boolean(
-      author &&
-        !author.deletedAt &&
-        (author.accountStatus === 'ACTIVE' || author.accountStatus === 'RESTRICTED'),
-    );
-  });
+  const visible = rows.filter((row) => isPubliclyVisible(authors.get(row.authorId)));
 
   const hasMore = rows.length > limit;
   const page = hasMore ? visible.slice(0, limit) : visible;

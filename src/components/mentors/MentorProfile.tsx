@@ -14,9 +14,12 @@ import {
   Star,
   UserRoundSearch,
 } from 'lucide-react';
-import { useT } from '@/lib/i18n/LocaleProvider';
+import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { UserAvatar } from '@/components/ui/UserAvatar';
+import { industryLabel } from '@/lib/mentors/display';
 import { FollowingBadge } from '@/components/social/Following';
 import { BookingPanel } from './BookingPanel';
+import { MentorRate } from './MentorRate';
 
 /**
  * One mentor's profile.
@@ -32,7 +35,10 @@ import { BookingPanel } from './BookingPanel';
  * information - so both render the same not-found state.
  */
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** Short weekday name in the reader's language; 0 = Sunday (1 Jan 2023 was one). */
+function weekdayName(weekday: number, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2023, 0, 1 + weekday)));
+}
 
 type Review = {
   id: string;
@@ -73,16 +79,6 @@ type Mentor = {
   availabilityRules: { weekday: number; startMinute: number; endMinute: number }[];
 };
 
-function initialsOf(nickname: string): string {
-  return nickname.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '??';
-}
-
-/** Money is stored in qepik (minor units); never format from a float. */
-function formatPrice(minor: number, locale: string): string | null {
-  if (minor <= 0) return null;
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'AZN' }).format(minor / 100);
-}
-
 /** Minutes past midnight -> "09:30". */
 function clock(minute: number): string {
   const h = Math.floor(minute / 60);
@@ -91,7 +87,7 @@ function clock(minute: number): string {
 }
 
 export function MentorProfile({ mentorId }: { mentorId: string }) {
-  const t = useT();
+  const { t, locale } = useLocale();
 
   const [mentor, setMentor] = useState<Mentor | null>(null);
   const [canBook, setCanBook] = useState(false);
@@ -103,7 +99,6 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
 
-  const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'az' : 'az';
 
   const load = useCallback(
     /** `silent` refreshes in place (after a review) instead of flashing the skeleton. */
@@ -187,20 +182,19 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
     );
   }
 
-  const price = formatPrice(mentor.hourlyRateMinor, locale);
-
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
       <BackLink />
 
       <header className="card mt-3 p-5">
         <div className="flex flex-wrap items-start gap-4">
-          <span
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-surface-inset text-lg font-bold text-accent"
-            aria-hidden="true"
-          >
-            {initialsOf(mentor.user.nickname)}
-          </span>
+          <UserAvatar
+            nickname={mentor.user.nickname}
+            src={mentor.user.avatarUrl}
+            verified={mentor.user.isVerified}
+            size="lg"
+            verifiedLabel={t('profile.verified')}
+          />
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -208,16 +202,13 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
                 @{mentor.user.nickname}
               </h1>
               <FollowingBadge nickname={mentor.user.nickname} />
-              {mentor.user.isVerified && (
-                <BadgeCheck className="h-4 w-4 shrink-0 text-verified" aria-hidden="true" />
-              )}
               {mentor.user.university && (
                 <span className="rounded-md bg-surface-inset px-1.5 py-0.5 text-2xs font-semibold text-fg-muted">
                   {mentor.user.university.code}
                 </span>
               )}
               <span className="rounded-md bg-accent-soft px-1.5 py-0.5 text-2xs font-semibold text-accent">
-                {mentor.industry.replace(/_/g, ' ')}
+                {industryLabel(t, mentor.industry)}
               </span>
             </div>
 
@@ -245,9 +236,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
                 <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                 {t('mentors.sessionLength', { minutes: mentor.sessionMinutes })}
               </span>
-              <span className="font-medium text-fg">
-                {price ? t('mentors.rate', { price }) : t('mentors.free')}
-              </span>
+              <MentorRate minor={mentor.hourlyRateMinor} className="font-medium text-fg" />
             </div>
           </div>
         </div>
@@ -435,7 +424,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
               <ul className="mt-2 space-y-1">
                 {mentor.availabilityRules.map((rule, i) => (
                   <li key={i} className="flex justify-between text-xs text-fg-muted">
-                    <span>{WEEKDAYS[rule.weekday] ?? '—'}</span>
+                    <span>{weekdayName(rule.weekday, locale)}</span>
                     <span className="tabular">
                       {clock(rule.startMinute)}–{clock(rule.endMinute)}
                     </span>

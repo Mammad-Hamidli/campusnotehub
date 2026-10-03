@@ -39,7 +39,6 @@
     "theme": "Mövzu",
     "help": "Kömək",
     "bookmarks": "Yadda saxlanılanlar",
-    "explore": "Kəşf et",
     "admin": "Admin",
     "saved": "Saxlanılanlar",
     "mentorSchedule": "Mentor cədvəli",
@@ -522,8 +521,7 @@
       "subject": "Fənn",
       "courseCode": "Fənn kodu",
       "language": "Dil",
-      "rating": "Reytinq",
-      "freeOnly": "Yalnız pulsuz"
+      "rating": "Reytinq"
     },
     "card": {
       "pages": "{count} səhifə",
@@ -638,31 +636,23 @@
       "OTHER": "Digər"
     },
     "profile": {
-      "sessions": "{count} görüş",
-      "experience": "{years} il təcrübə",
-      "languages": "Dillər",
-      "about": "Haqqında",
-      "bookSession": "Görüş təyin et",
       "notAccepting": "Hazırda yeni sifariş qəbul etmir"
     },
     "booking": {
-      "selectDate": "Tarix seçin",
       "selectTime": "Vaxt seçin",
       "timezoneNote": "Vaxtlar {timezone} saat qurşağında göstərilir",
       "noSlots": "Bu gün üçün boş vaxt yoxdur",
       "topic": "Görüşün mövzusu",
       "topicPlaceholder": "Nə haqqında danışmaq istəyirsiniz?",
-      "confirm": "Təsdiqlə və ödə",
+      "confirm": "Sessiyanı təsdiqlə",
       "summary": "{date}, {time} - {duration} dəqiqə",
       "confirmed": {
         "title": "Görüş təsdiqləndi",
-        "body": "Video zəng linki görüşdən 30 dəqiqə əvvəl aktivləşəcək.",
-        "addToCalendar": "Təqvimə əlavə et",
-        "joinCall": "Zəngə qoşul"
+        "body": "Video zəng linki görüşdən 30 dəqiqə əvvəl aktivləşəcək."
       },
-      "cancel": "Görüşü ləğv et",
       "menteeNote": "Əlavə qeyd (istəyə bağlı)",
-      "menteeNotePlaceholder": "Mentorunuzun hazırlaşmasına kömək edəcək məlumat"
+      "menteeNotePlaceholder": "Mentorunuzun hazırlaşmasına kömək edəcək məlumat",
+      "freeNote": "Sessiya sifarişi pulsuzdur. Mentorun qiyməti yalnız məlumat üçün göstərilir — CampusNoteHub-da heç bir ödəniş alınmır və balansdan heç nə çıxılmır."
     },
     "errors": {
       "slotTaken": "Bu vaxt artıq tutulub. Başqa vaxt seçin.",
@@ -672,11 +662,10 @@
     "browse": "Mentor tap",
     "empty": "Hələ mentor yoxdur",
     "emptyHint": "Təsdiqlənmiş tələbələr və məzunlar mentorluq edə bilər. Sonra yenidən baxın.",
-    "loading": "Mentorlar yüklənir…",
     "book": "Sessiya istə",
     "viewProfile": "Profilə bax",
     "sessions": "{count} sessiya",
-    "rate": "{price} / sessiya",
+    "rate": "{price} / saat",
     "free": "Pulsuz",
     "industry": "Sahə",
     "allIndustries": "Bütün sahələr",
@@ -704,7 +693,7 @@
       "experience": "Təcrübə",
       "anyExperience": "İstənilən təcrübə",
       "yearsPlus": "{years}+ il",
-      "price": "Qiymət",
+      "price": "Göstərilən qiymət",
       "anyPrice": "İstənilən qiymət",
       "upTo": "{price}-a qədər",
       "acceptingOnly": "Rezerv qəbul edənlər"
@@ -730,7 +719,7 @@
       "field": "İxtisas",
       "year": "İl",
       "languages": "Dillər",
-      "rate": "Saatlıq qiymət (AZN, 0 = pulsuz)",
+      "rate": "Profilinizdə göstərilən saatlıq qiymət (AZN, 0 = pulsuz)",
       "sessionLength": "Sessiya müddəti",
       "minutes": "{minutes} dəq",
       "linkedin": "LinkedIn (istəyə bağlı)",
@@ -751,7 +740,8 @@
         "pending": "Artıq yoxlanılan müraciətiniz var.",
         "alreadyMentor": "Siz artıq təsdiqlənmiş mentorsunuz."
       },
-      "submitted": "Mentor müraciətiniz uğurla göndərildi."
+      "submitted": "Mentor müraciətiniz uğurla göndərildi.",
+      "rateHint": "Yalnız məlumat üçündür. CampusNoteHub sizə sessiya sifariş edənlərdən heç bir ödəniş almır və sessiyalar üçün ödəniş qəbul etmir."
     },
     "schedule": {
       "title": "Əlçatanlıq",
@@ -811,7 +801,8 @@
         "b2": "Təcrübəniz barədə tələbələrə danışın. Hər mentor profili kataloqa düşməzdən əvvəl moderator tərəfindən yoxlanılır.",
         "b3": "Mentor paneliniz qoşulma addımlarını, qarşıdakı görüşləri və aylıq üzvlük tarixinizi izləyir."
       }
-    }
+    },
+    "rateDisplayOnly": "yalnız məlumat üçün"
   },
   "mentorDashboard": {
     "title": "Mentor paneli",
@@ -1166,6 +1157,10 @@
       "subtitle": "Bu həftə ən çox alınanlar",
       "viewAll": "Hamısına bax"
     },
+    "feedAd": {
+      "title": "Seçilmiş mentor",
+      "badge": "Reklam"
+    },
     "quickActions": "Sürətli əməliyyatlar",
     "findMentor": "Mentor tap"
   },
@@ -1229,6 +1224,20 @@
       "queueTitle": "Doğrulama növbəsi",
       "openQueue": "Növbəni aç",
       "queueNote": "İşarələnmiş sənədlər sərt TTL ilə şifrələnmiş buferdə saxlanılır. Müddət bitdikdə iş baxıla bilmir və namizəd yenidən göndərməlidir."
+    },
+    "feedAd": {
+      "title": "Lentdə reklam yeri",
+      "description": "Bir mentor hər kəsə lentin sağ sütununda, «Populyar konspektlər» blokunun üstündə göstərilir. Mentoru ora yerləşdirmək üçün «Reklam et» düyməsini basın (cari mentor əvəzlənir); çıxarmaq üçün düyməni yenidən basın. Dəyişikliklər təxminən 30 saniyəyə görünür.",
+      "promote": "Reklam et",
+      "inSlot": "Lentdədir",
+      "remove": "Lentdən çıxar",
+      "promoted": "@{nickname} artıq lentdəki reklam yerindədir.",
+      "removed": "@{nickname} lentdəki reklam yerindən çıxarıldı.",
+      "search": "Mentor axtar",
+      "empty": "Hələ təsdiqlənmiş mentor yoxdur",
+      "errors": {
+        "notEligible": "Bu mentoru reklam etmək mümkün deyil: profil təsdiqlənməyib və ya hesab aktiv deyil."
+      }
     },
     "stats": {
       "total": "Ümumi istifadəçi",
@@ -1512,7 +1521,7 @@
       "experience": "Təcrübə (il)",
       "education": "Təhsil",
       "submitted": "Göndərilib",
-      "rate": "Qiymət",
+      "rate": "Göstərilən qiymət (yalnız məlumat üçün)",
       "errors": {
         "reasonRequired": "Ən azı 5 simvolluq səbəb yazın.",
         "alreadyDecided": "Bu barədə artıq qərar verilib."
@@ -1636,7 +1645,8 @@
       "request": "Hesabın silinməsini tələb et",
       "what": {
         "review": "Sorğunuzu administrator yoxlayır; nəticə barədə sizə e-poçt göndəriləcək.",
-        "signOut": "Təsdiqləndikdən sonra hesabınız silinir və bütün cihazlardan çıxış edilir."
+        "signOut": "Təsdiqləndikdən sonra hesabınız silinir və bütün cihazlardan çıxış edilir.",
+        "cooldown": "Silindikdən sonra 1 həftə (7 gün) ərzində bu e-poçtla nə daxil olmaq, nə də yeni hesab qeydiyyatdan keçirmək mümkün olmayacaq."
       },
       "reason": "Niyə ayrılırsınız?",
       "password": "Şifrənizlə təsdiqləyin",
@@ -1757,10 +1767,7 @@
     }
   },
   "stub": {
-    "title": "Bu bölmə hazırlanır",
-    "body": "Bu hissə hazırda qurulur və tezliklə əlçatan olacaq.",
-    "back": "Geri qayıt",
-    "toFeed": "Lentə keç"
+    "back": "Geri qayıt"
   },
   "notFound": {
     "title": "Səhifə tapılmadı",

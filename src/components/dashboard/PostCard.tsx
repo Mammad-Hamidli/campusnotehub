@@ -277,18 +277,21 @@ export function PostCard({
         </Menu>
       </header>
 
-      {/* break-words: a pasted URL has no spaces and would otherwise widen the card. */}
-      <p className="mt-3 whitespace-pre-wrap break-words text-[0.9375rem] leading-relaxed text-fg">
-        {splitHashtags(post.body).map((part, i) =>
-          part.tag ? (
-            <span key={i} className="font-medium text-accent">
-              {part.text}
-            </span>
-          ) : (
-            part.text
-          ),
-        )}
-      </p>
+      {/* break-words: a pasted URL has no spaces and would otherwise widen the card.
+          An image-only post has no text, and no empty paragraph either. */}
+      {post.body.trim().length > 0 && (
+        <p className="mt-3 whitespace-pre-wrap break-words text-[0.9375rem] leading-relaxed text-fg">
+          {splitHashtags(post.body).map((part, i) =>
+            part.tag ? (
+              <span key={i} className="font-medium text-accent">
+                {part.text}
+              </span>
+            ) : (
+              part.text
+            ),
+          )}
+        </p>
+      )}
 
       {/*
         Images, Instagram-style: shown WHOLE, centred, never cropped by the

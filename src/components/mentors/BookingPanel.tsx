@@ -19,9 +19,13 @@ import { SlotPicker } from './SlotPicker';
  *
  * Almost all of the machinery was already here and untouched by this file:
  * SlotPicker is wired to GET /api/mentors/:id/bookings, slot generation lives
- * in src/lib/mentors/availability.ts, and the POST handler books the slot,
- * holds the money in escrow and creates the meeting room in one transaction.
- * The only missing piece was a surface that put them together.
+ * in src/lib/mentors/availability.ts, and the POST handler books the slot and
+ * creates the meeting room in one transaction. The only missing piece was a
+ * surface that put them together.
+ *
+ * Booking is free. The mentor's rate on the profile is display-only - the
+ * endpoint takes no payment and never reads the rate - and the panel says so
+ * next to the confirm button, where a reader would otherwise expect a charge.
  *
  * Booking on the profile is also the better placement: the decision is made
  * while reading the mentor's background, so sending the reader to a separate
@@ -52,7 +56,7 @@ export function BookingPanel({
    *
    * The booking endpoint requires one and treats it as unique. Generating a
    * fresh value on each click would let an impatient double-tap create two
-   * bookings - and two escrow holds - for the same slot. Keying it to the
+   * bookings for the same slot. Keying it to the
    * mounted panel means every retry of the same intent carries the same key.
    */
   const [idempotencyKey] = useState(() => crypto.randomUUID());
@@ -158,6 +162,8 @@ export function BookingPanel({
               className="input mt-1 resize-y py-2 text-sm"
             />
           </label>
+
+          <p className="text-2xs text-fg-subtle">{t('mentors.booking.freeNote')}</p>
 
           <div className="flex items-center justify-end gap-2">
             <button type="button" onClick={() => setStartsAt(null)} className="btn-secondary px-3 py-1.5 text-sm">

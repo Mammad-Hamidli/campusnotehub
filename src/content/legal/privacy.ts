@@ -18,7 +18,7 @@ import type { LocalizedLegalDocument } from './types';
  * Section ids and order must match across locales; legal.test.ts enforces it.
  */
 export const PRIVACY: LocalizedLegalDocument = {
-  effective: '2026-09-19',
+  effective: '2026-10-03',
   content: {
     en: {
       title: 'Privacy Policy',
@@ -41,7 +41,7 @@ export const PRIVACY: LocalizedLegalDocument = {
               list: [
                 'Account data: your name, nickname, email address, phone number, date of birth, university, faculty and graduation year.',
                 'Profile and content: your photo, bio, posts, comments, notes, reviews and messages you send through the Platform.',
-                'Transaction data: wallet top-ups, purchases, bookings and payouts. Card details are handled by our payment provider and never reach our servers.',
+                'Booking data: the mentor sessions you book or host, their times and the topic you give. The Platform takes no payments, so it never receives card or bank details.',
                 'Technical data: IP address, device and browser type, and security logs used to protect your account and prevent fraud.',
               ],
             },
@@ -63,8 +63,7 @@ export const PRIVACY: LocalizedLegalDocument = {
             {
               list: [
                 'create and secure your account and keep you signed in;',
-                'provide the feed, UniNotes, PocketMentor and wallet features you ask for;',
-                'process payments and keep the financial records the law requires;',
+                'provide the feed, UniNotes and PocketMentor features you ask for;',
                 'moderate content and protect the community from fraud and abuse;',
                 'send you service messages, such as booking confirmations and security alerts;',
                 'improve the Platform and fix problems.',
@@ -84,7 +83,7 @@ export const PRIVACY: LocalizedLegalDocument = {
           id: 'sharing',
           heading: '6. Sharing with service providers',
           body: [
-            'We share data only with providers that help us run the Platform - hosting and database services, image processing, email delivery and payment processing - and only as far as each one needs to do its job. They act on our instructions and are bound by confidentiality and data-protection obligations.',
+            'We share data only with providers that help us run the Platform - hosting and database services, image processing and email delivery - and only as far as each one needs to do its job. They act on our instructions and are bound by confidentiality and data-protection obligations.',
             'We may also disclose data when required by law, or to protect the rights and safety of our users and the Platform.',
             'Some providers may process data outside Azerbaijan. When they do, we rely on appropriate safeguards to protect it.',
           ],
@@ -93,7 +92,7 @@ export const PRIVACY: LocalizedLegalDocument = {
           id: 'retention',
           heading: '7. How long we keep data',
           body: [
-            'We keep account data for as long as your account is active. After an account deletion is approved, we delete or anonymise your personal data, except records we must keep by law - such as financial transaction records - which are kept only for the legally required period.',
+            'We keep account data for as long as your account is active. After an account deletion is approved, we delete or anonymise your personal data, except records we must keep by law, which are kept only for the legally required period.',
           ],
         },
         {
@@ -179,7 +178,7 @@ export const PRIVACY: LocalizedLegalDocument = {
               list: [
                 'Hesab məlumatları: adınız, istifadəçi adınız, e-poçt ünvanınız, telefon nömrəniz, doğum tarixiniz, universitetiniz, fakültəniz və məzun olma iliniz.',
                 'Profil və məzmun: şəkliniz, haqqınızda məlumat, paylaşımlarınız, şərhləriniz, konspektləriniz, rəyləriniz və Platforma vasitəsilə göndərdiyiniz mesajlar.',
-                'Əməliyyat məlumatları: balansın artırılması, alışlar, sifarişlər və ödənişlər. Kart məlumatlarınızı ödəniş provayderimiz emal edir və onlar serverlərimizə heç vaxt çatmır.',
+                'Sifariş məlumatları: sifariş etdiyiniz və ya keçirdiyiniz mentor sessiyaları, onların vaxtı və göstərdiyiniz mövzu. Platforma ödəniş qəbul etmir, buna görə kart və ya bank məlumatlarınızı heç vaxt almır.',
                 'Texniki məlumatlar: IP ünvanı, cihaz və brauzer növü, həmçinin hesabınızı qorumaq və fırıldaqçılığın qarşısını almaq üçün istifadə olunan təhlükəsizlik jurnalları.',
               ],
             },
@@ -201,8 +200,7 @@ export const PRIVACY: LocalizedLegalDocument = {
             {
               list: [
                 'hesabınızı yaratmaq, qorumaq və sizi sistemdə saxlamaq;',
-                'lent, UniNotes, PocketMentor və pul kisəsi funksiyalarını təqdim etmək;',
-                'ödənişləri emal etmək və qanunun tələb etdiyi maliyyə qeydlərini aparmaq;',
+                'lent, UniNotes və PocketMentor funksiyalarını təqdim etmək;',
                 'məzmunu moderasiya etmək və icmanı fırıldaqçılıqdan və sui-istifadədən qorumaq;',
                 'sifariş təsdiqləri və təhlükəsizlik xəbərdarlıqları kimi xidməti mesajlar göndərmək;',
                 'Platformanı təkmilləşdirmək və problemləri aradan qaldırmaq.',
@@ -222,7 +220,7 @@ export const PRIVACY: LocalizedLegalDocument = {
           id: 'sharing',
           heading: '6. Xidmət təminatçıları ilə paylaşım',
           body: [
-            'Məlumatları yalnız Platformanın işləməsinə kömək edən təminatçılarla - hostinq və verilənlər bazası, şəkil emalı, e-poçt göndərişi və ödəniş emalı xidmətləri ilə - və yalnız onların öz işini görməsi üçün lazım olan həcmdə paylaşırıq. Onlar bizim göstərişlərimizlə hərəkət edir və məxfilik, eləcə də məlumatların qorunması öhdəlikləri ilə bağlıdırlar.',
+            'Məlumatları yalnız Platformanın işləməsinə kömək edən təminatçılarla - hostinq və verilənlər bazası, şəkil emalı və e-poçt göndərişi xidmətləri ilə - və yalnız onların öz işini görməsi üçün lazım olan həcmdə paylaşırıq. Onlar bizim göstərişlərimizlə hərəkət edir və məxfilik, eləcə də məlumatların qorunması öhdəlikləri ilə bağlıdırlar.',
             'Qanun tələb etdikdə və ya istifadəçilərimizin və Platformanın hüquqlarını və təhlükəsizliyini qorumaq üçün məlumatları açıqlaya bilərik.',
             'Bəzi təminatçılar məlumatları Azərbaycandan kənarda emal edə bilər. Belə hallarda məlumatların qorunması üçün müvafiq təminatlara əsaslanırıq.',
           ],
@@ -231,7 +229,7 @@ export const PRIVACY: LocalizedLegalDocument = {
           id: 'retention',
           heading: '7. Məlumatları nə qədər saxlayırıq',
           body: [
-            'Hesab məlumatlarını hesabınız aktiv olduğu müddətdə saxlayırıq. Hesabın silinməsi təsdiqləndikdən sonra şəxsi məlumatlarınızı silir və ya anonimləşdiririk; qanunla saxlanmalı olan qeydlər - məsələn, maliyyə əməliyyatları - yalnız qanunla müəyyən edilmiş müddət ərzində saxlanılır.',
+            'Hesab məlumatlarını hesabınız aktiv olduğu müddətdə saxlayırıq. Hesabın silinməsi təsdiqləndikdən sonra şəxsi məlumatlarınızı silir və ya anonimləşdiririk; qanunla saxlanmalı olan qeydlər yalnız qanunla müəyyən edilmiş müddət ərzində saxlanılır.',
           ],
         },
         {
@@ -317,7 +315,7 @@ export const PRIVACY: LocalizedLegalDocument = {
               list: [
                 'Данные аккаунта: имя, никнейм, адрес электронной почты, номер телефона, дата рождения, университет, факультет и год выпуска.',
                 'Профиль и контент: фото, описание, публикации, комментарии, конспекты, отзывы и сообщения, отправленные через Платформу.',
-                'Данные о транзакциях: пополнения кошелька, покупки, бронирования и выплаты. Данные карт обрабатывает наш платёжный провайдер, и они никогда не попадают на наши серверы.',
+                'Данные о записях: сессии с менторами, на которые вы записались или которые проводите, их время и указанная вами тема. Платформа не принимает платежи, поэтому никогда не получает данные карт или банковских счетов.',
                 'Технические данные: IP-адрес, тип устройства и браузера, а также журналы безопасности, которые защищают аккаунт и предотвращают мошенничество.',
               ],
             },
@@ -339,8 +337,7 @@ export const PRIVACY: LocalizedLegalDocument = {
             {
               list: [
                 'создавать и защищать ваш аккаунт и сохранять вход в систему;',
-                'предоставлять ленту, UniNotes, PocketMentor и кошелёк;',
-                'обрабатывать платежи и вести финансовый учёт, требуемый законом;',
+                'предоставлять ленту, UniNotes и PocketMentor;',
                 'модерировать контент и защищать сообщество от мошенничества и злоупотреблений;',
                 'отправлять служебные сообщения, например подтверждения бронирований и оповещения безопасности;',
                 'улучшать Платформу и устранять неполадки.',
@@ -360,7 +357,7 @@ export const PRIVACY: LocalizedLegalDocument = {
           id: 'sharing',
           heading: '6. Передача данных поставщикам услуг',
           body: [
-            'Мы передаём данные только поставщикам, которые помогают обеспечивать работу Платформы, — услугам хостинга и баз данных, обработки изображений, доставки электронной почты и обработки платежей — и только в объёме, необходимом для выполнения их задач. Они действуют по нашим указаниям и связаны обязательствами о конфиденциальности и защите данных.',
+            'Мы передаём данные только поставщикам, которые помогают обеспечивать работу Платформы, — услугам хостинга и баз данных, обработки изображений и доставки электронной почты — и только в объёме, необходимом для выполнения их задач. Они действуют по нашим указаниям и связаны обязательствами о конфиденциальности и защите данных.',
             'Мы также можем раскрыть данные, если этого требует закон, или для защиты прав и безопасности пользователей и Платформы.',
             'Некоторые поставщики могут обрабатывать данные за пределами Азербайджана. В таких случаях мы применяем надлежащие меры защиты.',
           ],
@@ -369,7 +366,7 @@ export const PRIVACY: LocalizedLegalDocument = {
           id: 'retention',
           heading: '7. Сроки хранения',
           body: [
-            'Данные аккаунта хранятся, пока аккаунт активен. После одобрения запроса на удаление мы удаляем или обезличиваем ваши персональные данные, за исключением записей, которые обязаны хранить по закону, — например, о финансовых операциях, — и храним их только в течение установленного законом срока.',
+            'Данные аккаунта хранятся, пока аккаунт активен. После одобрения запроса на удаление мы удаляем или обезличиваем ваши персональные данные, за исключением записей, которые обязаны хранить по закону, и храним их только в течение установленного законом срока.',
           ],
         },
         {

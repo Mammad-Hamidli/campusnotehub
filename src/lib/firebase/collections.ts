@@ -129,6 +129,8 @@ export const COLLECTIONS = {
   mentorApplications: 'mentorApplications',
   /** User-filed account deletion requests, keyed by user id; reviewed by an admin. */
   accountDeletionRequests: 'accountDeletionRequests',
+  /** Staff-set switches, one document each - `feedAd` is the promoted mentor. Server-only. */
+  siteConfig: 'siteConfig',
 } as const;
 
 /**
@@ -175,25 +177,3 @@ export const STORAGE_PATHS = {
   /** Avatars. Public by nature. */
   avatar: (userId: string) => `avatars/${userId}`,
 } as const;
-
-/**
- * Fields that must NEVER reach a client document.
- *
- * Firestore has no column-level grants, so "the client may read this document"
- * means "the client may read every field in it". Anything on this list is
- * therefore stripped before write, and the security rules deny direct reads of
- * the collections that would otherwise expose it.
- *
- * This is the single most important constant in the migration: in Postgres
- * these were protected by never appearing in a SELECT, and that protection
- * does not survive the move on its own.
- */
-export const NEVER_IN_FIRESTORE = [
-  'passwordHash',
-  'emailHash',
-  'phoneHash',
-  'refreshTokenHash',
-  'reviewBufferKey',
-  // The raw bytes columns; these become Storage objects instead.
-  'bytes',
-] as const;

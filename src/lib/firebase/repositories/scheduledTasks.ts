@@ -4,21 +4,22 @@ import { COLLECTIONS } from '../collections';
 import { docsToObjects, forFirestore, sortBy } from '../convert';
 
 /**
- * Deferred work: escrow releases and booking reminders.
+ * Deferred work: booking reminders. (No money moves through here - the
+ * platform takes no payments; legacy ESCROW_RELEASE rows are closed unrun by
+ * the scheduler.)
  *
  * ---------------------------------------------------------------------------
  * THE DEDUPE KEY IS THE DOCUMENT ID
  * ---------------------------------------------------------------------------
  * `scheduled_tasks.dedupeKey` carried a UNIQUE constraint whose whole job was
- * to stop the same work being queued twice - scheduling "release the escrow on
- * order X" a second time would pay a seller twice. Firestore has no unique
- * index, so the key becomes the document id and a duplicate schedule collides
- * on `create()` instead of being rejected by a constraint.
+ * to stop the same work being queued twice. Firestore has no unique index, so
+ * the key becomes the document id and a duplicate schedule collides on
+ * `create()` instead of being rejected by a constraint.
  *
- * That matters more here than almost anywhere else in the migration, because
- * this table is written from INSIDE the purchase transaction: if a retried
- * purchase could append a second ESCROW_RELEASE row, the idempotency the order
- * id gives us would be undone one collection over.
+ * This table is written from INSIDE the booking transaction, which re-runs its
+ * body on contention: if a retry could append a second reminder row, the
+ * idempotency the derived booking id gives us would be undone one collection
+ * over.
  */
 
 export type ScheduledTaskRecord = {

@@ -11,12 +11,12 @@ import type { LocalizedLegalDocument } from './types';
  *   - bump `effective`
  */
 export const TERMS: LocalizedLegalDocument = {
-  effective: '2026-09-19',
+  effective: '2026-10-03',
   content: {
     en: {
       title: 'Terms of Service',
       summary:
-        'These terms govern your use of CampusNoteHub: the campus feed, UniNotes, PocketMentor and the wallet. Please read them carefully before creating an account.',
+        'These terms govern your use of CampusNoteHub: the campus feed, UniNotes and PocketMentor. Please read them carefully before creating an account.',
       sections: [
         {
           id: 'acceptance',
@@ -30,7 +30,7 @@ export const TERMS: LocalizedLegalDocument = {
           id: 'eligibility',
           heading: '2. Eligibility',
           body: [
-            'You must be at least 16 years old to create an account. Some features, including buying and selling notes and booking mentors, are available only to users who have completed identity verification.',
+            'You must be at least 16 years old to create an account. Some features, such as booking or offering mentor sessions, are available only to users who have completed identity verification.',
             'You may hold only one personal account. Accounts are personal and may not be sold, transferred or shared.',
           ],
         },
@@ -77,10 +77,10 @@ export const TERMS: LocalizedLegalDocument = {
         },
         {
           id: 'notes',
-          heading: '7. UniNotes marketplace',
+          heading: '7. UniNotes',
           body: [
-            'Verified users may list study notes for sale. Every listing is reviewed by a moderator before it is published. Sellers are responsible for the accuracy of their listings and must own the material they sell.',
-            'A purchase grants the buyer a personal, non-transferable licence to use the note for their own study. Buyers may not resell, republish or redistribute purchased notes.',
+            'Users may share study notes. Every note is reviewed by a moderator before it is published. Authors are responsible for the accuracy of their notes and must own the material they share.',
+            'Published notes are free to download for any signed-in user, for their own study. Downloaded notes may not be sold, republished or redistributed.',
           ],
         },
         {
@@ -88,15 +88,15 @@ export const TERMS: LocalizedLegalDocument = {
           heading: '8. PocketMentor sessions',
           body: [
             'Mentors are independent users, not employees or agents of CampusNoteHub. We do not guarantee the outcome or quality of any session.',
-            'Session fees are held by the Platform until the session is completed. Cancellations made more than 24 hours before a session are refunded in full; other cancellations and disputes are handled under the policy shown at the time of booking.',
+            'Booking a session is free. Any rate shown on a mentor\'s profile is set by the mentor for information only: the Platform does not charge, hold or deduct it.',
           ],
         },
         {
           id: 'payments',
-          heading: '9. Wallet and payments',
+          heading: '9. Prices and payments',
           body: [
-            'Prices on the Platform are shown in Azerbaijani manat (AZN). Top-ups are processed by a third-party payment provider, and your wallet balance can be used only for purchases on the Platform.',
-            'Wallet balances do not earn interest. Refunds, where applicable, are returned to your wallet unless the law requires otherwise.',
+            'CampusNoteHub has no in-app purchases, wallet or stored balance, and does not process payments. The feed, UniNotes and booking mentor sessions are free.',
+            'Prices shown on the Platform, such as a mentor\'s hourly rate in Azerbaijani manat (AZN), are for information only. Any payment users arrange directly with each other happens outside the Platform and is not handled or guaranteed by CampusNoteHub.',
           ],
         },
         {
@@ -140,7 +140,7 @@ export const TERMS: LocalizedLegalDocument = {
     az: {
       title: 'İstifadə Şərtləri',
       summary:
-        'Bu şərtlər CampusNoteHub-dan - kampus lenti, UniNotes, PocketMentor və pul kisəsindən istifadə qaydalarını müəyyən edir. Hesab yaratmazdan əvvəl onları diqqətlə oxuyun.',
+        'Bu şərtlər CampusNoteHub-dan - kampus lenti, UniNotes və PocketMentor-dan istifadə qaydalarını müəyyən edir. Hesab yaratmazdan əvvəl onları diqqətlə oxuyun.',
       sections: [
         {
           id: 'acceptance',
@@ -154,7 +154,7 @@ export const TERMS: LocalizedLegalDocument = {
           id: 'eligibility',
           heading: '2. İstifadəçilərə qoyulan tələblər',
           body: [
-            'Hesab yaratmaq üçün ən azı 16 yaşınız olmalıdır. Konspektlərin alınıb-satılması və mentor sifarişi kimi bəzi funksiyalar yalnız şəxsiyyətini təsdiqləmiş istifadəçilər üçün əlçatandır.',
+            'Hesab yaratmaq üçün ən azı 16 yaşınız olmalıdır. Mentor sessiyası sifariş etmək və ya təklif etmək kimi bəzi funksiyalar yalnız şəxsiyyətini təsdiqləmiş istifadəçilər üçün əlçatandır.',
             'Hər istifadəçinin yalnız bir şəxsi hesabı ola bilər. Hesab şəxsidir; onu satmaq, başqasına ötürmək və ya paylaşmaq qadağandır.',
           ],
         },
@@ -201,10 +201,10 @@ export const TERMS: LocalizedLegalDocument = {
         },
         {
           id: 'notes',
-          heading: '7. UniNotes bazarı',
+          heading: '7. UniNotes',
           body: [
-            'Təsdiqlənmiş istifadəçilər konspektlərini satışa çıxara bilər. Hər elan dərc olunmazdan əvvəl moderator tərəfindən yoxlanılır. Satıcılar elanlarının düzgünlüyünə görə məsuliyyət daşıyır və satdıqları materialın müəllifi olmalıdırlar.',
-            'Alış alıcıya konspektdən yalnız öz təhsili üçün istifadə etməyə şəxsi, ötürülməz lisenziya verir. Alınmış konspektləri yenidən satmaq, dərc etmək və ya yaymaq qadağandır.',
+            'İstifadəçilər konspektlərini paylaşa bilər. Hər konspekt dərc olunmazdan əvvəl moderator tərəfindən yoxlanılır. Müəlliflər konspektlərinin düzgünlüyünə görə məsuliyyət daşıyır və paylaşdıqları materialın sahibi olmalıdırlar.',
+            'Dərc olunmuş konspektləri sistemə daxil olmuş istənilən istifadəçi öz təhsili üçün pulsuz yükləyə bilər. Yüklənmiş konspektləri satmaq, yenidən dərc etmək və ya yaymaq qadağandır.',
           ],
         },
         {
@@ -212,15 +212,15 @@ export const TERMS: LocalizedLegalDocument = {
           heading: '8. PocketMentor sessiyaları',
           body: [
             'Mentorlar CampusNoteHub-ın əməkdaşı və ya nümayəndəsi deyil, müstəqil istifadəçilərdir. Hər hansı sessiyanın nəticəsinə və ya keyfiyyətinə zəmanət vermirik.',
-            'Sessiya haqqı sessiya başa çatana qədər Platformada saxlanılır. Sessiyadan 24 saatdan çox əvvəl edilən ləğvlər üçün məbləğ tam qaytarılır; digər ləğvlər və mübahisələr sifariş zamanı göstərilən qaydalara əsasən həll edilir.',
+            'Sessiya sifarişi pulsuzdur. Mentorun profilində göstərilən qiyməti mentor özü müəyyən edir və o, yalnız məlumat xarakterlidir: Platforma bu məbləği tutmur, saxlamır və balansdan çıxmır.',
           ],
         },
         {
           id: 'payments',
-          heading: '9. Pul kisəsi və ödənişlər',
+          heading: '9. Qiymətlər və ödənişlər',
           body: [
-            'Platformadakı qiymətlər Azərbaycan manatı (AZN) ilə göstərilir. Balansın artırılması üçüncü tərəf ödəniş provayderi vasitəsilə həyata keçirilir və pul kisəsindəki vəsaitdən yalnız Platformadakı alışlar üçün istifadə etmək olar.',
-            'Pul kisəsindəki vəsaitə faiz hesablanmır. Geri qaytarılmalar, qanunla başqa qayda nəzərdə tutulmayıbsa, pul kisənizə edilir.',
+            'CampusNoteHub-da tətbiqdaxili alış, pul kisəsi və ya balans yoxdur və Platforma ödəniş emal etmir. Lent, UniNotes və mentor sessiyalarının sifarişi pulsuzdur.',
+            'Platformada göstərilən qiymətlər, məsələn, mentorun Azərbaycan manatı (AZN) ilə saatlıq qiyməti, yalnız məlumat xarakterlidir. İstifadəçilərin bir-biri ilə birbaşa razılaşdırdığı istənilən ödəniş Platformadan kənarda baş verir; CampusNoteHub onu emal etmir və ona zəmanət vermir.',
           ],
         },
         {
@@ -264,7 +264,7 @@ export const TERMS: LocalizedLegalDocument = {
     ru: {
       title: 'Условия использования',
       summary:
-        'Эти условия регулируют использование CampusNoteHub: ленты кампуса, UniNotes, PocketMentor и кошелька. Пожалуйста, внимательно прочитайте их перед созданием аккаунта.',
+        'Эти условия регулируют использование CampusNoteHub: ленты кампуса, UniNotes и PocketMentor. Пожалуйста, внимательно прочитайте их перед созданием аккаунта.',
       sections: [
         {
           id: 'acceptance',
@@ -278,7 +278,7 @@ export const TERMS: LocalizedLegalDocument = {
           id: 'eligibility',
           heading: '2. Требования к пользователям',
           body: [
-            'Для создания аккаунта вам должно быть не менее 16 лет. Некоторые функции, включая покупку и продажу конспектов и бронирование менторов, доступны только пользователям, прошедшим проверку личности.',
+            'Для создания аккаунта вам должно быть не менее 16 лет. Некоторые функции, например запись к менторам и проведение менторских сессий, доступны только пользователям, прошедшим проверку личности.',
             'У каждого пользователя может быть только один личный аккаунт. Аккаунт является личным: его нельзя продавать, передавать или использовать совместно.',
           ],
         },
@@ -325,10 +325,10 @@ export const TERMS: LocalizedLegalDocument = {
         },
         {
           id: 'notes',
-          heading: '7. Маркетплейс UniNotes',
+          heading: '7. UniNotes',
           body: [
-            'Прошедшие проверку пользователи могут выставлять конспекты на продажу. Каждое объявление проверяется модератором перед публикацией. Продавцы отвечают за точность объявлений и должны быть авторами продаваемых материалов.',
-            'Покупка даёт покупателю личную, непередаваемую лицензию на использование конспекта для собственной учёбы. Перепродавать, публиковать или распространять купленные конспекты запрещено.',
+            'Пользователи могут делиться конспектами. Каждый конспект проверяется модератором перед публикацией. Авторы отвечают за точность своих конспектов и должны быть правообладателями материалов, которыми делятся.',
+            'Опубликованные конспекты любой вошедший в аккаунт пользователь может бесплатно скачать для собственной учёбы. Продавать, повторно публиковать или распространять скачанные конспекты запрещено.',
           ],
         },
         {
@@ -336,15 +336,15 @@ export const TERMS: LocalizedLegalDocument = {
           heading: '8. Сессии PocketMentor',
           body: [
             'Менторы — независимые пользователи, а не сотрудники или представители CampusNoteHub. Мы не гарантируем результат или качество сессий.',
-            'Оплата сессии удерживается Платформой до её завершения. При отмене более чем за 24 часа до начала сумма возвращается полностью; прочие отмены и споры рассматриваются по правилам, указанным при бронировании.',
+            'Запись на сессию бесплатна. Ставку в профиле ментора устанавливает сам ментор, и она указана только для информации: Платформа не взимает, не удерживает и не списывает эту сумму.',
           ],
         },
         {
           id: 'payments',
-          heading: '9. Кошелёк и платежи',
+          heading: '9. Цены и платежи',
           body: [
-            'Цены на Платформе указаны в азербайджанских манатах (AZN). Пополнение обрабатывается сторонним платёжным провайдером, а баланс кошелька можно использовать только для покупок на Платформе.',
-            'На баланс кошелька проценты не начисляются. Возвраты, если они применимы, зачисляются в кошелёк, если закон не требует иного.',
+            'В CampusNoteHub нет встроенных покупок, кошелька или баланса, и Платформа не обрабатывает платежи. Лента, UniNotes и запись к менторам бесплатны.',
+            'Цены на Платформе, например ставка ментора в час в азербайджанских манатах (AZN), указаны только для информации. Любые платежи, о которых пользователи договариваются напрямую, происходят вне Платформы; CampusNoteHub их не обрабатывает и не гарантирует.',
           ],
         },
         {

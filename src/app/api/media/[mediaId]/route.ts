@@ -24,7 +24,7 @@ export const runtime = 'nodejs';
  * exposure is the same class as an unlisted photo link.
  *
  * If per-post visibility ever has to be enforced on media, the fix is a signed,
- * expiring URL like presignNoteDownload() already issues for purchased notes,
+ * expiring URL like the one GET /api/notes/:id/file mints for note downloads,
  * not a session check bolted on here.
  */
 export async function GET(
@@ -62,13 +62,18 @@ export async function GET(
       // The stored MIME, which was decided by the encoder on upload - never a
       // value that came from a client.
       'Content-Type': asset.mime,
-      'Content-Length': String(asset.sizeBytes),
+      'Content-Length': String(bytes.length),
       /**
        * Immutable and long-lived: the id addresses one specific re-encoded
        * blob that is never rewritten in place, so a cached copy can never go
        * stale. Editing an image means uploading a new asset with a new id.
+       *
+       * s-maxage lets the CDN answer too. Without it every new viewer cost a
+       * function call, a Firestore read and a Cloudinary fetch per image. A
+       * day rather than a year, so a deleted post's picture stops being
+       * served by the edge within one.
        */
-      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Cache-Control': 'public, max-age=31536000, s-maxage=86400, immutable',
       /**
        * Belt and braces against content sniffing.
        *

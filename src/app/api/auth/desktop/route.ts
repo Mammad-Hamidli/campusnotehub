@@ -18,8 +18,10 @@ export const dynamic = 'force-dynamic';
  * "/", and the landing page sends the app back here (installs from before that
  * change start on "/"). It does two things a browser visit never needs:
  *
- * 1. Skips the marketing page. A live session goes on to "/", which forwards
- *    it to /dashboard or /admin; everyone else lands on /login.
+ * 1. Opens on the FEED, every launch, whatever page the app was closed on and
+ *    whatever the account's role: a live session goes straight to
+ *    /dashboard (not "/", which would route staff to /admin and mentors to
+ *    their panel); everyone else signs in first and is then sent there.
  * 2. Marks this WebView2 profile as the desktop app (CH_CLIENT), so the next
  *    sign-in gets the desktop session policy - see DESKTOP_SESSION_DAYS in
  *    src/lib/auth/session.ts.
@@ -47,8 +49,11 @@ export async function GET(request: NextRequest) {
   return response;
 }
 
+/** The app's start page. The feed tab is /dashboard's default. */
+const START_PATH = '/dashboard';
+
 async function land(request: NextRequest): Promise<NextResponse> {
-  const home = new URL('/', request.url);
+  const home = new URL(START_PATH, request.url);
 
   // Reopened within the access token's lifetime: nothing to renew.
   try {
@@ -68,5 +73,7 @@ async function land(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.redirect(new URL('/login', request.url));
+  const login = new URL('/login', request.url);
+  login.searchParams.set('next', START_PATH);
+  return NextResponse.redirect(login);
 }

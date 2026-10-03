@@ -155,7 +155,3 @@ export class ForbiddenError extends Error {
   }
 }
 
-export function assertCan(viewer: Viewer | null, capability: Capability): asserts viewer is Viewer {
-  if (!can(viewer, capability)) throw new ForbiddenError(capability);
-}
-

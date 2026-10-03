@@ -39,7 +39,6 @@
     "theme": "Theme",
     "help": "Help",
     "bookmarks": "Bookmarks",
-    "explore": "Explore",
     "admin": "Admin",
     "saved": "Saved items",
     "mentorSchedule": "Mentor schedule",
@@ -522,8 +521,7 @@
       "subject": "Subject",
       "courseCode": "Course code",
       "language": "Language",
-      "rating": "Rating",
-      "freeOnly": "Free only"
+      "rating": "Rating"
     },
     "card": {
       "pages": "{count} pages",
@@ -638,31 +636,23 @@
       "OTHER": "Other"
     },
     "profile": {
-      "sessions": "{count} sessions",
-      "experience": "{years} years of experience",
-      "languages": "Languages",
-      "about": "About",
-      "bookSession": "Book a session",
       "notAccepting": "Not taking new bookings right now"
     },
     "booking": {
-      "selectDate": "Pick a date",
       "selectTime": "Pick a time",
       "timezoneNote": "Times are shown in {timezone}",
       "noSlots": "No open slots on this day",
       "topic": "Session topic",
       "topicPlaceholder": "What would you like to talk about?",
-      "confirm": "Confirm and pay",
+      "confirm": "Confirm booking",
       "summary": "{date} at {time} - {duration} minutes",
       "confirmed": {
         "title": "Session confirmed",
-        "body": "The video call link becomes active 30 minutes before the session.",
-        "addToCalendar": "Add to calendar",
-        "joinCall": "Join call"
+        "body": "The video call link becomes active 30 minutes before the session."
       },
-      "cancel": "Cancel session",
       "menteeNote": "Anything else to share (optional)",
-      "menteeNotePlaceholder": "Context that helps your mentor prepare"
+      "menteeNotePlaceholder": "Context that helps your mentor prepare",
+      "freeNote": "Booking is free. A mentor's rate is shown for information only — nothing is charged or deducted on CampusNoteHub."
     },
     "errors": {
       "slotTaken": "That slot was just taken. Please pick another.",
@@ -672,11 +662,10 @@
     "browse": "Find a mentor",
     "empty": "No mentors yet",
     "emptyHint": "Verified students and alumni can offer mentoring. Check back soon.",
-    "loading": "Loading mentors…",
     "book": "Request a session",
     "viewProfile": "View profile",
     "sessions": "{count} sessions",
-    "rate": "{price} / session",
+    "rate": "{price} / hour",
     "free": "Free",
     "industry": "Industry",
     "allIndustries": "All industries",
@@ -704,8 +693,8 @@
       "experience": "Experience",
       "anyExperience": "Any experience",
       "yearsPlus": "{years}+ years",
-      "price": "Price",
-      "anyPrice": "Any price",
+      "price": "Listed rate",
+      "anyPrice": "Any rate",
       "upTo": "Up to {price}",
       "acceptingOnly": "Accepting bookings"
     },
@@ -730,7 +719,7 @@
       "field": "Field of study",
       "year": "Year",
       "languages": "Languages",
-      "rate": "Hourly rate (AZN, 0 = free)",
+      "rate": "Hourly rate shown on your profile (AZN, 0 = free)",
       "sessionLength": "Session length",
       "minutes": "{minutes} min",
       "linkedin": "LinkedIn (optional)",
@@ -751,7 +740,8 @@
         "pending": "You already have an application under review.",
         "alreadyMentor": "You are already an approved mentor."
       },
-      "submitted": "Your mentor application was submitted successfully."
+      "submitted": "Your mentor application was submitted successfully.",
+      "rateHint": "For display only. CampusNoteHub never charges the people who book you and takes no payment for sessions."
     },
     "schedule": {
       "title": "Availability",
@@ -811,7 +801,8 @@
         "b2": "Tell students about your experience. A moderator reviews every mentor profile before it is listed.",
         "b3": "Your mentor panel tracks your onboarding, upcoming sessions and your monthly membership date."
       }
-    }
+    },
+    "rateDisplayOnly": "display only"
   },
   "mentorDashboard": {
     "title": "Mentor panel",
@@ -1166,6 +1157,10 @@
       "subtitle": "Most bought this week",
       "viewAll": "View all"
     },
+    "feedAd": {
+      "title": "Featured mentor",
+      "badge": "Ad"
+    },
     "quickActions": "Quick actions",
     "findMentor": "Find a mentor"
   },
@@ -1229,6 +1224,20 @@
       "queueTitle": "Verification queue",
       "openQueue": "Open queue",
       "queueNote": "Flagged documents are held in an encrypted buffer with a hard TTL. When it lapses the case can no longer be reviewed and the applicant must resubmit."
+    },
+    "feedAd": {
+      "title": "Feed ad slot",
+      "description": "One mentor is shown to everyone in the feed's right column, above Trending notes. Click Promote to put a mentor there (it replaces the current one); click the button again to remove them. Changes appear within about 30 seconds.",
+      "promote": "Promote",
+      "inSlot": "In feed",
+      "remove": "Remove from the feed",
+      "promoted": "@{nickname} is now in the feed ad slot.",
+      "removed": "@{nickname} was removed from the feed ad slot.",
+      "search": "Search mentors",
+      "empty": "No approved mentors yet",
+      "errors": {
+        "notEligible": "This mentor can't be promoted: the profile is not approved or the account is not active."
+      }
     },
     "stats": {
       "total": "Total users",
@@ -1512,7 +1521,7 @@
       "experience": "Experience (years)",
       "education": "Education",
       "submitted": "Submitted",
-      "rate": "Price",
+      "rate": "Listed rate (display only)",
       "errors": {
         "reasonRequired": "Give a reason of at least 5 characters.",
         "alreadyDecided": "This item was already decided."
@@ -1636,7 +1645,8 @@
       "request": "Request account deletion",
       "what": {
         "review": "An administrator reviews your request; you will get an email with the outcome.",
-        "signOut": "Once approved, your account is deleted and you are signed out everywhere."
+        "signOut": "Once approved, your account is deleted and you are signed out everywhere.",
+        "cooldown": "For 1 week (7 days) after deletion, this email cannot be used to sign in or to register a new account."
       },
       "reason": "Why are you leaving?",
       "password": "Confirm with your password",
@@ -1757,10 +1767,7 @@
     }
   },
   "stub": {
-    "title": "This section is under construction",
-    "body": "We are still building this part of CampusNoteHub. It will be available soon.",
-    "back": "Go back",
-    "toFeed": "Go to the feed"
+    "back": "Go back"
   },
   "notFound": {
     "title": "Page not found",

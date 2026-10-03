@@ -8,7 +8,7 @@ import {
 import { findUserById, findUsersByIds } from '@/lib/firebase/repositories/users';
 import { findUniversityById } from '@/lib/firebase/repositories/reference';
 import { getViewer } from '@/lib/auth/session';
-import { visibleAvatar } from '@/lib/profile/visibility';
+import { isPubliclyVisible, visibleAvatar } from '@/lib/profile/visibility';
 import { can } from '@/lib/permissions';
 
 export const runtime = 'nodejs';
@@ -52,12 +52,7 @@ export async function GET(
   }
 
   const owner = await findUserById(mentor.userId);
-  const ownerVisible =
-    owner &&
-    !owner.deletedAt &&
-    (owner.accountStatus === 'ACTIVE' || owner.accountStatus === 'RESTRICTED');
-
-  if (!owner || !ownerVisible) {
+  if (!isPubliclyVisible(owner)) {
     return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
   }
 

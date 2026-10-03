@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/Feedback';
 import { cellsToRules, rulesToCells, type WeeklyRule } from '@/lib/mentors/schedule';
 import { AvailabilityGrid } from './AvailabilityGrid';
 import { timezones } from './MentorScheduleSettings';
+import { MENTOR_INDUSTRIES, industryLabel } from '@/lib/mentors/display';
 
 /**
  * PocketMentor application form (POST /api/mentors/apply).
@@ -17,8 +18,6 @@ import { timezones } from './MentorScheduleSettings';
  * the end that they already applied.
  */
 
-/** Mirrors MentorIndustry in src/lib/enums.ts; the server re-validates. */
-const INDUSTRIES = ['IT', 'MARKETING', 'LAW', 'ENGINEERING', 'FINANCE', 'MEDICINE', 'EDUCATION', 'DESIGN', 'OTHER'];
 const LANGUAGES = ['az', 'en', 'ru', 'tr'] as const;
 const SESSION_LENGTHS = [30, 45, 60, 90];
 
@@ -215,9 +214,9 @@ export function MentorApplyForm() {
           <label className="flex flex-col gap-1">
             <span className="text-2xs font-medium text-fg-muted">{t('mentors.industry')}</span>
             <select className={field} value={industry} onChange={(e) => setIndustry(e.target.value)}>
-              {INDUSTRIES.map((value) => (
+              {MENTOR_INDUSTRIES.map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {industryLabel(t, value)}
                 </option>
               ))}
             </select>
@@ -286,6 +285,7 @@ export function MentorApplyForm() {
         <label className="flex flex-col gap-1">
           <span className="text-2xs font-medium text-fg-muted">{t('mentors.apply.rate')}</span>
           <input className={`${field} ${invalid('hourlyRateMinor')}`} type="number" min={0} max={500} step="0.5" value={rate} onChange={(e) => setRate(e.target.value)} />
+          <span className="text-2xs text-fg-subtle">{t('mentors.apply.rateHint')}</span>
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-2xs font-medium text-fg-muted">{t('mentors.apply.sessionLength')}</span>

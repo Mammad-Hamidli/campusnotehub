@@ -189,10 +189,10 @@ describe('GET /api/auth/desktop', () => {
   const call = (headers: Record<string, string>) =>
     launch(new NextRequest('http://localhost:3000/api/auth/desktop', { headers }));
 
-  it('sends a signed-out app to /login and marks it as the desktop app', async () => {
+  it('sends a signed-out app to /login, then the feed, and marks it as the desktop app', async () => {
     const response = await call({ 'sec-fetch-site': 'none' });
 
-    expect(response.headers.get('location')).toBe('http://localhost:3000/login');
+    expect(response.headers.get('location')).toBe('http://localhost:3000/login?next=%2Fdashboard');
     expect(cookieLine(response, 'CH_CLIENT')).toContain('CH_CLIENT=desktop');
     expect(cookieLine(response, 'CH_CLIENT')).toMatch(/HttpOnly/i);
     expect(response.headers.get('cache-control')).toBe('no-store');
@@ -212,18 +212,18 @@ describe('GET /api/auth/desktop', () => {
     const { issued } = await signIn('desktop');
     const response = await call({ 'sec-fetch-site': 'none', cookie: `CH_RT=${issued.refreshToken}` });
 
-    expect(response.headers.get('location')).toBe('http://localhost:3000/');
+    expect(response.headers.get('location')).toBe('http://localhost:3000/dashboard');
     expect(cookieLine(response, 'CH_AT')).toBeDefined();
     expect(cookieLine(response, 'CH_RT')).toContain('Max-Age=');
     expect(cookieLine(response, 'CH_RF')).toBeDefined();
     expect(sessions.get(issued.sessionId)!.revokedAt).not.toBeNull();
   });
 
-  it('forwards a live session without rotating it', async () => {
+  it('opens a live session on the feed without rotating it', async () => {
     const { issued, row } = await signIn('desktop');
     const response = await call({ 'sec-fetch-site': 'none', cookie: `CH_AT=${issued.accessToken}` });
 
-    expect(response.headers.get('location')).toBe('http://localhost:3000/');
+    expect(response.headers.get('location')).toBe('http://localhost:3000/dashboard');
     expect(row.revokedAt).toBeNull();
   });
 
@@ -235,6 +235,6 @@ describe('GET /api/auth/desktop', () => {
       cookie: `CH_AT=${issued.accessToken}`,
     });
 
-    expect(response.headers.get('location')).toBe('http://localhost:3000/login');
+    expect(response.headers.get('location')).toBe('http://localhost:3000/login?next=%2Fdashboard');
   });
 });

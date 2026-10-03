@@ -15,8 +15,7 @@ import { WindowsDownloadLink } from './WindowsDownload';
  * stitched templates - and in dark mode the old version was invisible against
  * the body anyway.
  *
- * Every link here resolves to a real 200 page. See the stub routes under
- * src/app and src/components/ui/UnderConstruction.tsx.
+ * Every link here resolves to a real 200 page.
  */
 export function SiteFooter() {
   const t = useT();

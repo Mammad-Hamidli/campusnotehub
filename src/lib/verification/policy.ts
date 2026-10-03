@@ -2,8 +2,8 @@
  * The decision policy: pure functions, no I/O, fully unit-testable.
  *
  * This is the code that decides whether a real 19-year-old keeps access to
- * their account, their notes, and their wallet balance. It is deliberately the
- * simplest, most inspectable module in the codebase.
+ * their account and their notes. It is deliberately the simplest, most
+ * inspectable module in the codebase.
  */
 
 export type SignalCode =
@@ -99,9 +99,8 @@ const CONFIDENCE_FLOOR = 0.55; // below this a signal is noise
  *     recapture, and it fires on cheap phone cameras under the fluorescent
  *     lighting of a university library - which describes most of our users.
  *  3. Asymmetric cost. A false approval costs one moderation ticket, and is
- *     reversible. A false ban costs a student their account, their uploaded
- *     notes and their wallet balance, and there is no reversal path that
- *     scales.
+ *     reversible. A false ban costs a student their account and their
+ *     uploaded notes, and there is no reversal path that scales.
  */
 export function decide(input: {
   signals: Signal[];

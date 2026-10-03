@@ -5,7 +5,8 @@ import { Camera, Loader2, Trash2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 import { UserAvatar } from '@/components/ui/UserAvatar';
-import { IMAGE_ACCEPT_ATTRIBUTE, MAX_IMAGE_BYTES } from '@/lib/media/constants';
+import { IMAGE_ACCEPT_ATTRIBUTE } from '@/lib/media/constants';
+import { AVATAR_UPLOAD_MAX_SIDE, uploadImage } from '@/lib/media/browser-upload';
 
 /**
  * The profile picture with change / remove controls.
@@ -31,25 +32,18 @@ export function AvatarUploader({
   const [busy, setBusy] = useState(false);
 
   async function upload(file: File) {
-    // Fast reject only; the server re-checks the actual bytes.
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error(t('feed.image.errors.tooLarge'));
-      return;
-    }
     setBusy(true);
     try {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await fetch('/api/me/avatar', { method: 'POST', body: form });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(t(body.error ?? 'feed.image.errors.uploadFailed'));
-        return;
-      }
-      onChange(body.avatarUrl);
+      // Shrunk in the browser first; rejects with a locale key.
+      const { avatarUrl: next } = await uploadImage<{ avatarUrl: string }>(
+        '/api/me/avatar',
+        file,
+        AVATAR_UPLOAD_MAX_SIDE,
+      );
+      onChange(next);
       toast.success(t('profile.avatar.updated'));
-    } catch {
-      toast.error(t('feed.image.errors.uploadFailed'));
+    } catch (cause) {
+      toast.error(t(cause instanceof Error ? cause.message : 'feed.image.errors.uploadFailed'));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';

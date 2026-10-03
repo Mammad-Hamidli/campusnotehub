@@ -9,9 +9,9 @@ import { Logo } from '@/components/ui/Logo';
 /**
  * Global 404.
  *
- * Every route the navigation links to has a real page (see the stub routes
- * under src/app), so reaching this screen means a genuinely bad URL — a typo,
- * a stale bookmark, a deleted resource. That is worth saying plainly rather
+ * Every route the navigation links to has a real page, so reaching this
+ * screen means a genuinely bad URL — a typo, a stale bookmark, a deleted
+ * resource. That is worth saying plainly rather
  * than dressing up: a 404 that pretends to be a feature wastes the one moment
  * the user needs a clear exit.
  */

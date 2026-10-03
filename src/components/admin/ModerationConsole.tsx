@@ -57,7 +57,7 @@ type CaseDetail = {
  *  2. Ban requires a typed reason and a confirmation step. Approve does not.
  *     The friction is deliberately asymmetric because the consequences are:
  *     a wrong approval is a later moderation ticket, a wrong ban costs a
- *     student their account and wallet balance with no self-service recovery.
+ *     student their account and notes with no self-service recovery.
  */
 /**
  * Rows written before the de-duplication in decide() still carry repeated

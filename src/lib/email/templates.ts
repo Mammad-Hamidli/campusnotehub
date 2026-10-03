@@ -572,6 +572,10 @@ export const TEMPLATES = {
         text: 'Your UniPath account has been deleted and every session was signed out. You will not receive further emails about it.',
       },
       {
+        kind: 'paragraph',
+        text: 'For 1 week (7 days) this email address cannot be used to sign in or to register a new account. After that it is free to use again.',
+      },
+      {
         kind: 'callout',
         tone: 'neutral',
         title: 'Did not expect this?',

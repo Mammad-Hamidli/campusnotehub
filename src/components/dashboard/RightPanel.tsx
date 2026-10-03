@@ -1,8 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowUpRight, CalendarClock, Flame, GraduationCap, Star, TrendingUp } from 'lucide-react';
-import { useT } from '@/lib/i18n/LocaleProvider';
+import { ArrowUpRight, Briefcase, CalendarClock, Flame, GraduationCap, Megaphone, Star, TrendingUp } from 'lucide-react';
+import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { UserAvatar } from '@/components/ui/UserAvatar';
+import { industryLabel } from '@/lib/mentors/display';
+import { MentorRate } from '@/components/mentors/MentorRate';
+import type { FeedAd } from '@/lib/feed/ad';
 
 /**
  * Graduation countdown.
@@ -177,6 +181,68 @@ export function TrendingNotes({ notes }: { notes: TrendingNote[] }) {
                    hover:border-edge hover:bg-surface-muted"
       >
         {t('dashboard.trending.viewAll')}
+        <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+      </Link>
+    </section>
+  );
+}
+
+/**
+ * The feed's ad slot: one mentor, promoted by staff from the admin dashboard
+ * (GET /api/feed/ad, set through /api/admin/feed-ad). Sits above Trending
+ * notes in the right rail. Renders nothing when the slot is empty.
+ *
+ * Labelled as an ad on purpose - a promoted profile that looks like an
+ * organic recommendation would be misleading.
+ */
+export function FeedAdCard({ ad }: { ad: FeedAd }) {
+  const { t } = useLocale();
+
+  return (
+    <section className="card p-4" aria-labelledby="feed-ad-title">
+      <header className="mb-3 flex items-center justify-between gap-2">
+        <h2 id="feed-ad-title" className="flex items-center gap-1.5 text-sm font-semibold text-fg">
+          <Megaphone className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+          {t('dashboard.feedAd.title')}
+        </h2>
+        <span className="rounded-md border border-edge px-1.5 py-0.5 text-2xs font-medium uppercase tracking-wide text-fg-subtle">
+          {t('dashboard.feedAd.badge')}
+        </span>
+      </header>
+
+      <div className="flex items-start gap-3">
+        <UserAvatar nickname={ad.nickname} src={ad.avatarUrl} verified={ad.isVerified} verifiedLabel={t('profile.verified')} />
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-medium text-fg">@{ad.nickname}</span>
+            {ad.university && (
+              <span className="shrink-0 rounded bg-surface-inset px-1 text-2xs font-semibold text-fg-muted">{ad.university}</span>
+            )}
+          </p>
+          <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-fg-muted">{ad.headline}</p>
+          {(ad.jobTitle || ad.company) && (
+            <p className="mt-1 flex min-w-0 items-center gap-1 text-2xs text-fg-subtle">
+              <Briefcase className="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span className="truncate">{[ad.jobTitle, ad.company].filter(Boolean).join(' · ')}</span>
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-fg-muted">
+        <span className="badge-accent">{industryLabel(t, ad.industry)}</span>
+        {ad.ratingCount > 0 && (
+          <span className="inline-flex items-center gap-0.5">
+            <Star className="h-2.5 w-2.5 fill-current text-warn" aria-hidden="true" />
+            <span className="tabular font-medium text-fg">{ad.ratingAvg.toFixed(1)}</span>({ad.ratingCount})
+          </span>
+        )}
+        <span>{t('mentors.sessions', { count: ad.sessionsCompleted })}</span>
+        <MentorRate minor={ad.hourlyRateMinor} className="ml-auto font-medium text-fg" />
+      </div>
+
+      <Link href={`/mentors/${ad.mentorId}`} className="btn-primary mt-3.5 w-full justify-center px-3 py-2 text-sm">
+        {t('mentors.viewProfile')}
         <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
       </Link>
     </section>

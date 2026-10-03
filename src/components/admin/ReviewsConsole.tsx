@@ -59,7 +59,6 @@ type DeletionRequest = {
   userId: string;
   reason: string | null;
   requestedAt: string;
-  /** Available + escrowed, minor units. Deleting strands whatever is here. */
   user: {
     nickname: string;
     fullName: string;

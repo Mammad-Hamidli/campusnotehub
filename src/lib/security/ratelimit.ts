@@ -31,7 +31,7 @@ export type RateLimitResult = { ok: boolean; remaining: number; retryAfterSecond
  * The cost is real and worth stating: this is a transaction (one read, one
  * write) per limited request, where Redis needed one round trip. It is spent
  * only on endpoints that are explicitly rate-limited - login, registration,
- * uploads, purchases - and never on ordinary reads. peekRateLimit() does not
+ * uploads, bookings - and never on ordinary reads. peekRateLimit() does not
  * pay it at all, being a plain document read.
  *
  * ===========================================================================

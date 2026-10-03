@@ -24,7 +24,7 @@ export class AccountDeletionError extends Error {
  * users panel performs - same guards, same record, same email.
  *
  * Soft, not hard: the row and its identifier hashes stay (so a banned identity
- * cannot be recycled and the ledger and audit trail stay intact), sessions are
+ * cannot be recycled and the audit trail stays intact), sessions are
  * revoked, and requireSession refuses a DELETED account from then on. See the
  * note on the admin DELETE route for the full reasoning.
  */

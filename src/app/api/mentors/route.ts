@@ -5,7 +5,7 @@ import { listMentors } from '@/lib/firebase/repositories/mentors';
 import { findUsersByIds } from '@/lib/firebase/repositories/users';
 import { findUniversitiesByIds, findUniversityByCode } from '@/lib/firebase/repositories/reference';
 import { getViewer } from '@/lib/auth/session';
-import { visibleAvatar } from '@/lib/profile/visibility';
+import { isPubliclyVisible, visibleAvatar } from '@/lib/profile/visibility';
 import { can } from '@/lib/permissions';
 
 export const runtime = 'nodejs';
@@ -89,9 +89,7 @@ export async function GET(request: NextRequest) {
     if (universityFilter !== undefined && (!universityFilter || user?.universityId !== universityFilter.id)) {
       return false;
     }
-    return (
-      user && !user.deletedAt && (user.accountStatus === 'ACTIVE' || user.accountStatus === 'RESTRICTED')
-    );
+    return isPubliclyVisible(user);
   });
 
   const universities = await findUniversitiesByIds(
@@ -128,8 +126,8 @@ export async function GET(request: NextRequest) {
           // `about` is deliberately absent: it is up to 4000 characters and
           // the card shows the headline. Including it for every row would make
           // the directory many times heavier than it renders.
-          // No account id: users/{id} also names the owner's wallet,
-          // credentials and sessions, and nothing public needs it.
+          // No account id: users/{id} also names the owner's credentials
+          // and sessions, and nothing public needs it.
           user: user
             ? {
                 nickname: user.nickname,

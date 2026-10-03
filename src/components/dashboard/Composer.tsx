@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bookmark, Hash, ImagePlus, Loader2, Send, X } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
-import { IMAGE_ACCEPT_ATTRIBUTE, MAX_IMAGE_BYTES, MAX_IMAGE_MB } from '@/lib/media/constants';
+import { IMAGE_ACCEPT_ATTRIBUTE, MAX_SOURCE_IMAGE_BYTES, MAX_SOURCE_IMAGE_MB } from '@/lib/media/constants';
 import { completedHashtags, extractHashtags, MAX_POST_TAGS } from '@/lib/feed/hashtags';
 
 const MAX_CHARS = 2000;
@@ -154,7 +154,8 @@ export function Composer({
   }
 
   const remaining = MAX_CHARS - body.length;
-  const canPost = body.trim().length > 0 && remaining >= 0 && !posting;
+  // An image alone is a post; so is text alone.
+  const canPost = (body.trim().length > 0 || image !== null) && remaining >= 0 && !posting;
 
   function autoGrow(el: HTMLTextAreaElement) {
     el.style.height = 'auto';
@@ -339,8 +340,8 @@ export function Composer({
                 </button>
               </div>
               {posting && (
-                // The upload is a real request now, and a 12 MB image on campus
-                // wifi is several seconds. An indeterminate bar is honest here:
+                // The upload is a real request (shrunk in the browser first),
+                // and on campus wifi that is still a second or two. An indeterminate bar is honest here:
                 // fetch cannot report upload progress (see the note in the
                 // notes form, which uses XHR for exactly that reason).
                 <div className="h-1 w-full overflow-hidden bg-surface-inset">
@@ -385,7 +386,7 @@ export function Composer({
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 aria-label={t('feed.attachImage')}
-                title={t('feed.image.maxSize', { mb: MAX_IMAGE_MB })}
+                title={t('feed.image.maxSize', { mb: MAX_SOURCE_IMAGE_MB })}
                 className="rounded-lg p-2 text-fg-subtle transition hover:bg-accent-soft hover:text-accent"
               >
                 <ImagePlus className="h-[1.15rem] w-[1.15rem]" />
@@ -412,10 +413,10 @@ export function Composer({
                   // is why the previous version could never upload anything -
                   // by submit time the bytes were gone.
                   if (file) {
-                    // Instant feedback only. The server re-derives the type
-                    // from the bytes and re-checks the size; this just saves a
-                    // pointless 12 MB round trip.
-                    if (file.size > MAX_IMAGE_BYTES) {
+                    // Instant feedback only. The browser shrinks the image
+                    // before upload and the server re-derives the type from
+                    // the bytes.
+                    if (file.size > MAX_SOURCE_IMAGE_BYTES) {
                       setError('feed.image.errors.tooLarge');
                       setImage(null);
                     } else {

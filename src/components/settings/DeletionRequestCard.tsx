@@ -142,6 +142,7 @@ export function DeletionRequestCard() {
               <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-fg-muted">
                 <li>{t('settings.deletion.what.review')}</li>
                 <li>{t('settings.deletion.what.signOut')}</li>
+                <li className="font-medium text-fg">{t('settings.deletion.what.cooldown')}</li>
               </ul>
 
               <div>

@@ -10,8 +10,8 @@ import { docToObject, docsToObjects, forFirestore } from '../convert';
  * the same soft delete as the admin panel, see src/lib/accounts/softDelete.ts)
  * or rejects it with a reason. Manual review exists because deletion is the
  * one account action that cannot be walked back by the user, and because an
- * account can hold things that need a human decision first - a wallet balance,
- * open bookings, notes other people have paid for.
+ * account can hold things that need a human decision first - open bookings,
+ * notes other people rely on.
  *
  * One document per user, keyed by user id, like mentorApplications: "does this
  * user have an open request" is a keyed read, and a new request after a

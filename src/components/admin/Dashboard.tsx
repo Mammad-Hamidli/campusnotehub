@@ -17,6 +17,7 @@ import {
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { PageHeader } from './AdminShell';
 import { ErrorState, useAdminFetch } from './primitives';
+import { FeedAdManager } from './FeedAdManager';
 
 type Stats = {
   users: {
@@ -166,6 +167,8 @@ export function AdminDashboard() {
           {t('admin.dashboard.queueNote')}
         </p>
       </section>
+
+      <FeedAdManager />
     </>
   );
 }

@@ -10,11 +10,11 @@ import { resolveViewerAudience } from '@/lib/feed/visibility';
 import { createPost, feedPage, likedPostIds, newPostId } from '@/lib/firebase/repositories/posts';
 import { findUserById, findUsersByIds } from '@/lib/firebase/repositories/users';
 import { findUniversitiesByIds } from '@/lib/firebase/repositories/reference';
-import { followingIds } from '@/lib/firebase/repositories/follows';
 import { claimMediaAssets } from '@/lib/firebase/repositories/media';
 import { upsertTags } from '@/lib/firebase/repositories/tags';
 import { MAX_POST_TAGS, TAG_PATTERN } from '@/lib/feed/hashtags';
 import { mediaIdFromKey } from '@/lib/media/images';
+import { isPubliclyVisible } from '@/lib/profile/visibility';
 
 export const runtime = 'nodejs';
 
@@ -46,20 +46,22 @@ export async function GET(request: NextRequest) {
   }
   const { cursor, limit, filter, tag, universityId, authorId } = params.data;
 
-  const rate = await rateLimit('search', { userId: viewer?.id, ip: clientIp(request.headers) });
+  /**
+   * The rate check and the viewer's entitlements, together: neither depends on
+   * the other, so the feed pays one round trip for both instead of two.
+   *
+   * The entitlements come from the viewer's OWN record, never the query
+   * string: trusting `?universityId=` here would let anyone read another
+   * university's private feed by editing the URL. They are the audience tokens
+   * that replace the old SQL `OR` - see src/lib/feed/audience.ts.
+   */
+  const [rate, audience] = await Promise.all([
+    rateLimit('search', { userId: viewer?.id, ip: clientIp(request.headers) }),
+    resolveViewerAudience(viewer),
+  ]);
   if (!rate.ok) return NextResponse.json({ error: 'errors.rateLimited' }, { status: 429 });
 
   const [cursorTime] = cursor ? cursor.split('_') : [];
-
-  /**
-   * The viewer's entitlements, resolved from their OWN record.
-   *
-   * Never from the query string: trusting `?universityId=` here would let
-   * anyone read another university's private feed by editing the URL. This
-   * returns the audience tokens that replace the old SQL `OR` - see
-   * src/lib/feed/audience.ts.
-   */
-  const audience = await resolveViewerAudience(viewer);
 
   /**
    * The `university` tab narrows to the viewer's own university feed. An
@@ -72,9 +74,9 @@ export async function GET(request: NextRequest) {
     filter === 'university' && viewer ? audience.universityId : (universityId ?? null);
 
   // The `following` tab is a presentation filter over posts the viewer may
-  // already see; it is not a security boundary (the tokens are).
-  const followedAuthors =
-    filter === 'following' && viewer ? await followingIds(viewer.id) : null;
+  // already see; it is not a security boundary (the tokens are). The list was
+  // already read for the tokens, so it is not read twice.
+  const followedAuthors = filter === 'following' && viewer ? audience.followingIds : null;
 
   const { rows, hasMore } = await feedPage({
     tokens: audience.tokens,
@@ -117,14 +119,7 @@ export async function GET(request: NextRequest) {
    * page whose posts were all filtered out would loop forever on the same
    * cursor.
    */
-  const visible = rows.filter((post) => {
-    const author = authors.get(post.authorId);
-    return Boolean(
-      author &&
-        !author.deletedAt &&
-        (author.accountStatus === 'ACTIVE' || author.accountStatus === 'RESTRICTED'),
-    );
-  });
+  const visible = rows.filter((post) => isPubliclyVisible(authors.get(post.authorId)));
 
   const lastScanned = rows.at(-1);
 
@@ -155,9 +150,10 @@ export async function GET(request: NextRequest) {
 }
 
 const createSchema = z.object({
-  // Sanitised BEFORE the length checks, so a body that is only markup is
-  // rejected as empty. The pre-transform max bounds the sanitiser's work.
-  body: z.string().max(4000).transform(toPlainText).pipe(z.string().min(1).max(2000)),
+  // Sanitised BEFORE the length checks, so a body that is only markup counts
+  // as empty. The pre-transform max bounds the sanitiser's work. Empty is
+  // allowed only alongside an image (refined below).
+  body: z.string().max(4000).transform(toPlainText).pipe(z.string().max(2000)),
   visibility: z.nativeEnum(PostVisibility).default(PostVisibility.PUBLIC),
   universityId: z.string().min(1).max(64).optional(),
   tags: z.array(z.string().regex(TAG_PATTERN)).max(MAX_POST_TAGS).default([]),
@@ -180,7 +176,7 @@ const createSchema = z.object({
     )
     .max(4)
     .default([]),
-});
+}).refine((post) => post.body.trim().length > 0 || post.media.length > 0);
 
 /** POST /api/feed - unverified users may post; only earning is gated. */
 export async function POST(request: NextRequest) {
@@ -196,12 +192,9 @@ export async function POST(request: NextRequest) {
   }
 
   /**
-   * `can`, not `assertCan`.
-   *
-   * assertCan THROWS a ForbiddenError, and nothing in this handler caught it -
-   * so a frozen account trying to post got a 500 with a stack trace instead of
-   * a clean 403 with a message it could act on. The capability table is
-   * unchanged; only the way the answer is delivered is.
+   * Answered, never thrown: a thrown ForbiddenError that nothing caught gave
+   * a frozen account a 500 with a stack trace instead of a clean 403 with a
+   * message it could act on.
    *
    * This is the check that stops a frozen or suspended account from posting:
    * 'feed:post' is absent from ALWAYS_ALLOWED, so a SUSPENDED viewer fails it.

@@ -381,13 +381,14 @@ type OwnerSplit = {
  * accounts share an address. Banned identifiers never come back this way:
  * those live in the blocklist, which every sign-up checks first.
  *
- * `DELETED_ACCOUNT_REUSE_DAYS`, default 30; 0 releases at once. An empty or
+ * `DELETED_ACCOUNT_REUSE_DAYS`, default 7 (one week - the period the settings
+ * page and the deletion email promise); 0 releases at once. An empty or
  * malformed value falls back to the default rather than to 0.
  */
 const DELETED_ACCOUNT_REUSE_MS = (() => {
   const raw = process.env.DELETED_ACCOUNT_REUSE_DAYS?.trim();
   const days = raw ? Number(raw) : NaN;
-  return (Number.isFinite(days) && days >= 0 ? days : 30) * 86_400_000;
+  return (Number.isFinite(days) && days >= 0 ? days : 7) * 86_400_000;
 })();
 
 /** When a deleted account's email, phone and Google sign-in become free; null for a live account. */

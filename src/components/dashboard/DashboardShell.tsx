@@ -10,11 +10,13 @@ import { Composer } from './Composer';
 import { PostCard, type Post } from './PostCard';
 import { FocusedPost } from './FocusedPost';
 import { toPost, type ApiPost } from './postMapping';
-import { GraduationCountdown, TrendingNotes, type TrendingNote } from './RightPanel';
+import { FeedAdCard, GraduationCountdown, TrendingNotes, type TrendingNote } from './RightPanel';
+import type { FeedAd } from '@/lib/feed/ad';
 import { NotesList } from '@/components/notes/NotesList';
 import { MentorsList } from '@/components/mentors/MentorsList';
 import { can, type Viewer as PermissionViewer } from '@/lib/permissions';
 import { GradCap } from '@/components/ui/GradCap';
+import { FEED_UPLOAD_MAX_SIDE, uploadImage } from '@/lib/media/browser-upload';
 
 /** 'all' or a university code. The codes are loaded from /api/universities. */
 type UniversityFilter = string;
@@ -82,6 +84,7 @@ export function DashboardShell({
   const [filter, setFilter] = useState<UniversityFilter>('all');
   const [posts, setPosts] = useState<Post[]>([]);
   const [trending, setTrending] = useState<TrendingNote[]>([]);
+  const [feedAd, setFeedAd] = useState<FeedAd | null>(null);
   const [viewer, setViewer] = useState<Viewer | null>(null);
   const [loading, setLoading] = useState(true);
   const [universityCodes, setUniversityCodes] = useState<string[]>([]);
@@ -120,6 +123,13 @@ export function DashboardShell({
     const controller = new AbortController();
 
     async function load() {
+      // Started alongside the rest but kept out of the Promise.all below: a
+      // sidebar ad must never be able to take the feed down with it.
+      fetch('/api/feed/ad', { signal: controller.signal })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((body) => setFeedAd(body?.ad ?? null))
+        .catch(() => {});
+
       try {
         const [meRes, feedRes, notesRes] = await Promise.all([
           fetch('/api/me', { signal: controller.signal }),
@@ -273,27 +283,25 @@ export function DashboardShell({
        * post that silently lost its picture, which is worse than an error the
        * user can act on. The bytes never go to /api/feed; only the key does.
        */
-      const media: { storageKey: string; altText?: string }[] = [];
+      const media: { storageKey: string }[] = [];
 
       if (draft.image) {
-        const form = new FormData();
-        form.append('file', draft.image);
-
-        const uploaded = await fetch('/api/media', { method: 'POST', body: form });
-        const uploadPayload = await uploaded.json().catch(() => null);
-
-        if (!uploaded.ok) {
-          // Thrown with the server's locale key so the composer can render the
-          // real reason ("that file is too large") rather than a generic one.
-          throw new Error(uploadPayload?.error ?? 'feed.image.errors.uploadFailed');
-        }
-        media.push({ storageKey: uploadPayload.storageKey });
+        // Shrunk in the browser first (the platform drops bodies over 4.5 MB);
+        // rejects with the locale key the composer renders.
+        const { storageKey } = await uploadImage<{ storageKey: string }>(
+          '/api/media',
+          draft.image,
+          FEED_UPLOAD_MAX_SIDE,
+        );
+        media.push({ storageKey });
       }
 
       const response = await fetch('/api/feed', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ body: draft.body, tags: draft.tags, media }),
+      }).catch(() => {
+        throw new Error('errors.network');
       });
 
       const payload = await response.json().catch(() => null);
@@ -514,6 +522,7 @@ export function DashboardShell({
             {viewer.graduationYear && viewer.graduationMonth && (
               <GraduationCountdown year={viewer.graduationYear} month={viewer.graduationMonth} />
             )}
+            {feedAd && <FeedAdCard ad={feedAd} />}
             <TrendingNotes notes={trending} />
           </aside>
         </div>

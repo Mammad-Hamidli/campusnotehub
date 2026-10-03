@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BadgeCheck, Briefcase, GraduationCap, Search, ShieldAlert, Star, UserRoundSearch, Video } from 'lucide-react';
-import { useT } from '@/lib/i18n/LocaleProvider';
+import { Briefcase, GraduationCap, Search, ShieldAlert, Star, UserRoundSearch, Video } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 import { FollowingBadge } from '@/components/social/Following';
 import { SectionHeading } from '@/components/ui/SectionHeading';
+import { UserAvatar } from '@/components/ui/UserAvatar';
+import { MENTOR_INDUSTRIES, industryLabel } from '@/lib/mentors/display';
+import { MentorRate } from './MentorRate';
 
 /**
  * The PocketMentor directory.
@@ -45,41 +48,10 @@ type Mentor = {
   };
 };
 
-/**
- * Mirrors the MentorIndustry enum in prisma/schema.prisma exactly.
- *
- * Written out rather than imported because pulling a server module into a
- * client component pulls the query engine types into the browser bundle. The
- * server re-validates every value against the real enum, so a drift here costs
- * a rejected filter rather than bad data - but it MUST match, or the dropdown
- * offers filters that return nothing.
- */
-const INDUSTRIES = [
-  'IT',
-  'MARKETING',
-  'LAW',
-  'ENGINEERING',
-  'FINANCE',
-  'MEDICINE',
-  'EDUCATION',
-  'DESIGN',
-  'OTHER',
-] as const;
-
-function initialsOf(nickname: string): string {
-  return nickname.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '??';
-}
-
-/** Money is stored in qepik (minor units); never format from a float. */
-function formatPrice(minor: number, locale: string): string | null {
-  if (minor <= 0) return null;
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'AZN' }).format(minor / 100);
-}
-
 /** `embedded` drops the page gutter and demotes the heading, for the dashboard tab. */
 export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
   const Heading = embedded ? 'h2' : 'h1';
-  const t = useT();
+  const { t } = useLocale();
 
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [canBook, setCanBook] = useState(false);
@@ -104,8 +76,6 @@ export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
       .catch(() => {});
     return () => controller.abort();
   }, []);
-
-  const locale = typeof document !== 'undefined' ? document.documentElement.lang || 'az' : 'az';
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -204,9 +174,9 @@ export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
             className="input py-1.5 text-sm"
           >
             <option value="">{t('mentors.allIndustries')}</option>
-            {INDUSTRIES.map((value) => (
+            {MENTOR_INDUSTRIES.map((value) => (
               <option key={value} value={value}>
-                {value.replace(/_/g, ' ')}
+                {industryLabel(t, value)}
               </option>
             ))}
           </select>
@@ -280,107 +250,99 @@ export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
         </div>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
-          {mentors.map((mentor) => {
-            const price = formatPrice(mentor.hourlyRateMinor, locale);
-            return (
-              <li key={mentor.id} className="card flex flex-col p-4">
-                <div className="flex items-start gap-3">
-                  <span
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-inset text-xs font-bold text-accent"
-                    aria-hidden="true"
-                  >
-                    {initialsOf(mentor.user.nickname)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-1.5">
-                      <span className="truncate text-sm font-medium text-fg">
-                        @{mentor.user.nickname}
+          {mentors.map((mentor) => (
+            <li key={mentor.id} className="card flex flex-col p-4">
+              <div className="flex items-start gap-3">
+                <UserAvatar
+                  nickname={mentor.user.nickname}
+                  src={mentor.user.avatarUrl}
+                  verified={mentor.user.isVerified}
+                  verifiedLabel={t('profile.verified')}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-1.5">
+                    <span className="truncate text-sm font-medium text-fg">
+                      @{mentor.user.nickname}
+                    </span>
+                    <FollowingBadge nickname={mentor.user.nickname} />
+                    {mentor.user.university && (
+                      <span className="rounded-md bg-surface-inset px-1.5 py-0.5 text-2xs font-semibold text-fg-muted">
+                        {mentor.user.university.code}
                       </span>
-                      <FollowingBadge nickname={mentor.user.nickname} />
-                      {mentor.user.isVerified && (
-                        <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-verified" aria-hidden="true" />
-                      )}
-                      {mentor.user.university && (
-                        <span className="rounded-md bg-surface-inset px-1.5 py-0.5 text-2xs font-semibold text-fg-muted">
-                          {mentor.user.university.code}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-fg-muted">
-                      {mentor.headline}
+                    )}
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-fg-muted">
+                    {mentor.headline}
+                  </p>
+                  {(mentor.jobTitle || mentor.company) && (
+                    <p className="mt-1 flex min-w-0 items-center gap-1 text-2xs text-fg-subtle">
+                      <Briefcase className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      <span className="truncate">
+                        {[mentor.jobTitle, mentor.company].filter(Boolean).join(' · ')}
+                      </span>
                     </p>
-                    {(mentor.jobTitle || mentor.company) && (
-                      <p className="mt-1 flex min-w-0 items-center gap-1 text-2xs text-fg-subtle">
-                        <Briefcase className="h-3 w-3 shrink-0" aria-hidden="true" />
-                        <span className="truncate">
-                          {[mentor.jobTitle, mentor.company].filter(Boolean).join(' · ')}
-                        </span>
-                      </p>
-                    )}
-                  </div>
+                  )}
                 </div>
+              </div>
 
-                {mentor.specialties.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {mentor.specialties.slice(0, 3).map((tag) => (
-                      <span
-                        key={tag}
-                        className="badge-accent"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                    {mentor.specialties.length > 3 && (
-                      <span className="text-2xs text-fg-subtle">
-                        +{mentor.specialties.length - 3}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-fg-muted">
-                  {mentor.ratingCount > 0 && (
-                    <span className="inline-flex items-center gap-1">
-                      <Star className="h-3 w-3 fill-current text-warn" aria-hidden="true" />
-                      <span className="tabular font-medium text-fg">
-                        {mentor.ratingAvg.toFixed(1)}
-                      </span>
-                      <span>({mentor.ratingCount})</span>
+              {mentor.specialties.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {mentor.specialties.slice(0, 3).map((tag) => (
+                    <span
+                      key={tag}
+                      className="badge-accent"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {mentor.specialties.length > 3 && (
+                    <span className="text-2xs text-fg-subtle">
+                      +{mentor.specialties.length - 3}
                     </span>
                   )}
-                  <span className="inline-flex items-center gap-1">
-                    <Video className="h-3 w-3" aria-hidden="true" />
-                    {t('mentors.sessions', { count: mentor.sessionsCompleted })}
-                  </span>
-                  <span className="ml-auto font-medium text-fg">
-                    {price ? t('mentors.rate', { price }) : t('mentors.free')}
-                  </span>
                 </div>
+              )}
 
-                <div className="mt-3 flex gap-2 border-t border-edge pt-3">
-                  {/* Booking is offered only when the server said this viewer
-                      may book AND the mentor is open to it. Anything else gets
-                      the message action, which is available to any live
-                      account and is a genuinely useful fallback. */}
-                  {canBook && mentor.isAcceptingBookings ? (
-                    <Link
-                      href={`/mentors/${mentor.id}`}
-                      className="btn-primary flex-1 justify-center px-3 py-1.5 text-sm"
-                    >
-                      {t('mentors.book')}
-                    </Link>
-                  ) : (
-                    <Link
-                      href={`/mentors/${mentor.id}`}
-                      className="btn-secondary flex-1 justify-center px-3 py-1.5 text-sm"
-                    >
-                      {t('mentors.viewProfile')}
-                    </Link>
-                  )}
-                </div>
-              </li>
-            );
-          })}
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-fg-muted">
+                {mentor.ratingCount > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <Star className="h-3 w-3 fill-current text-warn" aria-hidden="true" />
+                    <span className="tabular font-medium text-fg">
+                      {mentor.ratingAvg.toFixed(1)}
+                    </span>
+                    <span>({mentor.ratingCount})</span>
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1">
+                  <Video className="h-3 w-3" aria-hidden="true" />
+                  {t('mentors.sessions', { count: mentor.sessionsCompleted })}
+                </span>
+                <MentorRate minor={mentor.hourlyRateMinor} className="ml-auto font-medium text-fg" />
+              </div>
+
+              <div className="mt-3 flex gap-2 border-t border-edge pt-3">
+                {/* Booking is offered only when the server said this viewer
+                    may book AND the mentor is open to it. Anything else gets
+                    the message action, which is available to any live
+                    account and is a genuinely useful fallback. */}
+                {canBook && mentor.isAcceptingBookings ? (
+                  <Link
+                    href={`/mentors/${mentor.id}`}
+                    className="btn-primary flex-1 justify-center px-3 py-1.5 text-sm"
+                  >
+                    {t('mentors.book')}
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/mentors/${mentor.id}`}
+                    className="btn-secondary flex-1 justify-center px-3 py-1.5 text-sm"
+                  >
+                    {t('mentors.viewProfile')}
+                  </Link>
+                )}
+              </div>
+            </li>
+          ))}
         </ul>
       )}
     </div>

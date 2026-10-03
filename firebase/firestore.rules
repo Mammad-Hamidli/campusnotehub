@@ -279,6 +279,10 @@ service cloud.firestore {
     match /moderationActions/{id} { allow read, write: if false; }
     match /contentReports/{id}    { allow read, write: if false; }
 
+    // Staff-set switches (the feed ad slot). Read through GET /api/feed/ad,
+    // written through /api/admin/feed-ad, which audits every change.
+    match /siteConfig/{id}        { allow read, write: if false; }
+
     // Deferred work and raw media metadata are infrastructure.
     match /scheduledTasks/{id} { allow read, write: if false; }
 

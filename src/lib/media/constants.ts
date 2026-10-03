@@ -31,6 +31,22 @@ export const MAX_IMAGE_BYTES = 12 * 1024 * 1024; // 12 MB
 export const MAX_IMAGE_MB = MAX_IMAGE_BYTES / (1024 * 1024);
 
 /**
+ * The largest file the BROWSER sends.
+ *
+ * Vercel refuses a function request body over 4.5 MB before the handler runs:
+ * no JSON error, usually not even a response - the connection is dropped and
+ * fetch() rejects. That is why phone photos (5-15 MB) failed to upload while
+ * MAX_IMAGE_BYTES said 12 MB was fine. The browser now shrinks every image
+ * below this before sending it (./browser-upload.ts); the margin under 4.5 MB
+ * covers the multipart envelope.
+ */
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+/** What the file picker accepts. Originals are shrunk in the browser first. */
+export const MAX_SOURCE_IMAGE_BYTES = 40 * 1024 * 1024;
+export const MAX_SOURCE_IMAGE_MB = MAX_SOURCE_IMAGE_BYTES / (1024 * 1024);
+
+/**
  * Feed images keep their OWN aspect ratio, Instagram-style.
  *
  * Every upload used to be cover-cropped to a fixed 1200x900 (4:3), which cut
