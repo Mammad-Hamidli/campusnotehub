@@ -35,6 +35,11 @@ const mfaEnrolled = new Set<string>();
 const sessions = new Map<string, { userId: string; revokedAt: Date | null; expiresAt: Date }>();
 let consumed: Record<string, unknown> | null;
 let profile: ProviderProfile;
+let tokens: { idToken: string; refreshToken: string | null; scope: string };
+const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const saveCalendarLink = vi.fn(async () => ({ replacedToken: null as string | null }));
+const revokeGoogleToken = vi.fn(async () => {});
+const provisionWaitingMeetings = vi.fn(async () => {});
 
 const updateUser = vi.fn(async (id: string, patch: Partial<User>) => void Object.assign(users.get(id)!, patch));
 const completeLogin = vi.fn(async (p: { user: User; redirectTo?: string; amr: string[] }) =>
@@ -66,6 +71,7 @@ vi.mock('./flow', async () => {
     ...actual,
     consumeState: async () => consumed,
     exchangeCode: async () => 'id-token',
+    exchangeTokens: async () => tokens,
     verifyIdToken: async () => profile,
   };
 });
@@ -108,6 +114,18 @@ vi.mock('@/lib/security/blocklist', () => ({ isUserBlocked: async () => false })
 vi.mock('@/lib/security/ratelimit', () => ({
   rateLimit: async () => ({ ok: true, remaining: 1, retryAfterSeconds: 0 }),
   clientIp: () => '127.0.0.1',
+}));
+vi.mock('@/lib/firebase/repositories/calendarLinks', () => ({
+  saveCalendarLink: (...a: unknown[]) => saveCalendarLink(...(a as [])),
+  maskAddress: (email: string | null) => (email ? `${email.slice(0, 2)}***` : null),
+}));
+vi.mock('@/lib/google/calendar', () => ({
+  CALENDAR_SCOPE,
+  forgetAccessToken: () => {},
+  revokeGoogleToken: (...a: unknown[]) => revokeGoogleToken(...(a as [])),
+}));
+vi.mock('@/lib/mentors/meeting', () => ({
+  provisionWaitingMeetings: (...a: unknown[]) => provisionWaitingMeetings(...(a as [])),
 }));
 vi.mock('@/lib/email/send', () => ({ sendEmailAsync: (...a: unknown[]) => sendEmailAsync(...a) }));
 vi.mock('@/lib/auth/complete-login', () => ({ completeLogin: (p: never) => completeLogin(p) }));
@@ -163,6 +181,7 @@ beforeEach(() => {
   sessions.clear();
   vi.clearAllMocks();
   consumed = loginState();
+  tokens = { idToken: 'id-token', refreshToken: null, scope: 'openid email profile' };
 });
 
 describe('sign-in', () => {
@@ -406,5 +425,57 @@ describe('after email verification', () => {
     const { location } = await callback();
     expect(location.pathname).toBe('/__session/aysel');
     expect(identities.get('google:g-sub')?.userId).toBe('aysel');
+  });
+});
+
+describe('Google Calendar connection (mentor panel)', () => {
+  function calendarState() {
+    sessions.set('s1', { userId: 'm1', revokedAt: null, expiresAt: new Date(Date.now() + 60_000) });
+    return { provider: 'google', intent: 'calendar', userId: 'm1', sessionId: 's1', returnTo: '/mentors/dashboard', nonceHash: 'n', verifier: 'v' };
+  }
+
+  beforeEach(() => {
+    user('m1', { role: 'MENTOR' });
+    consumed = calendarState();
+    profile = google({ subject: 'g-cal', email: 'mentor@gmail.com' });
+    tokens = { idToken: 'id-token', refreshToken: 'refresh-1', scope: `openid ${CALENDAR_SCOPE} email` };
+  });
+
+  it('stores the grant for the session user and signs nobody in', async () => {
+    const { location } = await callback();
+    expect(location.pathname).toBe('/mentors/dashboard');
+    expect(location.searchParams.get('calendar')).toBe('connected');
+    expect(saveCalendarLink).toHaveBeenCalledWith('m1', expect.objectContaining({ refreshToken: 'refresh-1', googleSubject: 'g-cal' }));
+    expect(completeLogin).not.toHaveBeenCalled();
+    expect(identities.size).toBe(0);
+    expect(sendEmailAsync).toHaveBeenCalledWith('m1@ada.edu.az', 'calendarConnected', expect.anything());
+  });
+
+  it('refuses a grant without calendar access, and revokes what it was given', async () => {
+    tokens = { ...tokens, scope: 'openid email' };
+    const { location } = await callback();
+    expect(location.searchParams.get('oauth')).toBe('calendar_scope_missing');
+    expect(saveCalendarLink).not.toHaveBeenCalled();
+    expect(revokeGoogleToken).toHaveBeenCalledWith('refresh-1');
+  });
+
+  it('refuses an account that is not a mentor', async () => {
+    users.get('m1')!.role = 'STUDENT';
+    const { location } = await callback();
+    expect(location.searchParams.get('oauth')).toBe('forbidden');
+    expect(saveCalendarLink).not.toHaveBeenCalled();
+  });
+
+  it('does not complete when the starting session was signed out meanwhile', async () => {
+    sessions.get('s1')!.revokedAt = new Date();
+    const { location } = await callback();
+    expect(location.searchParams.get('oauth')).toBe('expired');
+    expect(saveCalendarLink).not.toHaveBeenCalled();
+  });
+
+  it('revokes the token a reconnect replaced', async () => {
+    saveCalendarLink.mockResolvedValueOnce({ replacedToken: 'refresh-0' });
+    await callback();
+    expect(revokeGoogleToken).toHaveBeenCalledWith('refresh-0');
   });
 });

@@ -253,6 +253,8 @@ service cloud.firestore {
     match /authIdentities/{id} { allow read, write: if false; }
     match /oauthStates/{id}    { allow read, write: if false; }
     match /oauthSignups/{id}   { allow read, write: if false; }
+    // A mentor's sealed Google Calendar refresh token. A credential.
+    match /googleCalendarLinks/{userId} { allow read, write: if false; }
 
     // hash. Server-only like every other credential.
     match /emailVerifications/{id} { allow read, write: if false; }

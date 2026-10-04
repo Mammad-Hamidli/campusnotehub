@@ -1,6 +1,7 @@
 /**
- * A minimal in-memory Firestore for repository tests: documents, equality
- * queries with limit(), and transactions whose writes apply after the
+ * A minimal in-memory Firestore for repository tests: documents, queries
+ * (==, in, and ranges; Dates compare by instant) with limit(), and
+ * transactions whose writes apply after the
  * callback returns (as Firestore's do). No contention retries - atomicity is
  * Firestore's guarantee; what tests check is that the code puts each check and
  * its write in one transaction.
@@ -38,11 +39,22 @@ export function createFakeFirestore() {
   }
   type Ref = ReturnType<typeof docRef>;
 
-  function query(collection: string, filters: [string, unknown][] = [], max = Infinity) {
+  type Op = '==' | 'in' | '<' | '<=' | '>' | '>=';
+  /** Dates compare by instant, as Firestore Timestamps do. */
+  const comparable = (v: unknown) => (v instanceof Date ? v.getTime() : v) as number | string;
+  function matches(actual: unknown, op: Op, expected: unknown): boolean {
+    if (op === '==') return comparable(actual) === comparable(expected);
+    if (op === 'in') return (expected as unknown[]).some((v) => comparable(v) === comparable(actual));
+    if (actual === undefined || actual === null) return false;
+    const [a, b] = [comparable(actual), comparable(expected)];
+    return op === '<' ? a < b : op === '<=' ? a <= b : op === '>' ? a > b : a >= b;
+  }
+
+  function query(collection: string, filters: [string, Op, unknown][] = [], max = Infinity) {
     const run = () => {
       const docs = [...store.keys()]
         .filter((p) => p.startsWith(`${collection}/`) && p.split('/').length === 2)
-        .filter((p) => filters.every(([f, v]) => store.get(p)![f] === v))
+        .filter((p) => filters.every(([f, op, v]) => matches(store.get(p)![f], op, v)))
         .slice(0, max)
         .map(snapshot);
       return { empty: docs.length === 0, size: docs.length, docs };
@@ -50,7 +62,7 @@ export function createFakeFirestore() {
     return {
       __query: true as const,
       run,
-      where: (field: string, _op: '==', value: unknown) => query(collection, [...filters, [field, value]], max),
+      where: (field: string, op: Op, value: unknown) => query(collection, [...filters, [field, op, value]], max),
       limit: (n: number) => query(collection, filters, n),
       get: async () => run(),
     };
@@ -59,7 +71,7 @@ export function createFakeFirestore() {
   const db = {
     collection: (name: string) => ({
       doc: (id?: string) => docRef(`${name}/${id ?? `auto${++autoId}`}`),
-      where: (field: string, op: '==', value: unknown) => query(name).where(field, op, value),
+      where: (field: string, op: Op, value: unknown) => query(name).where(field, op, value),
     }),
     runTransaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
       const writes: (() => void)[] = [];

@@ -149,6 +149,12 @@ const DEDICATED_EMAIL: ReadonlySet<string> = new Set([
   'VERIFICATION_NEEDS_REVIEW',
   'NOTE_MODERATION',
   'FOLLOW_REQUEST',
+  // Session requests: src/lib/mentors/request-service.ts and meeting.ts.
+  'BOOKING_REQUESTED',
+  'BOOKING_CONFIRMED',
+  'BOOKING_REJECTED',
+  'BOOKING_EXPIRED',
+  'CALENDAR_DISCONNECTED',
 ]);
 const SOCIAL: ReadonlySet<string> = new Set(['POST_LIKE', 'POST_REPLY', 'NEW_FOLLOWER', 'FOLLOW_ACCEPTED']);
 

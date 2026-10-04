@@ -5,6 +5,7 @@ import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 import { PASSIVE_HEADER } from '@/components/auth/SessionKeeper';
 import type { SerializedNotification } from '@/lib/notifications/serialize';
+import { displayParams } from '@/lib/notifications/params';
 
 /** Fired on window with the new rows, for screens that list notifications. */
 export const NOTIFICATIONS_EVENT = 'campusnotehub:notifications';
@@ -14,7 +15,16 @@ const POLL_MS = 15_000;
 /** Re-asks a few seconds back each time; rows already seen are skipped by id. */
 const OVERLAP_MS = 5_000;
 /** Toasted as they arrive; everything else only moves the badge. */
-const TOASTED = new Set(['POST_LIKE', 'POST_REPLY', 'FOLLOW_REQUEST', 'FOLLOW_ACCEPTED', 'NEW_FOLLOWER']);
+const TOASTED = new Set([
+  'POST_LIKE',
+  'POST_REPLY',
+  'FOLLOW_REQUEST',
+  'FOLLOW_ACCEPTED',
+  'NEW_FOLLOWER',
+  'BOOKING_REQUESTED',
+  'BOOKING_CONFIRMED',
+  'BOOKING_REJECTED',
+]);
 
 type LiveState = {
   unread: number;
@@ -101,9 +111,11 @@ export function LiveNotificationsProvider({ viewerId, children }: { viewerId: st
         new CustomEvent<NotificationsEventDetail>(NOTIFICATIONS_EVENT, { detail: { latest: fresh } }),
       );
       // Oldest first, and at most three: a burst of likes is one glance, not a wall.
+      const locale = document.documentElement.lang || 'az';
       for (const row of fresh.filter((r) => TOASTED.has(r.type)).slice(0, 3).reverse()) {
-        notify.current.toast.info(notify.current.t(row.bodyKey, row.params), {
-          title: notify.current.t(row.titleKey, row.params),
+        const params = displayParams(row.params, locale);
+        notify.current.toast.info(notify.current.t(row.bodyKey, params), {
+          title: notify.current.t(row.titleKey, params),
         });
       }
     } catch {

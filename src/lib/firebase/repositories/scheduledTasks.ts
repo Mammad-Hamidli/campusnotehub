@@ -65,6 +65,14 @@ export function scheduleTx(
   );
 }
 
+/**
+ * Drops queued work inside a transaction - an answered request's expiry, say.
+ * Deleting a task that does not exist (or already ran) is a no-op.
+ */
+export function unscheduleTx(tx: Transaction, dedupeKey: string): void {
+  tx.delete(tasks().doc(taskId(dedupeKey)));
+}
+
 /** Standalone scheduling, for callers that are not already in a transaction. */
 export async function schedule(params: {
   kind: string;

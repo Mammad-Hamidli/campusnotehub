@@ -63,6 +63,12 @@ export type TemplateName =
   | 'noteApproved'
   | 'noteRejected'
   | 'followRequest'
+  | 'bookingRequested'
+  | 'bookingConfirmed'
+  | 'bookingRejected'
+  | 'bookingExpired'
+  | 'calendarConnected'
+  | 'calendarReconnect'
   | 'emailChangeConfirm'
   | 'emailChangeRequested'
   | 'emailChanged'
@@ -706,6 +712,145 @@ export const TEMPLATES = {
       { kind: 'paragraph', text: hi(p.nickname) },
       { kind: 'paragraph', text: `@${p.requester} sent you a follow request. Nothing is shared until you accept it.` },
       { kind: 'button', label: 'Review the request', href: p.url },
+    ],
+  }),
+
+  /**
+   * Session requests. Times arrive pre-formatted in the RECIPIENT's zone (see
+   * src/lib/mentors/email-time.ts). The Google Meet link is NEVER in these
+   * emails: it is a bearer credential, and it is handed out only from 30
+   * minutes before the session, by the session page.
+   */
+  bookingRequested: (p: {
+    nickname: string;
+    mentee: string;
+    when: string;
+    minutes: number;
+    topic: string;
+    answerBy: string;
+    path: string;
+  }): EmailContent => ({
+    subject: `New session request from @${p.mentee}`,
+    heading: 'New session request',
+    preheader: `@${p.mentee} asked for a session on ${p.when}. Accept or decline in the app.`,
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: `@${p.mentee} would like a mentoring session with you.` },
+      {
+        kind: 'facts',
+        rows: [
+          { label: 'When', value: p.when },
+          { label: 'Length', value: `${p.minutes} minutes` },
+          { label: 'Topic', value: p.topic },
+          { label: 'Answer by', value: p.answerBy },
+        ],
+      },
+      {
+        kind: 'callout',
+        tone: 'neutral',
+        title: 'The time is held for you',
+        body: 'Nobody else can book this slot until you answer. If you do not answer in time, the request expires and the slot opens again.',
+      },
+      { kind: 'button', label: 'Accept or decline', href: appUrl(p.path) },
+    ],
+  }),
+
+  bookingConfirmed: (p: {
+    nickname: string;
+    mentor: string;
+    when: string;
+    minutes: number;
+    topic: string;
+    path: string;
+  }): EmailContent => ({
+    subject: `Your session with @${p.mentor} is confirmed`,
+    heading: 'Session confirmed',
+    preheader: `@${p.mentor} accepted your request for ${p.when}.`,
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: `@${p.mentor} accepted your session request.` },
+      {
+        kind: 'facts',
+        rows: [
+          { label: 'When', value: p.when },
+          { label: 'Length', value: `${p.minutes} minutes` },
+          { label: 'Topic', value: p.topic },
+          { label: 'Where', value: 'Google Meet' },
+        ],
+      },
+      {
+        kind: 'callout',
+        tone: 'success',
+        title: 'Joining',
+        body: 'The Google Meet link opens on the session page 30 minutes before the start. It is not included in this email - open the session page when it is time, then wait for your mentor to let you in.',
+      },
+      { kind: 'button', label: 'Open the session', href: appUrl(p.path) },
+    ],
+  }),
+
+  bookingRejected: (p: { nickname: string; mentor: string; when: string; reason: string; path: string }): EmailContent => ({
+    subject: `@${p.mentor} could not take your session request`,
+    heading: 'Session request declined',
+    preheader: `Your request for ${p.when} was declined.`,
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: `@${p.mentor} declined your session request for ${p.when}.` },
+      { kind: 'facts', rows: [{ label: 'Note from your mentor', value: p.reason }] },
+      { kind: 'paragraph', text: 'You can pick another time, or ask another mentor.' },
+      { kind: 'button', label: 'Find another time', href: appUrl(p.path) },
+    ],
+  }),
+
+  bookingExpired: (p: { nickname: string; mentor: string; when: string; path: string }): EmailContent => ({
+    subject: 'Your session request expired',
+    heading: 'Request expired',
+    preheader: `@${p.mentor} did not answer your request for ${p.when} in time.`,
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: `@${p.mentor} did not answer your session request for ${p.when} in time, so it has expired. Nothing was booked.`,
+      },
+      { kind: 'button', label: 'Pick another time', href: appUrl(p.path) },
+    ],
+  }),
+
+  calendarConnected: (p: { nickname: string; account: string | null }): EmailContent => ({
+    subject: 'Google Calendar connected to your mentor account',
+    heading: 'Google Calendar connected',
+    preheader: 'Accepted sessions will now get a Google Meet room on your calendar.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: 'A Google Calendar was connected to your mentor account. When you accept a session, its Google Meet room is created on that calendar, with you as the host.',
+      },
+      ...(p.account ? [{ kind: 'facts' as const, rows: [{ label: 'Google account', value: p.account }] }] : []),
+      {
+        kind: 'callout',
+        tone: 'warning',
+        title: 'Not you?',
+        body: 'Disconnect it from your mentor panel, change your password, and contact support.',
+      },
+      { kind: 'button', label: 'Open the mentor panel', href: appUrl('/mentors/dashboard#calendar') },
+    ],
+  }),
+
+  calendarReconnect: (p: { nickname: string; when: string }): EmailContent => ({
+    subject: 'Reconnect Google Calendar to create your Meet links',
+    heading: 'Google Calendar needs reconnecting',
+    preheader: 'A confirmed session is waiting for its Google Meet link.',
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      {
+        kind: 'paragraph',
+        text: `Google no longer lets us create events on your calendar, so your session on ${p.when} does not have a Meet link yet.`,
+      },
+      {
+        kind: 'paragraph',
+        text: 'Reconnect your calendar from the mentor panel; every waiting session gets its link straight away.',
+      },
+      { kind: 'button', label: 'Reconnect Google Calendar', href: appUrl('/mentors/dashboard#calendar') },
     ],
   }),
 

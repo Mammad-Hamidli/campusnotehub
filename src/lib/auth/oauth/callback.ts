@@ -26,7 +26,20 @@ import { completeLogin } from '@/lib/auth/complete-login';
 import { setMfaTicketCookie } from '@/lib/auth/mfa-http';
 import { createQuickAccount } from '@/lib/auth/quick-signup';
 import { LOCALE_COOKIE } from '@/lib/i18n/dictionaries';
-import { BINDING_COOKIE, consumeState, exchangeCode, verifyIdToken, type ConsumedState } from './flow';
+import { can } from '@/lib/permissions';
+import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
+import { maskAddress, saveCalendarLink } from '@/lib/firebase/repositories/calendarLinks';
+import { afterResponse } from '@/lib/after-response';
+import { CALENDAR_SCOPE, forgetAccessToken, revokeGoogleToken } from '@/lib/google/calendar';
+import { provisionWaitingMeetings } from '@/lib/mentors/meeting';
+import {
+  BINDING_COOKIE,
+  consumeState,
+  exchangeTokens,
+  verifyIdToken,
+  type ConsumedState,
+  type TokenSet,
+} from './flow';
 import { OAuthError, PROVIDER_LABELS, isProviderId, providerConfig, type ProviderProfile } from './providers';
 import { clearBindingCookie, outcomeRedirect, redirectTo } from './http';
 
@@ -124,7 +137,8 @@ export async function handleCallback(request: NextRequest, providerParam: string
   });
   if (!state) return outcomeRedirect(request, '/login', 'expired');
 
-  const page = state.intent === 'link' ? '/settings/security' : '/login';
+  const page =
+    state.intent === 'link' ? '/settings/security' : state.intent === 'calendar' ? MENTOR_DASHBOARD_PATH : '/login';
 
   // The provider's error TEXT is never shown - it arrives in the URL and is
   // attacker-controllable. Only the fact of cancellation is used.
@@ -138,9 +152,10 @@ export async function handleCallback(request: NextRequest, providerParam: string
   if (!code) return outcomeRedirect(request, page, 'failed');
 
   let profile: ProviderProfile;
+  let tokens: TokenSet;
   try {
-    const idToken = await exchangeCode(config, state, code);
-    profile = await verifyIdToken(config, idToken, state.nonceHash);
+    tokens = await exchangeTokens(config, state, code);
+    profile = await verifyIdToken(config, tokens.idToken, state.nonceHash);
   } catch (error) {
     const reason = error instanceof OAuthError ? error.message : 'unexpected';
     console.warn(`[oauth] ${config.id} callback rejected: ${reason}`);
@@ -148,7 +163,68 @@ export async function handleCallback(request: NextRequest, providerParam: string
     return outcomeRedirect(request, page, 'failed');
   }
 
+  if (state.intent === 'calendar') return handleCalendar(request, state, profile, tokens);
+  // Sign-in and linking never keep anything but the verified identity.
   return state.intent === 'link' ? handleLink(request, state, profile) : handleLogin(request, state, profile, userAgent);
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * A mentor granting Google Calendar access, so accepted sessions get a Meet
+ * room on their calendar (src/lib/mentors/meeting.ts). Signs nobody in and
+ * links no identity: the Google account here may be any account the mentor
+ * chooses, and only the refresh token is kept - sealed, see
+ * repositories/calendarLinks.ts.
+ *
+ * Checked like a link: the session that started the flow must still be alive
+ * and the same user's, and the account must still be a mentor.
+ */
+async function handleCalendar(request: NextRequest, state: ConsumedState, profile: ProviderProfile, tokens: TokenSet) {
+  const page = MENTOR_DASHBOARD_PATH;
+  const session = state.sessionId ? await findSessionById(state.sessionId) : null;
+  if (!session || session.revokedAt || session.expiresAt <= new Date() || session.userId !== state.userId) {
+    return outcomeRedirect(request, page, 'expired');
+  }
+  const user = await findUserById(session.userId);
+  if (!usable(user) || (await isUserBlocked(user.id))) return outcomeRedirect(request, page, 'expired');
+
+  const viewer = {
+    id: user.id,
+    role: user.role,
+    accountStatus: user.accountStatus,
+    verificationStatus: user.verificationStatus,
+    mentorSince: user.mentorSince ?? null,
+  };
+  if (!can(viewer, 'mentors:console')) return outcomeRedirect(request, page, 'forbidden');
+
+  // Granular consent lets the person untick calendar access and still "allow".
+  if (!tokens.scope.split(' ').includes(CALENDAR_SCOPE)) {
+    if (tokens.refreshToken) void revokeGoogleToken(tokens.refreshToken);
+    return outcomeRedirect(request, page, 'calendar_scope_missing');
+  }
+  // prompt=consent + access_type=offline always yields one; if not, nothing works later.
+  if (!tokens.refreshToken) return outcomeRedirect(request, page, 'failed');
+
+  const { replacedToken } = await saveCalendarLink(user.id, {
+    refreshToken: tokens.refreshToken,
+    scope: tokens.scope,
+    googleSubject: profile.subject,
+    email: profile.email,
+  });
+  forgetAccessToken(user.id);
+  if (replacedToken) void revokeGoogleToken(replacedToken);
+
+  await audit(request, 'GOOGLE_CALENDAR_CONNECTED', user.id, 'SUCCESS', { replaced: replacedToken !== null });
+  sendEmailAsync(user.email, 'calendarConnected', {
+    nickname: user.nickname,
+    account: maskAddress(profile.email),
+  });
+  // Sessions accepted while access was missing get their rooms now - after the
+  // redirect, so the mentor is not kept waiting on Google.
+  afterResponse('calendar', () => provisionWaitingMeetings(user.id));
+
+  return clearBindingCookie(redirectTo(request, `${page}?calendar=connected#calendar`));
 }
 
 // ---------------------------------------------------------------------------

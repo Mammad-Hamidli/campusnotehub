@@ -153,6 +153,10 @@ export const LIMITS = {
   'notes:download': { limit: 60, windowMs: 60 * 60_000 },
   'mentors:schedule': { limit: 60, windowMs: 60 * 60_000 },
   'bookings:create': { limit: 10, windowMs: 24 * 60 * 60_000 },
+  // A mentor answering requests; generous, it only stops a scripted loop.
+  'bookings:respond': { limit: 60, windowMs: 60 * 60_000 },
+  // Each join may call Google once to finish a Meet room that is not ready yet.
+  'bookings:join': { limit: 30, windowMs: 15 * 60_000 },
   'search': { limit: 120, windowMs: 60_000 },
   // Finishing a quick-login profile: a handful of attempts covers typos and
   // taken nicknames without letting the form probe which handles exist.

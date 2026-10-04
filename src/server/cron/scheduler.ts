@@ -1,6 +1,6 @@
 // Must stay the first import: loads .env* the same way Next.js does.
 import '../load-env';
-import { dueTasks, markExecuted, markFailed } from '@/lib/firebase/repositories/scheduledTasks';
+import { runDueTasks as runScheduledTasks } from '@/lib/scheduled/run-due-tasks';
 import { reapExpired, sweepExpiredAssets } from '@/lib/verification/reviewBuffer';
 import { runGraduationSweep } from './graduation';
 import { retryQueuedEmails } from '@/lib/email/send';
@@ -12,7 +12,7 @@ import { retryQueuedEmails } from '@/lib/email/send';
  * containers, because all three are cheap and all three need the same Firebase
  * Admin app:
  *
- *   every  1 min  run due scheduled tasks (booking reminders), retry queued email
+ *   every  1 min  run due scheduled tasks (request expiry, Meet rooms), retry queued email
  *   every 15 min  reap expired review buffers
  *   1 May 06:00   graduation sweep
  *
@@ -31,34 +31,15 @@ const GRAD_CHECK_INTERVAL_MS = 60 * 60_000;
 let stopping = false;
 
 /**
- * Runs work that was scheduled to happen later.
- *
- * The two BOOKING_REMINDER_* kinds are marked executed without acting,
- * because push and email fan-out does not exist yet (see the note in
- * src/lib/notifications/dispatch.ts) - leaving them due forever would grow an
- * unbounded backlog of work nothing can do. Legacy ESCROW_RELEASE rows from
- * the retired wallet are closed the same way: there is no money to move.
+ * Runs due scheduled tasks (request expiry, Meet provisioning retries,
+ * reminders - see src/lib/scheduled/run-due-tasks.ts), then retries parked
+ * emails.
  */
 async function runDueTasks(): Promise<void> {
-  let tasks;
   try {
-    tasks = await dueTasks(new Date());
+    await runScheduledTasks();
   } catch (error) {
     console.error('[scheduler] could not read the task queue', error);
-    return;
-  }
-
-  for (const task of tasks) {
-    try {
-      await markExecuted(task.id);
-    } catch (error) {
-      // A failure leaves `executedAt` null so the next sweep tries again,
-      // and increments the attempt counter so a task that will never succeed
-      // is visible to a human.
-      const message = error instanceof Error ? error.message : String(error);
-      console.error('[scheduler] task %s (%s) failed: %s', task.id, task.kind, message);
-      await markFailed(task.id, message).catch(() => {});
-    }
   }
 
   // Emails parked in the outbox after a failed delivery get their next try.

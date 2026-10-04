@@ -8,6 +8,9 @@ import { can } from '@/lib/permissions';
 import { findUserById } from '@/lib/firebase/repositories/users';
 import { findMentorApplication } from '@/lib/firebase/repositories/mentorApplications';
 import { findMentorByUserId, listUpcomingMentorBookings } from '@/lib/firebase/repositories/mentors';
+import { findUsersByIds } from '@/lib/firebase/repositories/users';
+import { findCalendarLink } from '@/lib/firebase/repositories/calendarLinks';
+import { answerDeadline, isPendingRequest } from '@/lib/mentors/requests';
 import { billingSnapshot } from '@/lib/mentors/billing';
 import { buildMentorChecklist } from '@/lib/mentors/checklist';
 import { mentorJoinDate } from '@/lib/mentors/membership';
@@ -17,6 +20,8 @@ import { OnboardingChecklist } from '@/components/mentors/dashboard/OnboardingCh
 import { PaymentReminderCard } from '@/components/mentors/dashboard/PaymentReminderCard';
 import { MentorStats } from '@/components/mentors/dashboard/MentorStats';
 import { UpcomingSessions } from '@/components/mentors/dashboard/UpcomingSessions';
+import { SessionRequestsCard } from '@/components/mentors/dashboard/SessionRequestsCard';
+import { GoogleCalendarCard } from '@/components/mentors/dashboard/GoogleCalendarCard';
 import type { Translate } from '@/components/mentors/dashboard/format';
 
 export const metadata: Metadata = { title: 'Mentor panel', robots: { index: false, follow: false } };
@@ -50,21 +55,46 @@ export const dynamic = 'force-dynamic';
  * Rendered entirely on the server, widgets included: see
  * src/components/mentors/dashboard/format.ts for the az date-format reason.
  */
-export default async function MentorDashboardPage() {
+export default async function MentorDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ calendar?: string; oauth?: string }>;
+}) {
   const viewer = await requirePageSession(MENTOR_DASHBOARD_PATH);
   if (!can(viewer, 'mentors:console')) redirect('/dashboard');
 
-  const [user, application, profile] = await Promise.all([
+  const [user, application, profile, calendarLink, query] = await Promise.all([
     findUserById(viewer.id),
     findMentorApplication(viewer.id),
     findMentorByUserId(viewer.id),
+    findCalendarLink(viewer.id),
+    searchParams,
   ]);
   // The session was valid a moment ago; a vanished row is a deleted account.
   if (!user) redirect('/logout');
 
   const now = new Date();
   const live = profile?.isApproved === true;
-  const upcoming = live ? await listUpcomingMentorBookings(profile.id, now) : [];
+  const active = live ? await listUpcomingMentorBookings(profile.id, now) : [];
+  // One read serves both lists: requests still waiting for an answer, and
+  // sessions that are actually on.
+  const pending = active.filter((b) => isPendingRequest(b, now));
+  const upcoming = active.filter((b) => b.status !== 'REQUESTED');
+  const mentees = await findUsersByIds(pending.map((b) => b.menteeId));
+  const requests = pending.flatMap((b) => {
+    const mentee = mentees.get(b.menteeId);
+    if (!mentee || mentee.deletedAt) return [];
+    return [
+      {
+        id: b.id,
+        startsAt: b.startsAt,
+        answerBy: answerDeadline(b),
+        topic: b.topic,
+        menteeNote: b.menteeNote,
+        mentee: mentee.nickname,
+      },
+    ];
+  });
 
   /**
    * The fee schedule is computed in the platform's time zone (billingSnapshot
@@ -134,6 +164,12 @@ export default async function MentorDashboardPage() {
           <aside className="space-y-5 lg:order-last">
             {billing && <PaymentReminderCard billing={billing} locale={locale} t={t} />}
 
+            <GoogleCalendarCard
+              link={calendarLink ? { status: calendarLink.status, accountHint: calendarLink.accountHint } : null}
+              notice={query.calendar === 'connected' ? 'connected' : (query.oauth ?? null)}
+              t={t}
+            />
+
             <nav aria-label={t('mentorDashboard.links.title')} className="card p-2">
               {links.map(({ href, icon: Icon, labelKey }) => (
                 <Link
@@ -149,6 +185,15 @@ export default async function MentorDashboardPage() {
           </aside>
 
           <div className="min-w-0 space-y-5 lg:col-span-2">
+            {live && (
+              <SessionRequestsCard
+                requests={requests}
+                calendarConnected={calendarLink?.status === 'ACTIVE'}
+                locale={locale}
+                timeZone={profile?.timezone ?? user.timezone ?? 'Asia/Baku'}
+                t={t}
+              />
+            )}
             {live && (
               <MentorStats
                 sessionsCompleted={profile.sessionsCompleted}

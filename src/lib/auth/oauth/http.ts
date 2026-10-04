@@ -20,7 +20,11 @@ export type OAuthOutcome =
   | 'identity_in_use'
   | 'provider_already_linked'
   | 'rate_limited'
-  | 'account_deleted';
+  | 'account_deleted'
+  /** Calendar intent: the person unticked calendar access on Google's consent screen. */
+  | 'calendar_scope_missing'
+  /** Calendar intent: the account is not (or no longer) a mentor. */
+  | 'forbidden';
 
 /** Public base for redirects: APP_URL (or loopback in dev), never a Host header an attacker can set. */
 export function appBase(request: NextRequest): string {
@@ -37,7 +41,7 @@ export function redirectTo(request: NextRequest, path: string): NextResponse {
 
 export function outcomeRedirect(
   request: NextRequest,
-  page: '/login' | '/settings/security',
+  page: '/login' | '/settings/security' | '/mentors/dashboard',
   outcome: OAuthOutcome,
   extra: Record<string, string> = {},
 ): NextResponse {

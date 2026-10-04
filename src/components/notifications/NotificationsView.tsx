@@ -7,6 +7,7 @@ import {
   Bell,
   BookOpen,
   CalendarClock,
+  CalendarX,
   Check,
   CheckCheck,
   Clock,
@@ -22,6 +23,8 @@ import {
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { SessionRequestActions } from '@/components/mentors/SessionRequestActions';
+import { displayParams, formatInstant } from '@/lib/notifications/params';
 import {
   NOTIFICATIONS_EVENT,
   useLiveNotifications,
@@ -83,12 +86,24 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   BOOKING_REMINDER_24H: { icon: CalendarClock, tone: 'text-accent bg-accent-soft' },
   BOOKING_REMINDER_1H: { icon: CalendarClock, tone: 'text-warn bg-warn-soft' },
   BOOKING_CANCELLED: { icon: CalendarClock, tone: 'text-danger bg-danger-soft' },
+  BOOKING_REJECTED: { icon: CalendarX, tone: 'text-danger bg-danger-soft' },
+  BOOKING_EXPIRED: { icon: CalendarX, tone: 'text-fg-muted bg-surface-inset' },
+  CALENDAR_DISCONNECTED: { icon: CalendarX, tone: 'text-warn bg-warn-soft' },
   POST_REPLY: { icon: MessageCircle, tone: 'text-accent bg-accent-soft' },
   POST_LIKE: { icon: Heart, tone: 'text-danger bg-danger-soft' },
   NEW_FOLLOWER: { icon: UserPlus, tone: 'text-accent bg-accent-soft' },
   FOLLOW_REQUEST: { icon: UserPlus, tone: 'text-accent bg-accent-soft' },
   FOLLOW_ACCEPTED: { icon: UserCheck, tone: 'text-verified bg-verified-soft' },
   SYSTEM: { icon: Bell, tone: 'text-fg-muted bg-surface-inset' },
+};
+
+/** A request still waiting for the viewer's answer - GET /api/mentors/me/requests. */
+type PendingRequest = {
+  id: string;
+  startsAt: string;
+  requestExpiresAt: string | null;
+  topic: string;
+  menteeNote: string | null;
 };
 
 function iconFor(type: string) {
@@ -115,6 +130,32 @@ export function NotificationsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const live = useLiveNotifications();
+  /**
+   * Session requests the viewer can still answer, by booking id. A
+   * BOOKING_REQUESTED row whose booking is in here carries Accept / Decline;
+   * one that is not (answered, expired) reads as an ordinary notification.
+   * Fetched only when such a row is on screen, so nobody else pays for it.
+   */
+  const [pending, setPending] = useState<Map<string, PendingRequest>>(new Map());
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const hasRequestRows = items.some((row) => row.type === 'BOOKING_REQUESTED');
+
+  const loadPending = useCallback(async () => {
+    try {
+      const response = await fetch('/api/mentors/me/requests', { cache: 'no-store' });
+      if (!response.ok) return;
+      const data = (await response.json()) as { requests?: PendingRequest[]; calendarConnected?: boolean };
+      setPending(new Map((data.requests ?? []).map((request) => [request.id, request])));
+      setCalendarConnected(data.calendarConnected === true);
+    } catch {
+      // The rows still render; only the buttons are missing until the next load.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (hasRequestRows) void loadPending();
+  }, [hasRequestRows, loadPending]);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -159,10 +200,11 @@ export function NotificationsView() {
         return added.length ? [...added, ...rows] : rows;
       });
       setUnread((count) => count + latest.filter((row) => !row.read).length);
+      if (latest.some((row) => row.type === 'BOOKING_REQUESTED')) void loadPending();
     };
     window.addEventListener(NOTIFICATIONS_EVENT, onLive);
     return () => window.removeEventListener(NOTIFICATIONS_EVENT, onLive);
-  }, []);
+  }, [loadPending]);
 
   /**
    * Marks rows read.
@@ -299,14 +341,14 @@ export function NotificationsView() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <p className={`text-sm ${item.read ? 'text-fg-muted' : 'font-semibold text-fg'}`}>
-                      {t(item.titleKey, item.params)}
+                      {t(item.titleKey, displayParams(item.params, locale))}
                     </p>
                     <time className="shrink-0 text-2xs text-fg-subtle">
                       {when(item.createdAt, locale)}
                     </time>
                   </div>
                   <p className="mt-0.5 truncate text-xs text-fg-muted">
-                    {t(item.bodyKey, item.params)}
+                    {t(item.bodyKey, displayParams(item.params, locale))}
                   </p>
                 </div>
 
@@ -324,6 +366,50 @@ export function NotificationsView() {
             const className = `card flex w-full items-start gap-3 p-3 text-left transition-colors hover:bg-surface-muted ${
               item.read ? '' : 'border-accent/30'
             }`;
+
+            /**
+             * A session request still waiting for an answer is answered right
+             * here. Not a link: buttons may not nest inside an anchor.
+             */
+            const request =
+              item.type === 'BOOKING_REQUESTED' ? pending.get(String(item.params.bookingId ?? '')) : undefined;
+            if (request) {
+              return (
+                <li key={item.id}>
+                  <div className={`card p-3 ${item.read ? '' : 'border-accent/30'}`}>
+                    <div className="flex items-start gap-3">{inner}</div>
+                    <div className="pl-12">
+                      <p className="mt-2 text-sm font-medium text-fg">{request.topic}</p>
+                      {request.menteeNote && (
+                        <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs text-fg-muted">
+                          {request.menteeNote}
+                        </p>
+                      )}
+                      {request.requestExpiresAt && (
+                        <p className="mt-1.5 text-2xs text-fg-subtle">
+                          {t('mentors.requests.answerBy', {
+                            when: formatInstant(new Date(request.requestExpiresAt), locale),
+                          })}
+                        </p>
+                      )}
+                      <SessionRequestActions
+                        bookingId={request.id}
+                        calendarConnected={calendarConnected}
+                        onAnswered={() => {
+                          setPending((rows) => {
+                            const next = new Map(rows);
+                            next.delete(request.id);
+                            return next;
+                          });
+                          if (!item.read) void markRead([item.id]);
+                          live.refresh();
+                        }}
+                      />
+                    </div>
+                  </div>
+                </li>
+              );
+            }
 
             // A row with a destination is a link; one without is a button that
             // only marks read. Rendering the right element matters for

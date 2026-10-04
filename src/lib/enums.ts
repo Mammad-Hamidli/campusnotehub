@@ -130,8 +130,11 @@ export const MentorIndustry = {
 export type MentorIndustry = (typeof MentorIndustry)[keyof typeof MentorIndustry];
 
 export const BookingStatus = {
+  /** Waiting for the mentor's answer; holds the slot until requestExpiresAt. */
   REQUESTED: 'REQUESTED',
   CONFIRMED: 'CONFIRMED',
+  /** Declined by the mentor, with a reason. */
+  REJECTED: 'REJECTED',
   RESCHEDULED: 'RESCHEDULED',
   COMPLETED: 'COMPLETED',
   CANCELLED_BY_MENTEE: 'CANCELLED_BY_MENTEE',
@@ -161,6 +164,10 @@ export const NotificationType = {
   BOOKING_REMINDER_24H: 'BOOKING_REMINDER_24H',
   BOOKING_REMINDER_1H: 'BOOKING_REMINDER_1H',
   BOOKING_CANCELLED: 'BOOKING_CANCELLED',
+  BOOKING_REJECTED: 'BOOKING_REJECTED',
+  BOOKING_EXPIRED: 'BOOKING_EXPIRED',
+  /** Google revoked the mentor's calendar access; Meet links cannot be made until they reconnect. */
+  CALENDAR_DISCONNECTED: 'CALENDAR_DISCONNECTED',
   POST_REPLY: 'POST_REPLY',
   POST_LIKE: 'POST_LIKE',
   NEW_FOLLOWER: 'NEW_FOLLOWER',

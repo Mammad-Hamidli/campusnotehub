@@ -45,7 +45,13 @@ export const BINDING_COOKIE = 'CH_OAUTH';
 export const BINDING_COOKIE_PATH = '/api/auth/oauth';
 const STATE_TTL_MS = 10 * 60_000;
 
-export type OAuthIntent = 'login' | 'link';
+/**
+ * login    - sign in (or up) with Google
+ * link     - attach Google sign-in to the signed-in account
+ * calendar - a mentor granting Google Calendar access for Meet rooms; the
+ *            callback stores a refresh token instead of signing anyone in
+ */
+export type OAuthIntent = 'login' | 'link' | 'calendar';
 
 export type OAuthState = {
   provider: ProviderId;
@@ -93,6 +99,13 @@ export async function beginAuthorization(params: {
   returnTo: string;
   userAgent: string;
   requestOrigin: string;
+  /** Overrides the provider's sign-in scope (the calendar intent asks for more). */
+  scope?: string;
+  /**
+   * Ask for a refresh token: access_type=offline plus prompt=consent, which
+   * is the only way Google reliably returns one on a repeat grant.
+   */
+  offline?: boolean;
 }): Promise<{ url: string; binding: string }> {
   const { config } = params;
   const state = newOpaqueToken();
@@ -129,7 +142,7 @@ export async function beginAuthorization(params: {
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('client_id', config.clientId);
   url.searchParams.set('redirect_uri', redirectUri);
-  url.searchParams.set('scope', config.scope);
+  url.searchParams.set('scope', params.scope ?? config.scope);
   url.searchParams.set('state', state);
   url.searchParams.set('nonce', nonce);
   if (verifier) {
@@ -138,7 +151,8 @@ export async function beginAuthorization(params: {
   }
   // Always show the account picker: silently reusing whichever Google account
   // the browser last used is how people link the wrong one.
-  url.searchParams.set('prompt', 'select_account');
+  url.searchParams.set('prompt', params.offline ? 'consent select_account' : 'select_account');
+  if (params.offline) url.searchParams.set('access_type', 'offline');
 
   return { url: url.toString(), binding };
 }
@@ -195,10 +209,23 @@ function clientSecret(config: ProviderConfig): string {
 
 /**
  * Exchanges the code for tokens and returns ONLY the id_token. The access
- * token is discarded unread: this app needs to know who signed in, not to act
- * on their provider account, and a token it never stores cannot leak.
+ * token is discarded unread: signing in needs to know who signed in, not to
+ * act on their provider account, and a token it never stores cannot leak.
  */
 export async function exchangeCode(config: ProviderConfig, state: ConsumedState, code: string): Promise<string> {
+  return (await exchangeTokens(config, state, code)).idToken;
+}
+
+export type TokenSet = {
+  idToken: string;
+  /** Present only when the flow asked for offline access (the calendar intent). */
+  refreshToken: string | null;
+  /** What the person actually granted - with granular consent, possibly less than asked. */
+  scope: string;
+};
+
+/** The full token response, for the calendar intent. Same errors as exchangeCode. */
+export async function exchangeTokens(config: ProviderConfig, state: ConsumedState, code: string): Promise<TokenSet> {
   if (code.length > 2048) throw new OAuthError('exchange', 'code too long');
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
@@ -223,9 +250,15 @@ export async function exchangeCode(config: ProviderConfig, state: ConsumedState,
   }
   // Status only: the body of a failed exchange can echo the code.
   if (!response.ok) throw new OAuthError('exchange', `status ${response.status}`);
-  const json = (await response.json().catch(() => null)) as { id_token?: unknown } | null;
+  const json = (await response.json().catch(() => null)) as
+    | { id_token?: unknown; refresh_token?: unknown; scope?: unknown }
+    | null;
   if (typeof json?.id_token !== 'string') throw new OAuthError('exchange', 'no id_token');
-  return json.id_token;
+  return {
+    idToken: json.id_token,
+    refreshToken: typeof json.refresh_token === 'string' ? json.refresh_token : null,
+    scope: typeof json.scope === 'string' ? json.scope : '',
+  };
 }
 
 const jwks = new Map<ProviderId, ReturnType<typeof createRemoteJWKSet>>();

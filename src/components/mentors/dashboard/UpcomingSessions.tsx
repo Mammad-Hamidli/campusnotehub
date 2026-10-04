@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { CalendarDays } from 'lucide-react';
 import type { Locale } from '@/lib/i18n/dictionaries';
 import { formatSessionTime, type Translate } from './format';
@@ -16,8 +17,9 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 /**
- * The mentor's next few sessions, in the mentor's own time zone. Read-only:
- * booking management stays where bookings are handled. `live` is false
+ * The mentor's next few confirmed sessions, in the mentor's own time zone.
+ * Each opens its session page (join button, details); requests waiting for
+ * an answer are listed separately (SessionRequestsCard). `live` is false
  * before approval, when there cannot be any bookings yet and the empty state
  * says so instead of "nothing booked".
  */
@@ -52,7 +54,12 @@ export function UpcomingSessions({
           {sessions.map((session) => (
             <li key={session.id} className="flex items-center gap-3 py-3">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-fg">{session.topic}</p>
+                <Link
+                  href={`/sessions/${session.id}`}
+                  className="block truncate text-sm font-medium text-fg hover:underline"
+                >
+                  {session.topic}
+                </Link>
                 <p className="mt-0.5 text-xs text-fg-muted">
                   <time dateTime={session.startsAt.toISOString()}>
                     {formatSessionTime(session.startsAt, locale, timeZone)}

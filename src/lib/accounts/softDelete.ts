@@ -6,6 +6,7 @@ import { revokeUserSessions } from '@/lib/firebase/repositories/sessions';
 import { writeModerationAction } from '@/lib/firebase/repositories/moderation';
 import { adminAudit } from '@/lib/auth/admin';
 import { sendEmailAsync } from '@/lib/email/send';
+import { disconnectCalendar } from '@/lib/google/disconnect';
 
 export class AccountDeletionError extends Error {
   constructor(readonly messageKey: string, readonly status: number) {
@@ -51,6 +52,8 @@ export async function softDeleteAccount(p: {
   // would be a false statement in the one table that must be true.
   await updateUser(p.userId, { deletedAt: now, accountStatus: AccountStatus.DELETED });
   await revokeUserSessions(p.userId);
+  // A mentor's Google Calendar grant must not outlive the account.
+  await disconnectCalendar(p.userId).catch((error) => console.error('[delete] calendar revoke failed', error));
   sendEmailAsync(target.email, 'accountDeleted', { nickname: target.nickname });
 
   await writeModerationAction({

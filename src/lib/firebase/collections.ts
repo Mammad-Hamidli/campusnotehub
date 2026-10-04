@@ -95,6 +95,12 @@ export const COLLECTIONS = {
    * SUBJECT, never by email. Server-only; see repositories/identities.ts.
    */
   authIdentities: 'authIdentities',
+  /**
+   * `googleCalendarLinks/{userId}`: a mentor's Google Calendar connection -
+   * the SEALED refresh token Meet links are created with. Server-only; see
+   * repositories/calendarLinks.ts.
+   */
+  googleCalendarLinks: 'googleCalendarLinks',
   /** `oauthStates/{hash(state)}`: one in-flight authorization. 10 minutes, single use. */
   oauthStates: 'oauthStates',
   /** `oauthSignups/{hash(token)}`: a verified provider identity awaiting registration. 30 minutes. */

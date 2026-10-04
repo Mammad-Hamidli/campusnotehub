@@ -2,35 +2,30 @@ import type { Transaction } from 'firebase-admin/firestore';
 import { adminDb } from '../admin.core';
 import { COLLECTIONS, SUBCOLLECTIONS } from '../collections';
 import { docToObject, docsToObjects, forFirestore, sortBy } from '../convert';
+import { holdsSlot, isPendingRequest } from '@/lib/mentors/requests';
 
 /**
  * PocketMentor: profiles, availability, bookings and reviews.
  *
  * ===========================================================================
- * THE BOOKING ID ENCODES THE SLOT, AND THAT IS DELIBERATE
+ * WHAT KEEPS TWO BOOKINGS OUT OF THE SAME TIME
  * ===========================================================================
- * Postgres protected the calendar with TWO things:
+ * Postgres had a GiST exclusion constraint (`bookings_no_overlap`). Firestore
+ * has no equivalent - no index type can express "these ranges must not
+ * intersect".
  *
- *   `@@unique([mentorId, startsAt])`  - one booking may start at one instant
- *   `bookings_no_overlap` (GiST)      - and no two may OVERLAP at all
- *
- * The first survives the move intact, structurally: the document id is derived
- * from (mentorId, startsAt), so a second booking for the same slot is the same
- * id and `create()` refuses it.
- *
- * The second has no Firestore equivalent - there is no exclusion constraint,
- * and no index type that can express "these ranges must not intersect". Saying
- * so plainly matters, because the old comment in availability.ts told the
- * reader that the GiST constraint "is the only thing that holds under
- * concurrency" and that statement is now false.
- *
- * What holds instead: createBooking() runs the overlap check INSIDE a
+ * What holds instead: the request route runs the overlap check INSIDE a
  * Firestore transaction. A transactional query participates in conflict
  * detection - if any document matching it is written before the commit, the
  * transaction aborts and re-runs - so two mentees racing for overlapping slots
- * cannot both succeed. This is a real guarantee rather than a check-then-act,
- * but it lives in this file now rather than in the database, so it must not be
- * bypassed by writing a booking document directly.
+ * cannot both succeed. Accepting a request re-runs the same check. This is a
+ * real guarantee rather than a check-then-act, but it lives in code rather
+ * than in the database, so it must not be bypassed by writing a booking
+ * document directly.
+ *
+ * The booking id is NOT the slot any more (see bookingIdFor in
+ * src/lib/mentors/requests.ts): once a mentor can decline, a slot-derived id
+ * would stay occupied by the declined request forever.
  *
  * ===========================================================================
  * AVAILABILITY IS A SUBCOLLECTION
@@ -85,9 +80,13 @@ export type AvailabilityExceptionRecord = {
   endMinute: number | null;
 };
 
+export type MeetingStatus = 'PENDING' | 'READY' | 'NEEDS_CALENDAR' | 'FAILED';
+
 export type BookingRecord = {
   id: string;
   mentorId: string;
+  /** The mentor's USER id, copied at request time: the ownership check for answering. */
+  mentorUserId?: string | null;
   menteeId: string;
   startsAt: Date;
   endsAt: Date;
@@ -95,8 +94,17 @@ export type BookingRecord = {
   status: string;
   topic: string;
   menteeNote: string | null;
+  /** REQUESTED only: after this the request no longer holds the slot. */
+  requestExpiresAt?: Date | null;
+  respondedAt?: Date | null;
+  /** The mentor's reason, required to decline. Shown to the mentee. */
+  rejectionReason?: string | null;
+  /** Sealed (vault, AAD = bookingId); only the join route opens it. */
   meetingUrlEnc: string | null;
   meetingProvider: string | null;
+  meetingStatus?: MeetingStatus | null;
+  meetingError?: string | null;
+  calendarEventId?: string | null;
   idempotencyKey: string;
   confirmedAt: Date | null;
   completedAt: Date | null;
@@ -127,11 +135,6 @@ const reviews = () => adminDb().collection(COLLECTIONS.mentorReviews);
 const rules = (mentorId: string) => adminDb().collection(SUBCOLLECTIONS.availability(mentorId));
 const exceptions = (mentorId: string) =>
   adminDb().collection(SUBCOLLECTIONS.availabilityExceptions(mentorId));
-
-/** The derived booking id - one mentor, one start instant, one booking. */
-export function bookingIdFor(mentorId: string, startsAt: Date): string {
-  return `${mentorId}__${startsAt.getTime()}`;
-}
 
 export async function findMentorById(id: string): Promise<MentorProfileRecord | null> {
   return docToObject<MentorProfileRecord>(
@@ -318,8 +321,10 @@ export async function bookingsOverlapping(
     .where('startsAt', '<', windowEnd);
 
   const snap = tx ? await tx.get(query) : await query.get();
+  // A lapsed request is still REQUESTED in storage but no longer holds its slot.
+  const now = new Date();
   return (docsToObjects<BookingRecord>(snap.docs) as BookingRecord[]).filter(
-    (b) => b.endsAt > windowStart,
+    (b) => b.endsAt > windowStart && holdsSlot(b, now),
   );
 }
 
@@ -338,11 +343,27 @@ export async function listUpcomingMentorBookings(
   now: Date,
   scan = 500,
 ): Promise<BookingRecord[]> {
-  const active = new Set<string>(ACTIVE_BOOKING_STATUSES);
   const snap = await bookings().where('mentorId', '==', mentorId).limit(scan).get();
   return (docsToObjects<BookingRecord>(snap.docs) as BookingRecord[])
-    .filter((b) => active.has(b.status) && b.endsAt > now)
+    .filter((b) => holdsSlot(b, now) && b.endsAt > now)
     .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+}
+
+/** Requests waiting for this mentor's answer, oldest deadline first. Same query shape as above. */
+export async function listPendingRequests(mentorId: string, now: Date): Promise<BookingRecord[]> {
+  const snap = await bookings().where('mentorId', '==', mentorId).where('status', '==', 'REQUESTED').limit(200).get();
+  return (docsToObjects<BookingRecord>(snap.docs) as BookingRecord[])
+    .filter((b) => isPendingRequest(b, now))
+    .sort((a, b) => (a.requestExpiresAt?.getTime() ?? 0) - (b.requestExpiresAt?.getTime() ?? 0));
+}
+
+/**
+ * Who may answer a booking and host its call. Bookings written before
+ * `mentorUserId` existed fall back to the profile, which is the same fact.
+ */
+export async function mentorUserIdOf(booking: Pick<BookingRecord, 'mentorId' | 'mentorUserId'>): Promise<string | null> {
+  if (booking.mentorUserId) return booking.mentorUserId;
+  return (await findMentorById(booking.mentorId))?.userId ?? null;
 }
 
 // ---------------------------------------------------------------- reviews

@@ -644,20 +644,25 @@
       "noSlots": "Bu gün üçün boş vaxt yoxdur",
       "topic": "Görüşün mövzusu",
       "topicPlaceholder": "Nə haqqında danışmaq istəyirsiniz?",
-      "confirm": "Sessiyanı təsdiqlə",
       "summary": "{date}, {time} - {duration} dəqiqə",
-      "confirmed": {
-        "title": "Görüş təsdiqləndi",
-        "body": "Video zəng linki görüşdən 30 dəqiqə əvvəl aktivləşəcək."
-      },
       "menteeNote": "Əlavə qeyd (istəyə bağlı)",
       "menteeNotePlaceholder": "Mentorunuzun hazırlaşmasına kömək edəcək məlumat",
-      "freeNote": "Sessiya sifarişi pulsuzdur. Mentorun qiyməti yalnız məlumat üçün göstərilir — CampusNoteHub-da heç bir ödəniş alınmır və balansdan heç nə çıxılmır."
+      "freeNote": "Sessiya sifarişi pulsuzdur. Mentorun qiyməti yalnız məlumat üçün göstərilir — CampusNoteHub-da heç bir ödəniş alınmır və balansdan heç nə çıxılmır.",
+      "sendRequest": "Sorğu göndər",
+      "requested": {
+        "title": "Sorğu göndərildi",
+        "body": "Mentorunuz sorğunu qəbul və ya rədd edəcək. Hər iki halda bildiriş və e-poçt alacaqsınız.",
+        "expires": "{when} tarixinədək cavab olmasa, sorğunun vaxtı bitəcək və görüş təyin olunmayacaq."
+      }
     },
     "errors": {
       "slotTaken": "Bu vaxt artıq tutulub. Başqa vaxt seçin.",
       "tooSoon": "Görüş ən azı {hours} saat sonraya təyin edilməlidir",
-      "selfBooking": "Özünüzə görüş təyin edə bilməzsiniz"
+      "selfBooking": "Özünüzə görüş təyin edə bilməzsiniz",
+      "tooSoonToAnswer": "Bu görüş mentorun cavab verməsi üçün çox tez başlayır. Daha gec vaxt seçin.",
+      "duplicateRequest": "Bu sorğu artıq göndərilib. Başqa vaxt seçmək üçün paneli bağlayıb yenidən başlayın.",
+      "menteeBusy": "Həmin vaxtda artıq görüşünüz və ya cavab gözləyən sorğunuz var.",
+      "tooManyPending": "Artıq cavab gözləyən {max} sorğunuz var. Yenisini göndərməzdən əvvəl onlardan birinin cavabını gözləyin."
     },
     "browse": "Mentor tap",
     "empty": "Hələ mentor yoxdur",
@@ -802,7 +807,50 @@
         "b3": "Mentor paneliniz qoşulma addımlarını, qarşıdakı görüşləri və aylıq üzvlük tarixinizi izləyir."
       }
     },
-    "rateDisplayOnly": "yalnız məlumat üçün"
+    "rateDisplayOnly": "yalnız məlumat üçün",
+    "requests": {
+      "accept": "Qəbul et",
+      "decline": "Rədd et",
+      "sendDecline": "Sorğunu rədd et",
+      "reasonLabel": "Niyə rədd edirsiniz? Bunu mentiniz görəcək.",
+      "reasonPlaceholder": "Məsələn: həmin həftə səfərdəyəm - növbəti həftə istənilən axşam uyğundur.",
+      "reasonHint": "Ən azı {min} simvol · {count}",
+      "accepted": "Görüş qəbul edildi. Mentiyə bildirildi.",
+      "declined": "Sorğu rədd edildi. Mentiyə səbəbi bildirildi.",
+      "meetingPending": "Google Meet otağı hələ yaradılır. Görüş səhifəsində hazır olacaq.",
+      "connectToAccept": "Qəbul etmək üçün Google Calendar-ı qoşun",
+      "connectCalendar": "Google Calendar-ı qoşun",
+      "answerBy": "Cavab müddəti: {when}",
+      "errors": {
+        "alreadyAnswered": "Bu sorğuya artıq cavab verilib.",
+        "expired": "Bu sorğunun vaxtı cavab verilməmiş bitdi.",
+        "calendarRequired": "Əvvəlcə Google Calendar-ınızı qoşun - Meet otağı orada yaradılır.",
+        "menteeBusy": "Mentinizin həmin vaxtda başqa görüşü var.",
+        "reasonRequired": "Ən azı 10 simvolluq səbəb yazın."
+      }
+    },
+    "calendar": {
+      "title": "Google Calendar və Meet",
+      "connected": "Qoşulub",
+      "connectedAs": "{account} hesabı qoşulub",
+      "notConnected": "Qoşulmayıb. Görüş sorğularını qəbul etmək üçün qoşun.",
+      "revoked": "Google girişi ləğv olunub. Meet linkləri yaratmaq üçün yenidən qoşun.",
+      "explainer": "Görüşü qəbul etdikdə onun Google Meet otağı sizin təqviminizdə yaradılır və siz aparıcı olursunuz. Menti linki görüş səhifəsində başlanğıcdan 30 dəqiqə əvvəl alır, qoşulmaq istəyir və siz onu içəri buraxırsınız.",
+      "connect": "Google Calendar-ı qoşun",
+      "reconnect": "Yenidən qoş",
+      "disconnect": "Ayır",
+      "disconnectConfirm": "Google Calendar ayrılsın? Artıq Meet linki olan görüşlər onu saxlayır, lakin yeni sorğuları qəbul etmək üçün yenidən qoşmalı olacaqsınız.",
+      "disconnected": "Google Calendar ayrıldı.",
+      "notice": {
+        "connected": "Google Calendar qoşuldu. Qəbul etdiyiniz görüşlər artıq Meet linki alır.",
+        "cancelled": "Qoşulma ləğv edildi.",
+        "scopeMissing": "Təqvimə giriş verilmədi. Yenidən qoşun və təqvim tədbirlərinə girişə icazə verin.",
+        "failed": "Google Calendar qoşula bilmədi. Yenidən cəhd edin."
+      },
+      "errors": {
+        "unavailable": "Google Calendar hazırda əlçatan deyil."
+      }
+    }
   },
   "mentorDashboard": {
     "title": "Mentor paneli",
@@ -880,6 +928,10 @@
       "schedule": "Cədvəl və əlçatanlıq",
       "application": "Mentor müraciəti",
       "feed": "Lent"
+    },
+    "requests": {
+      "title": "Görüş sorğuları",
+      "empty": "Cavabınızı gözləyən sorğu yoxdur."
     }
   },
   "notifications": {
@@ -903,7 +955,10 @@
       "VERIFICATION_NEEDS_REVIEW": "Əlavə yoxlama tələb olunur",
       "VERIFICATION_RESUBMIT_REQUIRED": "Sənədləri yenidən yükləyin",
       "FOLLOW_REQUEST": "{name} sizi izləmək istəyir",
-      "FOLLOW_ACCEPTED": "{name} izləmə sorğunuzu qəbul etdi"
+      "FOLLOW_ACCEPTED": "{name} izləmə sorğunuzu qəbul etdi",
+      "BOOKING_REJECTED": "Görüş sorğusu rədd edildi",
+      "BOOKING_EXPIRED": "Görüş sorğusunun vaxtı bitdi",
+      "CALENDAR_DISCONNECTED": "Google Calendar-ı yenidən qoşun"
     },
     "subtitle": "Hesabınızda baş verən hər şey",
     "loading": "Bildirişlər yüklənir…",
@@ -963,6 +1018,26 @@
     "followAccepted": {
       "title": "İzləmə sorğusu qəbul edildi",
       "body": "@{nickname} izləmə sorğunuzu qəbul etdi"
+    },
+    "bookingRequest": {
+      "title": "Yeni görüş sorğusu",
+      "body": "@{nickname} {when} tarixinə {duration} dəqiqəlik görüş istəyir"
+    },
+    "bookingConfirmed": {
+      "title": "Görüş təsdiqləndi",
+      "body": "@{nickname} {when} tarixli görüşünüzü qəbul etdi. Meet linki 30 dəqiqə əvvəl açılacaq."
+    },
+    "bookingRejected": {
+      "title": "Görüş sorğusu rədd edildi",
+      "body": "@{nickname} {when} tarixli sorğunuzu rədd etdi. Səbəbini görmək üçün açın."
+    },
+    "bookingExpired": {
+      "title": "Görüş sorğusunun vaxtı bitdi",
+      "body": "@{nickname} {when} tarixli sorğunuza vaxtında cavab vermədi."
+    },
+    "calendarDisconnected": {
+      "title": "Google Calendar-ı yenidən qoşun",
+      "body": "{when} tarixli görüşünüz Google Meet linkini gözləyir."
     }
   },
   "errors": {
@@ -1889,5 +1964,54 @@
     "body": "Versiya {version} hazırdır. Yeniləmək üçün onu yükləyin və quraşdırıcını işə salın.",
     "download": "Yeniləməni yüklə",
     "later": "Sonra"
+  },
+  "sessions": {
+    "withMentor": "Mentorunuz",
+    "withMentee": "Mentiniz",
+    "status": {
+      "REQUESTED": "Cavab gözlənilir",
+      "CONFIRMED": "Təsdiqlənib",
+      "RESCHEDULED": "Vaxtı dəyişib",
+      "REJECTED": "Rədd edilib",
+      "EXPIRED": "Vaxtı bitib",
+      "OTHER": "Bağlanıb"
+    },
+    "when": "Vaxt",
+    "length": "Müddət",
+    "minutes": "{count} dəqiqə",
+    "timezone": "Vaxtlar {timezone} saat qurşağında göstərilir",
+    "menteeNote": "Mentinin qeydi",
+    "requested": {
+      "mentorTitle": "Bu sorğu cavabınızı gözləyir",
+      "menteeTitle": "Mentorunuzun cavabı gözlənilir",
+      "menteeBody": "Mentorunuzun qəbul və ya rədd etmək üçün {when} tarixinədək vaxtı var. O vaxta qədər bu saat sizin üçün saxlanılır."
+    },
+    "rejected": {
+      "title": "Sorğu rədd edildi"
+    },
+    "expired": {
+      "title": "Sorğunun vaxtı bitdi",
+      "body": "Vaxtında cavab verilmədi, ona görə görüş təyin olunmadı."
+    },
+    "findAnotherTime": "Başqa vaxt seçin",
+    "join": {
+      "title": "Google Meet",
+      "mentorHint": "Aparıcı sizsiniz. Menti qoşulmaq istəyəcək - onu Meet pəncərəsindən içəri buraxın.",
+      "menteeHint": "Link başlanğıcdan 30 dəqiqə əvvəl açılır. Qoşulduqda mentorunuz sizi içəri buraxacaq.",
+      "button": "Google Meet-ə qoşul",
+      "opensAt": "Link {when} açılacaq",
+      "closed": "Bu görüş başa çatıb.",
+      "notice": {
+        "early": "Hələ tezdir - link başlanğıcdan 30 dəqiqə əvvəl açılır.",
+        "closed": "Bu görüş başa çatıb, linki bağlanıb.",
+        "pending": "Meet otağı hələ hazır deyil. Bir dəqiqədən sonra yenidən cəhd edin.",
+        "rate_limited": "Həddindən çox cəhd. Bir az gözləyib yenidən cəhd edin."
+      }
+    },
+    "meeting": {
+      "needsCalendarMentor": "Bu görüşün Meet linki alması üçün Google Calendar-ınızı yenidən qoşun.",
+      "needsCalendarMentee": "Mentorunuz təqvimini yenidən qoşmalıdır; bundan sonra Meet linki burada işləyəcək.",
+      "failed": "Bu görüş üçün Meet otağı yaradıla bilmədi. Mentorunuzla və ya dəstək xidməti ilə əlaqə saxlayın."
+    }
   }
 }

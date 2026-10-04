@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarCheck, Loader2, X } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
+import { formatInstant } from '@/lib/notifications/params';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 import { SlotPicker } from './SlotPicker';
@@ -22,6 +24,9 @@ import { SlotPicker } from './SlotPicker';
  * in src/lib/mentors/availability.ts, and the POST handler books the slot and
  * creates the meeting room in one transaction. The only missing piece was a
  * surface that put them together.
+ *
+ * Booking is a REQUEST: the mentor accepts (and the Google Meet room is made)
+ * or declines with a reason, and the panel says so instead of "confirmed".
  *
  * Booking is free. The mentor's rate on the profile is display-only - the
  * endpoint takes no payment and never reads the rate - and the panel says so
@@ -48,8 +53,11 @@ export function BookingPanel({
   const [topic, setTopic] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
+  const [error, setError] = useState<{ key: string; params?: Record<string, string | number> } | null>(null);
+  const [requested, setRequested] = useState<{ expiresAt: string | null } | null>(null);
+  const { locale } = useLocale();
+  /** The server's rule (createSchema): a mentor deciding needs to know what about. */
+  const topicValid = topic.trim().length >= 5;
 
   /**
    * The idempotency key is generated ONCE per panel, not per submit.
@@ -62,7 +70,7 @@ export function BookingPanel({
   const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   async function confirm() {
-    if (!startsAt || busy) return;
+    if (!startsAt || busy || !topicValid) return;
     setBusy(true);
     setError(null);
 
@@ -72,7 +80,7 @@ export function BookingPanel({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           startsAt,
-          topic: topic.trim() || undefined,
+          topic: topic.trim(),
           menteeNote: note.trim() || undefined,
           idempotencyKey,
         }),
@@ -83,29 +91,34 @@ export function BookingPanel({
       if (!response.ok) {
         // The server answers with a locale KEY, so the reason is shown in the
         // reader's own language.
-        setError(payload?.error ?? 'errors.generic');
+        setError({ key: payload?.error ?? 'errors.generic', params: payload?.params });
         return;
       }
 
-      setConfirmed(true);
-      toast.success(t('mentors.booking.confirmed.body'), { title: t('mentors.booking.confirmed.title') });
+      setRequested({ expiresAt: payload?.booking?.requestExpiresAt ?? null });
+      toast.success(t('mentors.booking.requested.body'), { title: t('mentors.booking.requested.title') });
       // Refreshes any server-rendered state that depends on the new booking.
       router.refresh();
     } catch {
-      setError('errors.generic');
+      setError({ key: 'errors.network' });
     } finally {
       setBusy(false);
     }
   }
 
-  if (confirmed) {
+  if (requested) {
     return (
       <section className="card mt-3 p-5 text-center">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-verified-soft">
           <CalendarCheck className="h-6 w-6 text-verified" aria-hidden="true" />
         </span>
-        <h2 className="mt-3 text-base font-semibold text-fg">{t('mentors.booking.confirmed.title')}</h2>
-        <p className="mt-1 text-sm text-fg-muted">{t('mentors.booking.confirmed.body')}</p>
+        <h2 className="mt-3 text-base font-semibold text-fg">{t('mentors.booking.requested.title')}</h2>
+        <p className="mt-1 text-sm text-fg-muted">{t('mentors.booking.requested.body')}</p>
+        {requested.expiresAt && (
+          <p className="mt-1 text-xs text-fg-subtle">
+            {t('mentors.booking.requested.expires', { when: formatInstant(new Date(requested.expiresAt), locale) })}
+          </p>
+        )}
         <button type="button" onClick={onClose} className="btn-secondary mt-4 px-4 py-1.5 text-sm">
           {t('common.close')}
         </button>
@@ -145,6 +158,8 @@ export function BookingPanel({
             <input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
+              required
+              minLength={5}
               maxLength={120}
               placeholder={t('mentors.booking.topicPlaceholder')}
               className="input mt-1 py-2 text-sm"
@@ -169,15 +184,20 @@ export function BookingPanel({
             <button type="button" onClick={() => setStartsAt(null)} className="btn-secondary px-3 py-1.5 text-sm">
               {t('common.cancel')}
             </button>
-            <button type="button" onClick={() => void confirm()} disabled={busy} className="btn-primary px-4 py-1.5 text-sm">
+            <button
+              type="button"
+              onClick={() => void confirm()}
+              disabled={busy || !topicValid}
+              className="btn-primary px-4 py-1.5 text-sm"
+            >
               {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-              {t('mentors.booking.confirm')}
+              {t('mentors.booking.sendRequest')}
             </button>
           </div>
 
           {error && (
             <p className="text-xs text-danger" role="alert">
-              {t(error)}
+              {t(error.key, error.params)}
             </p>
           )}
         </div>

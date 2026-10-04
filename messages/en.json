@@ -644,20 +644,25 @@
       "noSlots": "No open slots on this day",
       "topic": "Session topic",
       "topicPlaceholder": "What would you like to talk about?",
-      "confirm": "Confirm booking",
       "summary": "{date} at {time} - {duration} minutes",
-      "confirmed": {
-        "title": "Session confirmed",
-        "body": "The video call link becomes active 30 minutes before the session."
-      },
       "menteeNote": "Anything else to share (optional)",
       "menteeNotePlaceholder": "Context that helps your mentor prepare",
-      "freeNote": "Booking is free. A mentor's rate is shown for information only — nothing is charged or deducted on CampusNoteHub."
+      "freeNote": "Booking is free. A mentor's rate is shown for information only — nothing is charged or deducted on CampusNoteHub.",
+      "sendRequest": "Send request",
+      "requested": {
+        "title": "Request sent",
+        "body": "Your mentor will accept or decline it. You will get a notification and an email either way.",
+        "expires": "If there is no answer by {when}, the request expires and nothing is booked."
+      }
     },
     "errors": {
       "slotTaken": "That slot was just taken. Please pick another.",
       "tooSoon": "Sessions must start at least {hours} hours from now",
-      "selfBooking": "You cannot book a session with yourself"
+      "selfBooking": "You cannot book a session with yourself",
+      "tooSoonToAnswer": "That session starts too soon for the mentor to answer. Pick a later time.",
+      "duplicateRequest": "This request was already sent. Close the panel and start again to book another time.",
+      "menteeBusy": "You already have a session or a pending request at that time.",
+      "tooManyPending": "You already have {max} requests waiting for an answer. Wait for one of them before sending another."
     },
     "browse": "Find a mentor",
     "empty": "No mentors yet",
@@ -802,7 +807,50 @@
         "b3": "Your mentor panel tracks your onboarding, upcoming sessions and your monthly membership date."
       }
     },
-    "rateDisplayOnly": "display only"
+    "rateDisplayOnly": "display only",
+    "requests": {
+      "accept": "Accept",
+      "decline": "Decline",
+      "sendDecline": "Decline request",
+      "reasonLabel": "Why are you declining? Your mentee will see this.",
+      "reasonPlaceholder": "For example: I am travelling that week - any evening the week after works.",
+      "reasonHint": "At least {min} characters · {count}",
+      "accepted": "Session accepted. Your mentee has been told.",
+      "declined": "Request declined. Your mentee has been told why.",
+      "meetingPending": "The Google Meet room is still being created. It will be ready on the session page.",
+      "connectToAccept": "Connect Google Calendar to accept",
+      "connectCalendar": "Connect Google Calendar",
+      "answerBy": "Answer by {when}",
+      "errors": {
+        "alreadyAnswered": "This request was already answered.",
+        "expired": "This request expired before it was answered.",
+        "calendarRequired": "Connect your Google Calendar first - the Meet room is created on it.",
+        "menteeBusy": "Your mentee already has another session at that time.",
+        "reasonRequired": "Please give a reason of at least 10 characters."
+      }
+    },
+    "calendar": {
+      "title": "Google Calendar & Meet",
+      "connected": "Connected",
+      "connectedAs": "Connected as {account}",
+      "notConnected": "Not connected. Connect it to accept session requests.",
+      "revoked": "Google access was revoked. Reconnect to create Meet links.",
+      "explainer": "When you accept a session, its Google Meet room is created on your calendar with you as the host. Your mentee gets the link on the session page from 30 minutes before the start, asks to join, and you let them in.",
+      "connect": "Connect Google Calendar",
+      "reconnect": "Reconnect",
+      "disconnect": "Disconnect",
+      "disconnectConfirm": "Disconnect Google Calendar? Sessions that already have a Meet link keep it, but you will need to reconnect to accept new requests.",
+      "disconnected": "Google Calendar disconnected.",
+      "notice": {
+        "connected": "Google Calendar connected. Sessions you accept now get a Meet link.",
+        "cancelled": "Connection cancelled.",
+        "scopeMissing": "Calendar access was not granted. Connect again and allow access to your calendar events.",
+        "failed": "Google Calendar could not be connected. Please try again."
+      },
+      "errors": {
+        "unavailable": "Google Calendar is not available right now."
+      }
+    }
   },
   "mentorDashboard": {
     "title": "Mentor panel",
@@ -880,6 +928,10 @@
       "schedule": "Schedule & availability",
       "application": "Mentor application",
       "feed": "Feed"
+    },
+    "requests": {
+      "title": "Session requests",
+      "empty": "No requests are waiting for you."
     }
   },
   "notifications": {
@@ -903,7 +955,10 @@
       "VERIFICATION_NEEDS_REVIEW": "Your documents need a closer look",
       "VERIFICATION_RESUBMIT_REQUIRED": "Please upload your documents again",
       "FOLLOW_REQUEST": "{name} wants to follow you",
-      "FOLLOW_ACCEPTED": "{name} accepted your follow request"
+      "FOLLOW_ACCEPTED": "{name} accepted your follow request",
+      "BOOKING_REJECTED": "Session request declined",
+      "BOOKING_EXPIRED": "Session request expired",
+      "CALENDAR_DISCONNECTED": "Reconnect Google Calendar"
     },
     "subtitle": "Everything that happened on your account",
     "loading": "Loading notifications…",
@@ -963,6 +1018,26 @@
     "followAccepted": {
       "title": "Follow request accepted",
       "body": "@{nickname} accepted your follow request"
+    },
+    "bookingRequest": {
+      "title": "New session request",
+      "body": "@{nickname} asked for a {duration}-minute session on {when}"
+    },
+    "bookingConfirmed": {
+      "title": "Session confirmed",
+      "body": "@{nickname} accepted your session on {when}. The Meet link opens 30 minutes before."
+    },
+    "bookingRejected": {
+      "title": "Session request declined",
+      "body": "@{nickname} declined your request for {when}. Open it to see why."
+    },
+    "bookingExpired": {
+      "title": "Session request expired",
+      "body": "@{nickname} did not answer your request for {when} in time."
+    },
+    "calendarDisconnected": {
+      "title": "Reconnect Google Calendar",
+      "body": "Your session on {when} is waiting for its Google Meet link."
     }
   },
   "errors": {
@@ -1889,5 +1964,54 @@
     "body": "Version {version} is ready. Download it and run the installer to update.",
     "download": "Download update",
     "later": "Later"
+  },
+  "sessions": {
+    "withMentor": "Your mentor",
+    "withMentee": "Your mentee",
+    "status": {
+      "REQUESTED": "Awaiting answer",
+      "CONFIRMED": "Confirmed",
+      "RESCHEDULED": "Rescheduled",
+      "REJECTED": "Declined",
+      "EXPIRED": "Expired",
+      "OTHER": "Closed"
+    },
+    "when": "When",
+    "length": "Length",
+    "minutes": "{count} minutes",
+    "timezone": "Times are shown in {timezone}",
+    "menteeNote": "Note from the mentee",
+    "requested": {
+      "mentorTitle": "This request is waiting for your answer",
+      "menteeTitle": "Waiting for your mentor",
+      "menteeBody": "Your mentor has until {when} to accept or decline. The time is held for you until then."
+    },
+    "rejected": {
+      "title": "Request declined"
+    },
+    "expired": {
+      "title": "Request expired",
+      "body": "Nobody answered in time, so nothing was booked."
+    },
+    "findAnotherTime": "Find another time",
+    "join": {
+      "title": "Google Meet",
+      "mentorHint": "You are the host. Your mentee will ask to join - let them in from the Meet window.",
+      "menteeHint": "The link opens 30 minutes before the start. When you join, your mentor will let you in.",
+      "button": "Join Google Meet",
+      "opensAt": "The link opens at {when}",
+      "closed": "This session has ended.",
+      "notice": {
+        "early": "Too early - the link opens 30 minutes before the start.",
+        "closed": "This session has ended, so its link is closed.",
+        "pending": "The Meet room is not ready yet. Try again in a minute.",
+        "rate_limited": "Too many attempts. Wait a moment and try again."
+      }
+    },
+    "meeting": {
+      "needsCalendarMentor": "Reconnect your Google Calendar so this session gets its Meet link.",
+      "needsCalendarMentee": "Your mentor needs to reconnect their calendar; the Meet link will work here once they do.",
+      "failed": "The Meet room for this session could not be created. Please contact your mentor or support."
+    }
   }
 }
