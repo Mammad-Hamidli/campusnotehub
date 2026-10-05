@@ -63,10 +63,26 @@ describe('GET /api/auth/oauth/google/start', () => {
     expectGoogleHandoff(response, 'http://localhost:3000/api/auth/oauth/google/callback');
   });
 
-  it('local dev on 127.0.0.1: uses the host the browser sent, even though next dev reports nextUrl as localhost', async () => {
+  // Google rejects a 127.0.0.1 redirect URI, so the cookie must be set on
+  // localhost. Judged by the Host the browser sent: next dev reports nextUrl
+  // as localhost even for a request to 127.0.0.1.
+  it.each(['127.0.0.1:3000', '[::1]:3000'])(
+    'local dev on %s: one 308 hop to localhost on the same port, before any cookie',
+    async (host) => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const response = await get('http://localhost:3000/api/auth/oauth/google/start?returnTo=/notes', { host });
+      expect(response.status).toBe(308);
+      expect(response.headers.get('location')).toBe(
+        'http://localhost:3000/api/auth/oauth/google/start?returnTo=/notes',
+      );
+      expect(response.headers.get('set-cookie')).toBeNull();
+    },
+  );
+
+  it('local dev on another port: keeps the port in the redirect URI', async () => {
     vi.stubEnv('NODE_ENV', 'development');
-    const response = await get('http://localhost:3000/api/auth/oauth/google/start', { host: '127.0.0.1:3000' });
-    expectGoogleHandoff(response, 'http://127.0.0.1:3000/api/auth/oauth/google/callback');
+    const response = await get('http://localhost:4000/api/auth/oauth/google/start', { host: 'localhost:4000' });
+    expectGoogleHandoff(response, 'http://localhost:4000/api/auth/oauth/google/callback');
   });
 
   it('production behind a TLS proxy (nextUrl reads http://): no self-redirect loop', async () => {

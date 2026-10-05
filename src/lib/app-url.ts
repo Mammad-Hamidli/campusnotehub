@@ -22,26 +22,49 @@ export function configuredAppOrigin(): string | null {
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /**
- * The origin a request-bound flow (OAuth redirect URI, post-login redirect)
- * must come back to.
+ * The request's origin when it is a loopback host outside production, else
+ * null. Only loopback qualifies, so a spoofed Host header still cannot steer
+ * where codes or redirects are sent.
+ */
+function devLoopback(requestOrigin: string): URL | null {
+  if (process.env.NODE_ENV === 'production') return null;
+  try {
+    const url = new URL(requestOrigin);
+    return LOOPBACK_HOSTS.has(url.hostname) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The origin an OAuth flow runs on: its redirect URI, and the host the start
+ * route hops to before setting the CH_OAUTH binding cookie.
  *
  * APP_URL, except for a loopback request outside production. `.env` carries
  * the production APP_URL, so without this exception every local "Continue
  * with Google" was sent to https://www.campusnotehub.com (or given it as the
- * redirect URI) - a different host from the one holding the CH_OAUTH binding
- * cookie, so the flow could never complete. Only loopback hosts qualify, so a
- * spoofed Host header still cannot steer where codes are sent.
+ * redirect URI) - a different host from the one holding the binding cookie,
+ * so the flow could never complete.
+ *
+ * Every loopback host becomes `localhost` (port kept): Google accepts
+ * http://localhost:3000 as a redirect URI but rejects http://127.0.0.1:3000
+ * with redirect_uri_mismatch, so one host must own the whole flow.
  */
 export function flowOrigin(requestOrigin: string): string | null {
-  if (process.env.NODE_ENV !== 'production') {
-    try {
-      const url = new URL(requestOrigin);
-      if (LOOPBACK_HOSTS.has(url.hostname)) return url.origin;
-    } catch {
-      // Not a URL: fall through to APP_URL.
-    }
-  }
-  return configuredAppOrigin();
+  const url = devLoopback(requestOrigin);
+  if (!url) return configuredAppOrigin();
+  url.hostname = 'localhost';
+  return url.origin;
+}
+
+/**
+ * The origin for a redirect that sets cookies on the same response (session
+ * after login, OAuth outcomes). Like flowOrigin, but a loopback host is KEPT:
+ * cookies are host-only, so a session set on 127.0.0.1 and redirected to
+ * localhost would arrive signed out.
+ */
+export function sameHostOrigin(requestOrigin: string): string | null {
+  return devLoopback(requestOrigin)?.origin ?? configuredAppOrigin();
 }
 
 /**
@@ -50,8 +73,8 @@ export function flowOrigin(requestOrigin: string): string | null {
  * 127.0.0.1:3000, and a proxy can make it read http:// or an internal host, so
  * nextUrl alone mismatched the host the CH_OAUTH cookie is set on.
  *
- * Header-derived, so only ever fed to flowOrigin(), which ignores it outside
- * loopback-in-development.
+ * Header-derived, so only ever fed to flowOrigin() or sameHostOrigin(), which
+ * ignore it outside loopback-in-development.
  */
 export function browserOrigin(request: { headers: Headers; nextUrl: URL }): string {
   const first = (name: string) => request.headers.get(name)?.split(',')[0].trim() || null;

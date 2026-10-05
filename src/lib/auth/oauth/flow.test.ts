@@ -28,8 +28,10 @@ vi.mock('jose', async () => {
   };
 });
 
-const { beginAuthorization, consumeState, redirectUriFor, safeReturnTo, verifyIdToken } = await import('./flow');
+const { beginAuthorization, consumeState, exchangeTokens, redirectUriFor, safeReturnTo, verifyIdToken } =
+  await import('./flow');
 const { hashToken } = await import('@/lib/crypto/hash');
+import type { ConsumedState } from './flow';
 import type { ProviderConfig } from './providers';
 
 const config: ProviderConfig = {
@@ -170,6 +172,45 @@ describe('verifyIdToken', () => {
       .setExpirationTime(Math.floor(Date.now() / 1000) - 1800)
       .sign(privateKey);
     await expect(verifyIdToken(config, old, nonceHash)).rejects.toThrow();
+  });
+});
+
+describe('exchangeTokens', () => {
+  const CODE = '4/0AVG7fiQ-secret-authorization-code';
+  const state = { redirectUri: 'http://localhost:3000/api/auth/oauth/google/callback', verifier: 'v' } as ConsumedState;
+
+  async function failWith(status: number, body: string) {
+    vi.stubGlobal('fetch', async () => new Response(body, { status, headers: { 'content-type': 'application/json' } }));
+    try {
+      return await exchangeTokens(config, state, CODE).then(
+        () => null,
+        (error: Error) => error.message,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+
+  it('names the RFC 6749 error code, so a bad secret is not mistaken for a code bug', async () => {
+    expect(await failWith(401, '{"error":"invalid_client","error_description":"Unauthorized"}')).toBe(
+      'exchange: status 401 invalid_client',
+    );
+    expect(await failWith(400, '{"error":"redirect_uri_mismatch"}')).toBe('exchange: status 400 redirect_uri_mismatch');
+  });
+
+  it('logs nothing else from the body: no description, no echoed code, no non-code error', async () => {
+    for (const body of [
+      `{"error":"invalid_grant","error_description":"Bad code ${CODE}"}`,
+      `{"error":"${CODE}"}`,
+      '{"error":"Invalid Client"}',
+      '{"error":{"code":401}}',
+      '<html>Bad Gateway</html>',
+      '',
+    ]) {
+      const message = await failWith(400, body);
+      expect(message).toMatch(/^exchange: status 400( invalid_grant)?$/);
+      expect(message).not.toContain(CODE);
+    }
   });
 });
 

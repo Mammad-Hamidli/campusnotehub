@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { browserOrigin, flowOrigin } from '@/lib/app-url';
+import { browserOrigin, sameHostOrigin } from '@/lib/app-url';
 import { BINDING_COOKIE, BINDING_COOKIE_PATH } from './flow';
 
 /**
@@ -28,7 +28,7 @@ export type OAuthOutcome =
 
 /** Public base for redirects: APP_URL (or loopback in dev), never a Host header an attacker can set. */
 export function appBase(request: NextRequest): string {
-  return flowOrigin(browserOrigin(request)) ?? request.nextUrl.origin;
+  return sameHostOrigin(browserOrigin(request)) ?? request.nextUrl.origin;
 }
 
 export function redirectTo(request: NextRequest, path: string): NextResponse {

@@ -82,7 +82,7 @@ export function safeReturnTo(value: unknown, fallback = '/dashboard'): string {
  * The redirect URI must be byte-identical at authorize and token time, and
  * registered with the provider. It comes from APP_URL, never from the Host
  * header - a spoofed Host must not be able to steer where codes are sent.
- * A loopback request outside production uses its own origin (see flowOrigin),
+ * A loopback request outside production uses localhost on its own port (see flowOrigin),
  * and local development without APP_URL falls back to it too.
  */
 export function redirectUriFor(provider: ProviderId, requestOrigin: string): string {
@@ -224,6 +224,20 @@ export type TokenSet = {
   scope: string;
 };
 
+/**
+ * " invalid_client" from a failed token response, or "" - the RFC 6749 §5.2
+ * `error` code, which tells a bad secret (invalid_client) from a stale code
+ * (invalid_grant) or an unregistered redirect URI (redirect_uri_mismatch).
+ * Nothing else from the body is read: it can echo the code, and
+ * error_description is free text. The [a-z_] allow-list keeps anything that
+ * is not a plain registered-style code out of the logs.
+ */
+async function exchangeErrorCode(response: Response): Promise<string> {
+  const json = (await response.json().catch(() => null)) as { error?: unknown } | null;
+  const error = json?.error;
+  return typeof error === 'string' && /^[a-z_]{1,64}$/.test(error) ? ` ${error}` : '';
+}
+
 /** The full token response, for the calendar intent. Same errors as exchangeCode. */
 export async function exchangeTokens(config: ProviderConfig, state: ConsumedState, code: string): Promise<TokenSet> {
   if (code.length > 2048) throw new OAuthError('exchange', 'code too long');
@@ -248,8 +262,9 @@ export async function exchangeTokens(config: ProviderConfig, state: ConsumedStat
   } catch {
     throw new OAuthError('exchange', 'network');
   }
-  // Status only: the body of a failed exchange can echo the code.
-  if (!response.ok) throw new OAuthError('exchange', `status ${response.status}`);
+  if (!response.ok) {
+    throw new OAuthError('exchange', `status ${response.status}${await exchangeErrorCode(response)}`);
+  }
   const json = (await response.json().catch(() => null)) as
     | { id_token?: unknown; refresh_token?: unknown; scope?: unknown }
     | null;

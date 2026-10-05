@@ -6,7 +6,7 @@ import { recordDeviceDetailed } from '@/lib/security/blocklist';
 import { deviceLabel } from '@/lib/security/fingerprint';
 import { sendEmailAsync } from '@/lib/email/send';
 import { issueSession, sessionClientOf, sessionHasMfa } from '@/lib/auth/session';
-import { browserOrigin, flowOrigin } from '@/lib/app-url';
+import { browserOrigin, sameHostOrigin } from '@/lib/app-url';
 import { can } from '@/lib/permissions';
 import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
 
@@ -131,7 +131,7 @@ export async function completeLogin(params: {
     // Staff owed a second factor go to set it up whatever was requested; the
     // panel would refuse them anyway.
     const target = isStaff && !sessionHasMfa(params.amr) ? href : params.redirectTo || href;
-    const response = NextResponse.redirect(new URL(target, flowOrigin(browserOrigin(request)) ?? request.url), 303);
+    const response = NextResponse.redirect(new URL(target, sameHostOrigin(browserOrigin(request)) ?? request.url), 303);
     session.applyCookies(response);
     return response;
   }
