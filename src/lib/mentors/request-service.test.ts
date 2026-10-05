@@ -108,6 +108,35 @@ describe('requesting a session', () => {
     expect(doc(`scheduledTasks/BOOKING_REQUEST_EXPIRE:${booking.id}`)).toBeDefined();
   });
 
+  it('emails the mentor the details, linking to the request page rather than answering in the mail', async () => {
+    const { booking } = await request({ menteeNote: 'Could we look at my CV?' });
+    await settle();
+
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail).toHaveBeenCalledWith(
+      'mentor@ada.edu.az',
+      'bookingRequested',
+      expect.objectContaining({
+        mentee: 'aysel',
+        minutes: 60,
+        topic: 'Interview prep',
+        note: 'Could we look at my CV?',
+        path: `/sessions/${booking.id}`,
+      }),
+      { dedupeKey: `booking-requested:${booking.id}` },
+    );
+  });
+
+  it('re-sends the request email on a replay, under the same dedupe key', async () => {
+    const startsAt = inHours(72);
+    const { booking } = await request({ startsAt });
+    await request({ startsAt });
+    await settle();
+
+    const keys = sendEmail.mock.calls.map((call) => (call[3] as { dedupeKey: string }).dedupeKey);
+    expect(keys).toEqual([`booking-requested:${booking.id}`, `booking-requested:${booking.id}`]);
+  });
+
   it('answers a retried submit with the original request instead of a second one', async () => {
     // A real retry resends the same body, so the same instant.
     const startsAt = inHours(72);

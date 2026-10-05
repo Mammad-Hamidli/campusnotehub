@@ -6,7 +6,7 @@ import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { can } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { assertSlotBookable, BookingError, getDaySlots } from '@/lib/mentors/availability';
-import { createSessionRequest, sendRequestEmail } from '@/lib/mentors/request-service';
+import { createSessionRequest } from '@/lib/mentors/request-service';
 
 export const runtime = 'nodejs';
 
@@ -114,7 +114,6 @@ export async function POST(
       menteeNote: parsed.data.menteeNote || null,
       idempotencyKey: parsed.data.idempotencyKey,
     });
-    if (!replay) sendRequestEmail(booking, mentee.nickname);
 
     return NextResponse.json(
       {

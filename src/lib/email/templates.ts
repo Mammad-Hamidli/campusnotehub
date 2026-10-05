@@ -727,6 +727,8 @@ export const TEMPLATES = {
     when: string;
     minutes: number;
     topic: string;
+    /** The mentee's own words, if they left any. */
+    note?: string | null;
     answerBy: string;
     path: string;
   }): EmailContent => ({
@@ -745,13 +747,20 @@ export const TEMPLATES = {
           { label: 'Answer by', value: p.answerBy },
         ],
       },
+      ...(p.note ? [{ kind: 'quote' as const, text: p.note }] : []),
       {
         kind: 'callout',
         tone: 'neutral',
         title: 'The time is held for you',
         body: 'Nobody else can book this slot until you answer. If you do not answer in time, the request expires and the slot opens again.',
       },
-      { kind: 'button', label: 'Accept or decline', href: appUrl(p.path) },
+      // The email carries no answer of its own - no signed accept/decline
+      // links. The answer is given on the session page, signed in.
+      {
+        kind: 'paragraph',
+        text: 'Accepting or declining happens in UniPath. You will be asked to sign in first if you are not already.',
+      },
+      { kind: 'button', label: 'Review the request', href: appUrl(p.path) },
     ],
   }),
 

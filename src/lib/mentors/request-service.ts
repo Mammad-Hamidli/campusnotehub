@@ -19,6 +19,7 @@ import { bookingIdFor } from './ids';
 import {
   MAX_PENDING_REQUESTS,
   JOINABLE_STATUSES,
+  answerDeadline,
   holdsSlot,
   isLapsedRequest,
   isPendingRequest,
@@ -83,8 +84,10 @@ export type NewRequest = {
 };
 
 /**
- * Creates a REQUESTED booking. A retried submit with the same idempotency key
- * returns the original (`replay: true`) instead of failing or duplicating.
+ * Creates a REQUESTED booking and tells the mentor: in-app inside the
+ * transaction, by email after it commits. A retried submit with the same
+ * idempotency key returns the original (`replay: true`) instead of failing or
+ * duplicating.
  */
 export async function createSessionRequest(
   input: NewRequest,
@@ -95,7 +98,7 @@ export async function createSessionRequest(
 
   const bookingId = bookingIdFor(input.menteeId, input.idempotencyKey);
 
-  return adminDb().runTransaction(async (tx) => {
+  const result = await adminDb().runTransaction(async (tx) => {
     // ------------------------------------------------------------- reads
     const existing = await readBooking(tx, bookingId);
     if (existing) {
@@ -173,6 +176,12 @@ export async function createSessionRequest(
 
     return { booking: { id: bookingId, ...record }, replay: false };
   });
+
+  // On a replay too: a submit retried because the first response never
+  // arrived may also have lost that response's email. The dedupe key keeps
+  // it to one message per request.
+  if (isPendingRequest(result.booking, new Date())) sendRequestEmail(result.booking, input.menteeNickname);
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -387,8 +396,12 @@ function sendOutcomeEmail(result: RespondOutcome, mentorNickname: string): void 
   });
 }
 
-/** The mentor's "new request" email, after the request commits. */
-export function sendRequestEmail(booking: BookingRecord, menteeNickname: string): void {
+/**
+ * The mentor's "new request" email, after the request commits. It links to
+ * the request's own page, which carries the details and Accept / Decline
+ * behind the normal sign-in - the email itself can answer nothing.
+ */
+function sendRequestEmail(booking: BookingRecord, menteeNickname: string): void {
   afterResponse('bookings', async () => {
     if (!booking.mentorUserId) return;
     const mentor = await findUserById(booking.mentorUserId);
@@ -402,8 +415,9 @@ export function sendRequestEmail(booking: BookingRecord, menteeNickname: string)
         when: formatEmailTime(booking.startsAt, mentor.timezone),
         minutes: Math.round((booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000),
         topic: booking.topic,
-        answerBy: formatEmailTime(booking.requestExpiresAt ?? booking.startsAt, mentor.timezone),
-        path: '/notifications',
+        note: booking.menteeNote,
+        answerBy: formatEmailTime(answerDeadline(booking), mentor.timezone),
+        path: `/sessions/${booking.id}`,
       },
       { dedupeKey: `booking-requested:${booking.id}` },
     );

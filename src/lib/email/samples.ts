@@ -85,8 +85,9 @@ export const SAMPLE_PARAMS = {
     when: 'Wed, 14 Oct 2026, 18:30 GMT+4',
     minutes: 45,
     topic: 'Preparing for a junior backend interview',
+    note: 'I have a Go take-home due Friday.\nCould we walk through how I structured the API?',
     answerBy: 'Mon, 12 Oct 2026, 10:00 GMT+4',
-    path: '/notifications',
+    path: '/sessions/3f9c0d1e2a4b5c6d7e8f901a2b3c4d5e',
   },
   bookingConfirmed: {
     nickname: 'aysel',
