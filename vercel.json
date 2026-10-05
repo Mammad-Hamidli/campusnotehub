@@ -4,6 +4,6 @@
     { "path": "/api/cron/verification-cleanup", "schedule": "0 0 * * *" },
     { "path": "/api/cron/email-outbox", "schedule": "30 0 * * *" },
     { "path": "/api/cron/support-inbox", "schedule": "0 1 * * *" },
-    { "path": "/api/cron/scheduled-tasks", "schedule": "*/10 * * * *" }
+    { "path": "/api/cron/scheduled-tasks", "schedule": "0 1 * * *" }
   ]
 }
