@@ -4,6 +4,7 @@ import { runDueTasks as runScheduledTasks } from '@/lib/scheduled/run-due-tasks'
 import { reapExpired, sweepExpiredAssets } from '@/lib/verification/reviewBuffer';
 import { runGraduationSweep } from './graduation';
 import { retryQueuedEmails } from '@/lib/email/send';
+import { runAiVerificationBatch } from '@/lib/verification/aiQueue';
 
 /**
  * Long-running scheduler process.
@@ -14,6 +15,7 @@ import { retryQueuedEmails } from '@/lib/email/send';
  *
  *   every  1 min  run due scheduled tasks (request expiry, Meet rooms), retry queued email
  *   every 15 min  reap expired review buffers
+ *   00:00 Baku    nightly AI identity check (also a Vercel cron)
  *   1 May 06:00   graduation sweep
  *
  * The graduation sweep is ALSO wired as a real cron entry on the host (see
@@ -99,6 +101,33 @@ async function maybeRunGraduationSweep(): Promise<void> {
   }
 }
 
+/**
+ * The nightly AI identity check, once per Baku day from 00:00. No time limit
+ * here, unlike the Vercel route: it runs until the queue is empty or Workers
+ * AI stops it. The batch lease makes a concurrent Vercel run harmless.
+ */
+let lastAiVerificationDay: string | null = null;
+
+async function maybeRunAiVerification(): Promise<void> {
+  // Baku is UTC+4 with no DST (see maybeRunGraduationSweep).
+  const baku = new Date(Date.now() + 4 * 60 * 60_000);
+  const dayKey = baku.toISOString().slice(0, 10);
+  if (lastAiVerificationDay === dayKey) return;
+  if (lastAiVerificationDay === null) {
+    // First tick after a (re)start: wait for the next midnight rather than
+    // running at whatever hour the process happened to start.
+    lastAiVerificationDay = dayKey;
+    return;
+  }
+
+  lastAiVerificationDay = dayKey;
+  try {
+    await runAiVerificationBatch();
+  } catch (error) {
+    console.error('[scheduler] AI verification batch failed', error);
+  }
+}
+
 async function main(): Promise<void> {
   console.log('[scheduler] started');
 
@@ -109,6 +138,8 @@ async function main(): Promise<void> {
   const taskTimer = setInterval(() => void runDueTasks(), TASK_INTERVAL_MS);
   const reapTimer = setInterval(() => void reapReviewBuffers(), REAP_INTERVAL_MS);
   const gradTimer = setInterval(() => void maybeRunGraduationSweep(), GRAD_CHECK_INTERVAL_MS);
+  await maybeRunAiVerification();
+  const aiTimer = setInterval(() => void maybeRunAiVerification(), TASK_INTERVAL_MS);
 
   const shutdown = (signal: string) => {
     if (stopping) return;
@@ -117,6 +148,7 @@ async function main(): Promise<void> {
     clearInterval(taskTimer);
     clearInterval(reapTimer);
     clearInterval(gradTimer);
+    clearInterval(aiTimer);
     /**
      * No explicit disconnect.
      *

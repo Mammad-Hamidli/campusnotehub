@@ -69,7 +69,7 @@
       "graduationYear": "Graduation year",
       "graduationMonth": "Graduation month",
       "termsAccept": "I agree to the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>",
-      "dataConsent": "I consent to my identity documents being processed solely to verify my student status",
+      "dataConsent": "I consent to my identity documents being processed, including an automated check by our AI provider (Cloudflare), solely to verify my identity and student status",
       "createAccount": "Create account",
       "haveAccount": "Already have an account?",
       "phone": "Phone number",
@@ -338,7 +338,7 @@
       "unverified": "Account unverified: pending security check. Some features are limited.",
       "unverifiedCta": "Upload documents",
       "pending": "Your documents are being checked. This usually takes 5 minutes to 24 hours.",
-      "needsReview": "Your documents are under manual review. We will notify you with the result.",
+      "needsReview": "Your documents are under review. They are checked overnight, and we will notify you with the result.",
       "rejected": "Verification failed. {remaining} attempts remaining.",
       "rejectedCta": "Upload again",
       "processing": "Your documents are being checked right now. This takes a few seconds.",
@@ -493,7 +493,7 @@
         "failed": "This post could not be translated. Try again.",
         "unavailable": "Translation is unavailable right now. Check your connection and try again.",
         "empty": "There is nothing to translate.",
-        "quota": "Today's free translation limit is used up. Try again tomorrow.",
+        "quota": "Too many translations in a short time. Wait a few minutes and try again.",
         "sameLanguage": "This post is already in that language."
       }
     },
@@ -1223,12 +1223,12 @@
       "body": "A security check has blocked this submission."
     },
     "retention": {
-      "title": "Your documents are not stored",
-      "lead": "The images are processed at the moment of verification and deleted immediately. They are never kept on our servers or in cloud storage.",
-      "deleted": "Erased the instant the check finishes",
+      "title": "How your documents are handled",
+      "lead": "Until they are checked, the images are held in restricted storage that only our verification system and moderators can open. An automated check reads them overnight, and they are deleted as soon as a decision is made.",
+      "deleted": "Deleted as soon as you are verified or rejected",
       "flagsOnly": "The database keeps only \"verified: yes/no\"",
-      "humanReview": "A moderator may look if the check is inconclusive",
-      "window": "In that case the image is held encrypted for at most 24 hours"
+      "humanReview": "A moderator looks if the automated check is not certain",
+      "window": "Never kept longer than 7 days"
     },
     "created": "Your account was created. Welcome to CampusNoteHub!"
   },

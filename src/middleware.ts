@@ -195,10 +195,9 @@ export async function middleware(request: NextRequest) {
   ].join(' ');
 
   const connectSrc = [
+    // Post translation included: the browser only talks to /api/translate,
+    // and the server calls LibreTranslate (src/lib/translate/libretranslate.ts).
     `'self'`,
-    // Post translation runs in the browser against MyMemory's free API; see
-    // src/lib/translate/mymemory.ts.
-    `https://api.mymemory.translated.net`,
     // The dev server pushes hot updates over a plain-ws connection to
     // localhost, which 'self' does not cover once a scheme is involved.
     ...(isDev ? [`ws:`] : []),

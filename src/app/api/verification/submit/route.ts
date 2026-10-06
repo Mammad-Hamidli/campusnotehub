@@ -1,13 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { VerificationStatus } from '@/lib/enums';
-import { findUserById, updateUser } from '@/lib/firebase/repositories/users';
-import { findUniversityById } from '@/lib/firebase/repositories/reference';
-import {
-  createCase,
-  newCaseId,
-  listCases,
-  updateCase,
-} from '@/lib/firebase/repositories/verification';
+import { findUserById } from '@/lib/firebase/repositories/users';
+import { newCaseId, listCases } from '@/lib/firebase/repositories/verification';
 import { requireSession } from '@/lib/auth/session';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { isUserBlocked } from '@/lib/security/blocklist';
@@ -19,12 +13,8 @@ import {
   wipe,
   type ValidationFailure,
 } from '@/lib/verification/fileValidation';
-import {
-  runVerification,
-  escalateOnFailure,
-  PipelineUnavailableError,
-  type PipelineInput,
-} from '@/lib/verification/pipeline';
+import type { BufferedDocument } from '@/lib/verification/reviewBuffer';
+import { enqueueSubmission } from '@/lib/verification/aiQueue';
 import { requiredKindsFor } from '@/lib/verification/requirements';
 
 // Must be the Node runtime: the pipeline holds Buffers and calls node:crypto.
@@ -53,29 +43,24 @@ const MAX_ATTEMPTS = Number(process.env.VERIFICATION_MAX_ATTEMPTS ?? 3);
  * codebase where a national ID image exists.
  *
  * ---------------------------------------------------------------------------
- * WHAT CHANGED, AND WHY THE OLD SHAPE WAS WRONG
+ * HOW LONG A DOCUMENT CAN EXIST, AND WHY IT IS BOUNDED
  * ---------------------------------------------------------------------------
- * The previous design uploaded documents to S3 with a presigned POST, opened a
- * case, enqueued a background job, and scheduled a purge 30 days later. That
- * shape is incompatible with a zero-retention promise no matter how careful
- * the purge job is, because:
+ * An early design uploaded documents to S3 with a presigned POST and purged
+ * them 30 days later - a retention policy with no hard ceiling (versioning
+ * keeps deleted objects recoverable, and a backed-up queue holds documents for
+ * as long as it is backed up). Documents still wait in a queue today, but the
+ * ceiling is structural: Cloudinary assets under the review-buffer prefix are
+ * deleted 7 days after upload by three independent mechanisms, whatever the
+ * state of the queue or of the case row.
  *
- *   - S3 versioning and lifecycle rules keep deleted objects recoverable;
- *   - a queued job means documents sit in storage for however long the queue
- *     is backed up, which is unbounded during an incident;
- *   - "we delete after 30 days" is a retention policy, not zero retention.
- *
- * The request now does the whole thing inline: read the multipart body into
- * memory under a hard cap, validate the bytes, run the analysis, decide, and
- * wipe. Nothing is written to durable storage at any point. The only branch
- * where documents survive the response is NEEDS_REVIEW, which parks them in a
- * 7-day authenticated Cloudinary buffer so a human can actually review them - see
- * src/lib/verification/reviewBuffer.ts for why that compromise is necessary
- * and how it is bounded.
- *
- * Cost of doing it inline: the request takes 3-8 seconds instead of returning
- * instantly. That is an acceptable trade for a one-time action the user
- * expects to take a moment, and the UI shows real per-check progress.
+ * The request validates the bytes in memory under a hard cap and then parks
+ * them in the 7-day authenticated Cloudinary review buffer, with the case
+ * NEEDS_REVIEW ("under review") and queued for the nightly AI check - see
+ * src/lib/verification/aiQueue.ts. That batch reads the documents with
+ * Cloudflare's vision model in FIFO order, approves a complete match and
+ * destroys the images, and leaves anything else to a moderator, who can also
+ * decide a queued case before the batch reaches it. The buffer's 7-day cap
+ * (src/lib/verification/reviewBuffer.ts) bounds how long any image can wait.
  */
 export async function POST(request: NextRequest) {
   const { userId } = await requireSession(request);
@@ -100,11 +85,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
   }
 
-  // The institution CODE, which the verifier compares the student card
-  // against. A separate read where Prisma had a join, and issued before the
-  // status guards below only because every branch that proceeds needs it.
-  const university = user.universityId ? await findUniversityById(user.universityId) : null;
-
   if (user.verificationStatus === VerificationStatus.VERIFIED) {
     return NextResponse.json({ error: 'already_verified' }, { status: 409 });
   }
@@ -128,7 +108,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ---- Read and validate the four documents -------------------------------
-  const documents: PipelineInput['documents'] = [];
+  const documents: BufferedDocument[] = [];
 
   try {
     const contentLength = Number(request.headers.get('content-length') ?? 0);
@@ -183,93 +163,42 @@ export async function POST(request: NextRequest) {
       documents.push({ kind, mime: verdict.mime, bytes });
     }
 
-    // ---- Open the case, then run the pipeline -----------------------------
-    /**
-     * The case first, then the account flag.
-     *
-     * These shared a transaction; they no longer can, because createCase()
-     * and updateUser() each open their own write. The order is chosen so the
-     * survivable failure is the one that happens: a case with no PROCESSING
-     * flag is a row the pipeline will still decide, while a PROCESSING flag
-     * with no case would leave an account stuck in a state that nothing owns
-     * and nothing can clear.
-     */
-    const kase = await createCase({
-      id: newCaseId(),
-      userId,
-      attempt: priorAttempts + 1,
-      status: VerificationStatus.PROCESSING,
-    });
-
-    await updateUser(userId, { verificationStatus: VerificationStatus.PROCESSING });
-
-    const input: PipelineInput = {
-      userId,
-      caseId: kase.id,
-      documents,
-      declaredName: user.fullName,
-      declaredUniversityCode: university?.code ?? null,
-    };
-
-    let outcome;
+    // ---- Queue for the nightly check -------------------------------------
+    let caseId: string;
     try {
-      try {
-        // runVerification wipes `documents` in its own finally block.
-        outcome = await runVerification(input);
-      } catch (error) {
-        if (error instanceof PipelineUnavailableError) {
-          // Our outage must never read as the user's fraud. Park it for a human.
-          outcome = await escalateOnFailure(input);
-        } else {
-          throw error;
-        }
-      }
+      caseId = (
+        await enqueueSubmission({ userId, caseId: newCaseId(), attempt: priorAttempts + 1, documents })
+      ).id;
     } catch (error) {
-      /**
-       * Neither a verdict nor a parked review was committed (e.g. the review
-       * buffer upload to Cloudinary failed). Undo the PROCESSING flag set above
-       * so the account is not stuck in a state nothing will ever clear, and
-       * close the case like a RETAKE - decidedAt stays null, so our failure
-       * does not burn one of the user's attempts.
-       */
-      console.error('[verification] submission %s failed', kase.id, error);
-      await Promise.allSettled([
-        updateCase(kase.id, {
-          status: VerificationStatus.REJECTED,
-          failureCodes: ['SUBMISSION_FAILED'],
-          publicMessageKey: 'errors.generic',
-        }),
-        updateUser(userId, { verificationStatus: VerificationStatus.UNVERIFIED }),
-      ]);
+      // Nothing was queued (enqueueSubmission removes a half-made buffer), so
+      // the account is left as it was and no attempt is spent.
+      console.error('[verification] submission could not be queued', error);
       return NextResponse.json({ error: 'errors.generic' }, { status: 503 });
     }
 
     /**
-     * "We have your documents" - sent for every outcome, including the ones
-     * decided in the same second.
+     * "We have your documents" - every accepted submission is now queued, so
+     * this is the only thing the user hears until the nightly check decides.
      *
-     * The message says the submission was received and that the documents are
-     * not stored, and deliberately does NOT state the verdict: an approval or
-     * a rejection gets its own email from the decision path, so announcing the
-     * result twice from two places would be the way those two messages
-     * eventually start disagreeing.
+     * The message says the submission was received and how the documents are
+     * held, and deliberately does NOT state a verdict: an approval or a
+     * rejection gets its own email from the decision path.
      */
     sendEmailAsync(user.email, 'verificationSubmitted', { nickname: user.nickname });
 
     return NextResponse.json(
       {
-        caseId: kase.id,
-        status: outcome.status,
-        attempt: kase.attempt,
+        caseId,
+        status: VerificationStatus.NEEDS_REVIEW,
+        attempt: priorAttempts + 1,
         remainingAttempts: Math.max(0, MAX_ATTEMPTS - (priorAttempts + 1)),
-        messageKey: outcome.messageKey,
+        messageKey: 'verification.banner.needsReview',
       },
       { status: 200 },
     );
   } finally {
-    // Defence in depth. The pipeline already wipes on every path; this catches
-    // the cases that fail before it is ever called (validation rejection, a
-    // malformed multipart body, a thrown transaction).
+    // Every path ends here: queued (the buffer holds the only copy now),
+    // rejected by validation, or failed. No in-memory copy outlives the request.
     for (const doc of documents) wipe(doc.bytes);
     documents.length = 0;
   }

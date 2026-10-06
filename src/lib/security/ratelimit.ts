@@ -159,6 +159,13 @@ export const LIMITS = {
   'bookings:join': { limit: 30, windowMs: 15 * 60_000 },
   'search': { limit: 120, windowMs: 60_000 },
   /**
+   * "Translate" on a post, signed in or not. Every request is a call to the
+   * LibreTranslate instance, which has its own limits or a per-character bill,
+   * so this keeps one reader - or one script - from spending them for
+   * everyone. Two a minute, sustained, is far beyond reading a feed.
+   */
+  'translate': { limit: 120, windowMs: 60 * 60_000 },
+  /**
    * Direct messages. Sending is generous - a conversation is bursty - and only
    * stops a script. STARTING a message request to someone who does not follow
    * you back is the spam vector, so new requests have their own daily cap;

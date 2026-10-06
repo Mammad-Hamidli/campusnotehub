@@ -72,7 +72,8 @@ export type TemplateName =
   | 'emailChangeConfirm'
   | 'emailChangeRequested'
   | 'emailChanged'
-  | 'contactMessage';
+  | 'contactMessage'
+  | 'verificationAiDigest';
 
 /** Greeting line. Nickname, never the legal name - see the User model. */
 const hi = (nickname: string) => `Hi @${nickname},`;
@@ -137,20 +138,20 @@ export const TEMPLATES = {
   verificationSubmitted: (p: { nickname: string }): EmailContent => ({
     subject: 'We received your verification documents',
     heading: 'Verification in progress',
-    preheader: 'Your documents are being checked. Most results arrive within minutes.',
+    preheader: 'Your documents are queued for the nightly check. We will email you the result.',
     blocks: [
       { kind: 'paragraph', text: hi(p.nickname) },
       {
         kind: 'paragraph',
-        text: 'Your documents have been received and are being checked now. Most submissions are decided within a few minutes; if a human reviewer needs to look, it can take up to a few days.',
+        text: 'Your documents have been received and your account is under review. They are checked automatically overnight; if anything is unclear, a moderator looks at them, which can take up to a few days.',
       },
       {
         kind: 'callout',
         tone: 'neutral',
-        title: 'Your documents were not stored',
-        // Worth stating plainly: it is the platform's most unusual property
-        // and the thing a student is most likely to worry about.
-        body: 'UniPath processes identity documents in memory and deletes them as soon as a decision is made. No copy is kept in our database or file storage.',
+        title: 'How your documents are handled',
+        // Has to stay true to src/lib/verification/aiQueue.ts and
+        // reviewBuffer.ts: restricted storage until decided, 7 days at most.
+        body: 'Until a decision is made, the images are held in restricted storage that only our verification system and moderators can open. They are read by an automated document check and deleted as soon as you are verified or rejected, and never kept longer than 7 days.',
       },
       { kind: 'button', label: 'Check status', href: appUrl('/dashboard') },
     ],
@@ -947,6 +948,53 @@ export const TEMPLATES = {
           title: 'Reply to answer them',
           body: 'Replying to this email writes to the address above. It was typed into a public form and has not been verified.',
         },
+      ],
+    };
+  },
+
+  /**
+   * Staff alert from the nightly AI verification batch (aiQueue.ts), sent to
+   * verificationAlertInbox(). Case ids and category codes only: the platform
+   * rule about email still holds, so no name, no extracted text, no image.
+   */
+  verificationAiDigest: (p: {
+    flagged: { caseId: string; codes: string[] }[];
+    approved: number;
+    remaining: number;
+    stopped: string | null;
+  }): EmailContent => {
+    const shown = p.flagged.slice(0, 25);
+    return {
+      subject:
+        p.flagged.length > 0
+          ? `${p.flagged.length} verification${p.flagged.length === 1 ? '' : 's'} need review`
+          : 'Nightly verification check stopped early',
+      heading: 'Nightly verification check',
+      preheader: `${p.flagged.length} flagged, ${p.approved} approved automatically, ${p.remaining} still queued.`,
+      blocks: [
+        {
+          kind: 'facts',
+          rows: [
+            { label: 'Flagged for review', value: String(p.flagged.length) },
+            { label: 'Approved automatically', value: String(p.approved) },
+            { label: 'Still queued', value: String(p.remaining) },
+          ],
+        },
+        ...(p.stopped
+          ? [{ kind: 'callout' as const, tone: 'warning' as const, title: 'The run stopped early', body: p.stopped }]
+          : []),
+        ...(shown.length > 0
+          ? [
+              {
+                kind: 'facts' as const,
+                rows: shown.map((c) => ({ label: c.caseId, value: c.codes.join(', ') || 'AI_CHECK_FAILED' })),
+              },
+              ...(p.flagged.length > shown.length
+                ? [{ kind: 'paragraph' as const, text: `And ${p.flagged.length - shown.length} more.` }]
+                : []),
+            ]
+          : []),
+        { kind: 'button', label: 'Open the review queue', href: appUrl('/admin/verifications') },
       ],
     };
   },

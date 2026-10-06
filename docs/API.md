@@ -95,13 +95,13 @@ It is still accepted and ignored so a stale client is not broken mid-rollout.
 
 | Method | Path | Auth | Limit | Notes |
 |---|---|---|---|---|
-| `POST` | `/verification/submit` | session | 3 / day | **multipart**, 2 or 4 files by role. Runs the whole pipeline inline. |
+| `POST` | `/verification/submit` | session | 3 / day | **multipart**, 2 or 4 files by role. Queues the case for the nightly AI check. |
 | `GET` | `/verification/status` | session | — | `{ status, attempt, remainingAttempts, messageKey }` |
 | `POST` | `/me/graduation` | session | — | Answers the alumni prompt: `alumni` \| `still_studying` \| `later`. |
 
-There is **no** `/verification/presign`. Documents no longer go to object
-storage, so there is nothing to presign. See
-[SECURITY.md §3](SECURITY.md#3-zero-retention).
+There is **no** `/verification/presign`. Documents are uploaded server-side to
+the 7-day review buffer (authenticated Cloudinary assets), so there is nothing
+to presign.
 
 **`POST /verification/submit`** — `multipart/form-data`. Which parts are
 required is decided from the account's **stored role**, never from anything the
@@ -130,17 +130,47 @@ round trip rather than 20 MB of buffering. Every part is validated against its
 actual bytes — magic-byte sniffing, header dimension parse, PDF active-content
 scan — never against the client's declared `Content-Type`.
 
-Returns `200` with a real verdict (this call is synchronous, 3–8s):
+Returns `200` once the documents are queued. Every accepted submission is
+under review until the nightly check (below) or a moderator decides it:
 
 ```jsonc
 {
   "caseId": "clx…",
-  "status": "VERIFIED" | "REJECTED" | "NEEDS_REVIEW",
+  "status": "NEEDS_REVIEW",
   "attempt": 1,
   "remainingAttempts": 2,
-  "messageKey": "verification.badge.verified"
+  "messageKey": "verification.banner.needsReview"
 }
 ```
+
+`503 errors.generic` means nothing was queued (the review buffer upload
+failed); the account is unchanged and no attempt is spent.
+
+### Nightly AI check
+
+`GET /api/cron/verification-ai` (Bearer `CRON_SECRET`), scheduled in
+`vercel.json` at `0 20 * * *` UTC = 00:00 Baku. It answers `202` at once and
+runs the batch in `after()` ([aiQueue.ts](../src/lib/verification/aiQueue.ts)):
+
+- Cases with `aiCheckState: "QUEUED"`, oldest `submittedAt` first.
+- The ID front (and, for `STUDENT`, the student-card front) is read by
+  Cloudflare Workers AI `@cf/meta/llama-3.2-11b-vision-instruct`, which only
+  **transcribes** fields. The comparison against the profile (name, date of
+  birth when on file, expiry, university) is code in
+  [documentCheck.ts](../src/lib/verification/documentCheck.ts).
+- Complete match → case `VERIFIED`, account verified, buffer destroyed,
+  `verificationApproved` email. Anything else → stays `NEEDS_REVIEW`,
+  `aiCheckState: "FLAGGED"` with category codes, and staff get one
+  `verificationAiDigest` email per run (`VERIFICATION_ALERT_INBOX`).
+- Workers AI out of daily neurons (429 / 3036), down, or misconfigured → the
+  run stops with the current case untouched; the queue order is the resume
+  point for the next night. Out of function time → it calls itself again
+  (`?hop=n`, at most 30 per night) and continues.
+- A moderator can decide a queued case at any time; the batch re-checks each
+  case in a transaction and never overwrites a human decision.
+
+Manual run: `npm run cron:verification-ai`. The scheduler worker also runs it
+at 00:00 Baku.
 
 Errors are specific for quality (they help an honest user) and generic for
 anything fraud-adjacent (specifics would help a forger):
@@ -153,7 +183,7 @@ anything fraud-adjacent (specifics would help a forger):
 | `413` | `errors.fileTooLarge` | over 5 MB |
 | `429` | `verification.banner.attemptsExhausted` | 3 decided attempts used |
 
-Quality failures (`RETAKE`) do **not** consume an attempt.
+Only decided cases (approved or rejected) consume an attempt.
 
 ---
 
@@ -215,6 +245,7 @@ self-action and last-admin guards.
 | `GET` | `/feed/:postId/comments` | optional | — | Threaded. |
 | `POST` | `/feed/:postId/comments` | session | 60 / h | |
 | `POST` | `/feed/:postId/report` | session | 10 / h | |
+| `POST` | `/translate` | optional | `translate` 120 / h | `{ text, target }` → `{ translation }`. See below. |
 | `GET` | `/tags/trending` | optional | — | |
 | `POST` | `/users/:id/follow` | session | — | |
 
@@ -227,6 +258,14 @@ not ended. Staff promote through `PATCH /admin/feed-ad { promote?, demote?, dura
 now, so promoting a mentor already in the slot renews them. A lapsed promotion
 is hidden on read and swept (with a "promotion ended" notification) by the
 scheduler, the scheduled-tasks cron, or the first public read that sees it.
+
+**`POST /translate`** — `{ text: string (≤ 2000), target: "az" | "en" | "ru" | "zh" | "ar" | "de" }`
+→ `{ translation }`. The "Translate" button on a post. The server proxies to
+LibreTranslate (`LIBRETRANSLATE_URL`, optional `LIBRETRANSLATE_API_KEY`), so the
+instance and key never reach the browser. Errors are `feed.translate.errors.*`:
+`empty` `400`, `sameLanguage` `422`, `quota` `429` (this limit or the
+instance's), `failed` `502`, `unavailable` `503` (not configured, unreachable, or
+the key was refused - the last is logged server-side).
 
 ---
 

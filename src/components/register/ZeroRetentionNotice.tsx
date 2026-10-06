@@ -16,17 +16,19 @@ import { useT } from '@/lib/i18n/LocaleProvider';
  * Every claim here is one the architecture actually keeps, and each maps to a
  * specific mechanism:
  *
- * "never stored"      -> no S3 bucket exists for KYC; buffers are wiped in a
- *                          finally block (src/lib/verification/pipeline.ts)
- * "deleted instantly" -> the pipeline is synchronous; nothing is queued
- * "only a yes/no"     -> the User table holds booleans and timestamps only
- *                          (see the schema comment on the verification block)
- * "a person may look" -> the honest caveat: flagged cases go to a moderator,
- *                          with the documents held encrypted for at most 24h
+ * "restricted storage" -> authenticated Cloudinary assets with no public URL,
+ *                           delivered only through server-signed requests
+ *                           (src/lib/verification/reviewBuffer.ts)
+ * "checked overnight"  -> the nightly batch (src/lib/verification/aiQueue.ts),
+ *                           Cloudflare Workers AI; named in the consent line
+ * "deleted on decision"-> the batch and the moderator route both destroy the
+ *                           buffer when they decide
+ * "a person may look"  -> flagged cases go to a moderator
+ * "7 days at most"     -> the buffer's hard TTL, enforced in three places
  *
- * That fourth line matters. Claiming "no human ever sees it" would be a lie,
- * because the hybrid pipeline requires a human for ambiguous cases. Users
- * forgive a caveat; they do not forgive discovering one later.
+ * The component keeps its old name; the promise it makes is no longer "zero
+ * retention" but "bounded retention", and the copy says so. Users forgive a
+ * caveat; they do not forgive discovering one later.
  */
 export function ZeroRetentionNotice() {
   const t = useT();

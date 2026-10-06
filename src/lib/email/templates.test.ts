@@ -16,7 +16,7 @@ describe('email templates', () => {
   it('covers every template with sample data', () => {
     // SAMPLE_PARAMS is typed `satisfies SampleMap`, so a missing template is
     // already a compile error; this asserts the count is what we think it is.
-    expect(SAMPLE_NAMES).toHaveLength(42);
+    expect(SAMPLE_NAMES).toHaveLength(43);
   });
 
   describe.each(SAMPLE_NAMES)('%s', (name) => {

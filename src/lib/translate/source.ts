@@ -1,12 +1,12 @@
 /**
  * Source-language detection for post translation. Browser-safe, no imports.
  *
- * MyMemory's `autodetect` is unreliable on short, casual text - which is most
- * of what a campus feed holds. "salam dostum" is read as Indonesian (where
- * "salam" is a formal greeting) and comes back as "salutation dostum"; told the
- * source is Azerbaijani, the very same call answers "hello friend". So the
- * source is decided here whenever the text itself says so, and autodetect is
- * only the fallback.
+ * A provider's automatic detection is unreliable on short, casual text - which
+ * is most of what a campus feed holds. "salam dostum" gets read as Indonesian
+ * (where "salam" is a formal greeting) and comes back as "salutation dostum";
+ * told the source is Azerbaijani, the very same call answers "hello friend".
+ * So the source is decided here whenever the text itself says so, and the
+ * provider's `auto` is only the fallback (see ./libretranslate.ts).
  *
  * Deliberately small: the script settles Russian, Arabic and Chinese outright;
  * for Latin text the letter ə (Azerbaijani only), the Turkic letters ğ ı ş and
@@ -16,7 +16,7 @@
 
 /**
  * Everyday words people type WITHOUT Azerbaijani letters, and their spelling.
- * The provider translates "necesen qardas" as "howesen ward" but
+ * Machine translation turns "necesen qardas" into "howesen ward" but
  * "necəsən qardaş" as "how are you brother", so the query - never the post -
  * is respelled before it is sent. Only words with a single plausible reading
  * belong here.

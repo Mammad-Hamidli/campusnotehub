@@ -49,7 +49,21 @@ export type VerificationCaseRecord = {
   moderatorNote: string | null;
   dismissedAt: Date | null;
   dismissedById: string | null;
+  /**
+   * The nightly AI check (src/lib/verification/aiQueue.ts). QUEUED cases wait
+   * for it in FIFO order of submittedAt; null on cases from before it existed.
+   */
+  aiCheckState: AiCheckState | null;
+  aiCheckedAt: Date | null;
 };
+
+export const AiCheckState = {
+  QUEUED: 'QUEUED',
+  APPROVED: 'APPROVED',
+  FLAGGED: 'FLAGGED',
+  SKIPPED: 'SKIPPED',
+} as const;
+export type AiCheckState = (typeof AiCheckState)[keyof typeof AiCheckState];
 
 const cases = () => adminDb().collection(COLLECTIONS.verificationCases);
 
@@ -86,6 +100,13 @@ export async function createCase(params: {
   userId: string;
   attempt: number;
   status: VerificationStatus;
+  /** Buffered documents, written with the case so a queued case is never without them. */
+  review?: {
+    bufferKey: string;
+    expiresAt: Date;
+    documents: StoredReviewDocument[];
+  };
+  aiCheckState?: AiCheckState;
 }): Promise<VerificationCaseRecord> {
   const record = {
     userId: params.userId,
@@ -98,14 +119,16 @@ export async function createCase(params: {
     failureCodes: [] as string[],
     checkScores: null,
     publicMessageKey: null,
-    reviewBufferKey: null,
-    reviewExpiresAt: null,
-    reviewDocuments: null,
+    reviewBufferKey: params.review?.bufferKey ?? null,
+    reviewExpiresAt: params.review?.expiresAt ?? null,
+    reviewDocuments: params.review?.documents ?? null,
     reviewPriority: 0,
     decidedByModeratorId: null,
     moderatorNote: null,
     dismissedAt: null,
     dismissedById: null,
+    aiCheckState: params.aiCheckState ?? null,
+    aiCheckedAt: null,
   };
   await cases().doc(params.id).set(forFirestore(record));
   return { id: params.id, ...record } as VerificationCaseRecord;
@@ -202,3 +225,20 @@ export async function expiredReviewCases(
   );
 }
 
+/**
+ * The nightly AI check's queue, oldest submission first.
+ *
+ * One equality filter and the order applied in memory, for the same reason as
+ * reviewQueue(): `where aiCheckState == QUEUED orderBy submittedAt` needs a
+ * composite index, and those are not deployed. The id breaks ties so two runs
+ * over the same rows always walk them in the same order.
+ */
+export async function aiQueuedCases(): Promise<VerificationCaseRecord[]> {
+  const snap = await cases()
+    .where('aiCheckState', '==', AiCheckState.QUEUED)
+    .limit(QUEUE_SCAN_CEILING)
+    .get();
+  return (docsToObjects<VerificationCaseRecord>(snap.docs) as VerificationCaseRecord[]).sort(
+    (a, b) => a.submittedAt.getTime() - b.submittedAt.getTime() || a.id.localeCompare(b.id),
+  );
+}

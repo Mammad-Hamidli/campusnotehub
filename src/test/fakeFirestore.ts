@@ -1,7 +1,8 @@
 /**
  * A minimal in-memory Firestore for repository tests: documents and
  * subcollections, queries (==, in, and ranges; Dates compare by instant) with
- * orderBy(), limit(), select() and count(), and transactions whose writes
+ * orderBy(), limit(), select() and count(), set() with { merge }, and
+ * transactions whose writes
  * apply after the callback returns (as Firestore's do). No contention retries
  * - atomicity is Firestore's guarantee; what tests check is that the code puts
  * each check and its write in one transaction.
@@ -29,7 +30,8 @@ export function createFakeFirestore() {
       id: path.split('/').pop()!,
       get: async () => snapshot(path),
       delete: async () => void store.delete(path),
-      set: async (data: Data) => void store.set(path, structuredClone(data)),
+      set: async (data: Data, options?: { merge?: boolean }) =>
+        void store.set(path, options?.merge ? { ...store.get(path), ...structuredClone(data) } : structuredClone(data)),
       update: async (data: Data) => void store.set(path, { ...store.get(path)!, ...structuredClone(data) }),
       create: async (data: Data) => {
         if (store.has(path)) throw Object.assign(new Error('ALREADY_EXISTS'), { code: 6 });
@@ -109,7 +111,8 @@ export function createFakeFirestore() {
           '__query' in target ? target.run() : snapshot(target.path),
         getAll: async (...refs: Ref[]) => refs.map((r) => snapshot(r.path)),
         update: (r: Ref, d: Data) => writes.push(() => store.set(r.path, { ...store.get(r.path)!, ...structuredClone(d) })),
-        set: (r: Ref, d: Data) => writes.push(() => store.set(r.path, structuredClone(d))),
+        set: (r: Ref, d: Data, o?: { merge?: boolean }) =>
+          writes.push(() => store.set(r.path, o?.merge ? { ...store.get(r.path), ...structuredClone(d) } : structuredClone(d))),
         delete: (r: Ref) => writes.push(() => store.delete(r.path)),
         create: (r: Ref, d: Data) =>
           writes.push(() => {

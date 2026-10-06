@@ -6,7 +6,7 @@
  * In development it is logged, so a partial local setup still starts.
  *
  * Degraded: the app runs, but a feature is off (email) or falls back
- * (verification without the doc-verifier goes to human review).
+ * (verification without Workers AI waits for a moderator).
  */
 import { MAIL_ACCOUNT, isEmailShaped, roleMailbox } from '@/lib/email/identity';
 
@@ -73,8 +73,26 @@ export function checkEnvironment(env: Env = process.env): { missing: string[]; d
     }
   }
 
-  if (!has('DOC_VERIFIER_URL') || !has('DOC_VERIFIER_TOKEN')) {
-    degraded.push('DOC_VERIFIER_URL / DOC_VERIFIER_TOKEN (every submission goes to human review)');
+  /**
+   * The nightly AI identity check (src/lib/verification/workersAi.ts). Without
+   * it submissions still queue, and every one waits for a moderator.
+   */
+  if (!has('CLOUDFLARE_ACCOUNT_ID') || !has('CLOUDFLARE_AI_API_TOKEN')) {
+    degraded.push('CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_AI_API_TOKEN (no automatic verification; every submission waits for a moderator)');
+  }
+  if (has('VERIFICATION_ALERT_INBOX') && !isEmailShaped(env.VERIFICATION_ALERT_INBOX!.trim())) {
+    degraded.push('VERIFICATION_ALERT_INBOX (not an email address; verification alerts go to the contact inbox)');
+  }
+
+  /**
+   * Post translation (src/lib/translate/libretranslate.ts). The base URL of a
+   * LibreTranslate instance; LIBRETRANSLATE_API_KEY is optional because a
+   * self-hosted one may not ask for it.
+   */
+  if (!has('LIBRETRANSLATE_URL')) {
+    degraded.push('LIBRETRANSLATE_URL (post translation is unavailable)');
+  } else if (!/^https?:\/\/[^\s/]/i.test(env.LIBRETRANSLATE_URL!.trim())) {
+    degraded.push('LIBRETRANSLATE_URL (not an http(s) URL; post translation is unavailable)');
   }
 
   if (degraded.length) console.warn(`[env] Degraded configuration: ${degraded.join('; ')}`);

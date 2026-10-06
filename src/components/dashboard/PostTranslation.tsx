@@ -10,7 +10,8 @@ import {
   normalizeTargetLang,
   type TargetLang,
 } from '@/lib/i18n/translatable';
-import { TranslationError, translateText } from '@/lib/translate/mymemory';
+import { translateText } from '@/lib/translate/client';
+import { TranslationError } from '@/lib/translate/errors';
 
 /**
  * "Translate this post", on the card.
@@ -29,15 +30,17 @@ import { TranslationError, translateText } from '@/lib/translate/mymemory';
  * ONE REQUEST PER LANGUAGE, PER CARD
  * ---------------------------------------------------------------------------
  * Results are kept in a per-card map, so switching back to a language already
- * fetched is instant; src/lib/translate/mymemory.ts also caches per tab. Both
- * matter, because MyMemory's free quota is counted per reader.
+ * fetched is instant; src/lib/translate/client.ts also caches per tab and the
+ * server per instance. All three matter, because every reader's translations
+ * now go through one LibreTranslate instance and one rate-limit bucket each.
  *
  * The component renders NOTHING until pressed beyond its own button, so a feed
  * page of twenty cards issues zero translation requests on load. Machine
  * translation is opt-in per post by design.
  *
- * The text is translated in the browser, straight from MyMemory - there is no
- * server route. Only a body the reader can already see is ever sent. There is
+ * The text goes to POST /api/translate, which asks LibreTranslate; the
+ * instance and its key are server settings. Only a body the reader can already
+ * see is ever sent. There is
  * no `readOnly` prop, unlike the like button: translating is READING, which a
  * view-only quick-login account may do.
  */

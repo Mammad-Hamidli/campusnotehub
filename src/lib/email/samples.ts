@@ -117,6 +117,15 @@ export const SAMPLE_PARAMS = {
     message: 'Salam!\n\nUniNotes-da fayl yükləyə bilmirəm - "Şəkil yüklənmədi" yazır.\nTəşəkkürlər.',
     locale: 'az',
   },
+  verificationAiDigest: {
+    flagged: [
+      { caseId: 'Xk2pQe7RtY9aLm3n', codes: ['NAME_MISMATCH'] },
+      { caseId: 'Bv8sWd1KjH4cZq6u', codes: ['SCREEN_RECAPTURE', 'BLURRY'] },
+    ],
+    approved: 11,
+    remaining: 4,
+    stopped: 'The Cloudflare Workers AI daily allocation ran out. The remaining cases are checked at the next nightly run.',
+  },
 } satisfies SampleMap;
 
 /** Every template name, for iterating in the preview route and the tests. */

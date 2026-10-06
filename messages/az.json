@@ -69,7 +69,7 @@
       "graduationYear": "Məzuniyyət ili",
       "graduationMonth": "Məzuniyyət ayı",
       "termsAccept": "<terms>İstifadə şərtləri</terms> və <privacy>Məxfilik siyasəti</privacy> ilə razıyam",
-      "dataConsent": "Şəxsiyyət sənədlərimin yalnız tələbə statusunun doğrulanması üçün emal olunmasına razılıq verirəm",
+      "dataConsent": "Şəxsiyyət sənədlərimin, o cümlədən süni intellekt provayderimiz (Cloudflare) tərəfindən avtomatik yoxlanılmaqla, yalnız şəxsiyyətimin və tələbə statusumun doğrulanması üçün emal olunmasına razılıq verirəm",
       "createAccount": "Hesab yarat",
       "haveAccount": "Artıq hesabınız var?",
       "phone": "Telefon nömrəsi",
@@ -338,7 +338,7 @@
       "unverified": "Hesab doğrulanmayıb: təhlükəsizlik yoxlaması gözlənilir. Bəzi funksiyalar məhduddur.",
       "unverifiedCta": "Sənədləri yüklə",
       "pending": "Sənədləriniz yoxlanılır. Bu adətən 5 dəqiqə - 24 saat çəkir.",
-      "needsReview": "Sənədləriniz əl ilə yoxlanılır. Nəticəni bildirişlə göndərəcəyik.",
+      "needsReview": "Sənədləriniz yoxlanılır. Yoxlama gecə aparılır, nəticəni bildirişlə göndərəcəyik.",
       "rejected": "Doğrulama alınmadı. {remaining} cəhd qalıb.",
       "rejectedCta": "Yenidən yüklə",
       "processing": "Sənədləriniz indi yoxlanılır. Bu bir neçə saniyə çəkir.",
@@ -493,7 +493,7 @@
         "failed": "Bu paylaşım tərcümə edilə bilmədi. Yenidən cəhd edin.",
         "unavailable": "Tərcümə hazırda əlçatan deyil. Bağlantınızı yoxlayıb yenidən cəhd edin.",
         "empty": "Tərcümə ediləcək mətn yoxdur.",
-        "quota": "Bugünkü pulsuz tərcümə limiti bitib. Sabah yenidən cəhd edin.",
+        "quota": "Qısa müddətdə çox tərcümə edildi. Bir neçə dəqiqə gözləyib yenidən cəhd edin.",
         "sameLanguage": "Bu paylaşım artıq həmin dildədir."
       }
     },
@@ -1223,12 +1223,12 @@
       "body": "Təhlükəsizlik yoxlaması bu müraciəti bloklayıb."
     },
     "retention": {
-      "title": "Sənədləriniz saxlanılmır",
-      "lead": "Şəkillər yalnız yoxlama anında emal olunur və dərhal silinir. Serverlərimizdə və ya buludda qalmır.",
-      "deleted": "Yoxlamadan dərhal sonra tamamilə silinir",
+      "title": "Sənədləriniz necə qorunur",
+      "lead": "Yoxlanılana qədər şəkillər yalnız doğrulama sistemimizin və moderatorların aça bildiyi məhdud girişli yaddaşda saxlanılır. Avtomatik yoxlama onları gecə oxuyur və qərar veriləndən dərhal sonra silinir.",
+      "deleted": "Təsdiqləndikdə və ya rədd edildikdə dərhal silinir",
       "flagsOnly": "Bazada yalnız \"doğrulanıb: bəli/xeyr\" saxlanılır",
-      "humanReview": "Şübhəli hallarda moderator baxa bilər",
-      "window": "Belə hallarda şəkil ən çox 24 saat şifrələnmiş qalır"
+      "humanReview": "Avtomatik yoxlama əmin olmadıqda moderator baxır",
+      "window": "Heç vaxt 7 gündən çox saxlanılmır"
     },
     "created": "Hesabınız uğurla yaradıldı. CampusNoteHub-a xoş gəlmisiniz!"
   },

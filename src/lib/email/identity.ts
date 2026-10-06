@@ -129,3 +129,13 @@ export function contactInbox(): string {
   const configured = process.env.CONTACT_INBOX?.trim();
   return configured && isEmailShaped(configured) ? configured.toLowerCase() : supportAddress();
 }
+
+/**
+ * Where verification alerts for staff go (cases the nightly AI check flagged,
+ * a batch that stopped on quota or configuration): VERIFICATION_ALERT_INBOX,
+ * else the contact inbox. A recipient, so not allowlisted - see contactInbox().
+ */
+export function verificationAlertInbox(): string {
+  const configured = process.env.VERIFICATION_ALERT_INBOX?.trim();
+  return configured && isEmailShaped(configured) ? configured.toLowerCase() : contactInbox();
+}
