@@ -79,7 +79,7 @@ export function EmailPanel() {
           </p>
         )}
 
-        <EmailChange current={data.email} />
+        <EmailChange />
 
         {!data.verified &&
           (sent ? (
@@ -99,7 +99,7 @@ export function EmailPanel() {
 
 type Reauth = 'code' | 'password' | 'recent_sign_in';
 
-function EmailChange({ current }: { current: string }) {
+function EmailChange() {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [reauth, setReauth] = useState<Reauth>('password');
@@ -176,7 +176,7 @@ function EmailChange({ current }: { current: string }) {
           required
           autoComplete="email"
           value={newEmail}
-          placeholder={current}
+          placeholder={t('auth.register.emailPlaceholder')}
           onChange={(e) => setNewEmail(e.target.value)}
           className="input"
         />

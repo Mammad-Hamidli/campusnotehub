@@ -15,6 +15,7 @@ import {
   UserRoundSearch,
 } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { weekdayName } from '@/lib/i18n/dates';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { industryLabel } from '@/lib/mentors/display';
 import { FollowingBadge } from '@/components/social/Following';
@@ -34,11 +35,6 @@ import { MentorRate } from './MentorRate';
  * and seniority, and confirming that a given id exists but is hidden is itself
  * information - so both render the same not-found state.
  */
-
-/** Short weekday name in the reader's language; 0 = Sunday (1 Jan 2023 was one). */
-function weekdayName(weekday: number, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2023, 0, 1 + weekday)));
-}
 
 type Review = {
   id: string;

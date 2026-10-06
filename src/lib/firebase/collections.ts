@@ -61,6 +61,13 @@ export const COLLECTIONS = {
    * accept or reject, so a rejected requester may simply ask again.
    */
   followRequests: 'followRequests',
+  /**
+   * `conversations/{a}__{b}` (the two user ids, sorted): one direct-message
+   * thread per pair, so starting a chat twice reaches the same document. Its
+   * messages are a subcollection; each side's inbox row lives under the user.
+   * Server-only; see src/lib/messages/service.ts.
+   */
+  conversations: 'conversations',
 
   mentorProfiles: 'mentorProfiles',
   bookings: 'bookings',
@@ -152,6 +159,16 @@ export const SUBCOLLECTIONS = {
   userFollowing: (userId: string) => `${COLLECTIONS.users}/${userId}/following`,
   /** Per-user notification preferences, one document per type+channel. */
   notifPrefs: (userId: string) => `${COLLECTIONS.users}/${userId}/notificationPreferences`,
+  /** A direct-message thread's messages, oldest to newest by `createdAt`. */
+  conversationMessages: (conversationId: string) => `${COLLECTIONS.conversations}/${conversationId}/messages`,
+  /**
+   * One row per conversation the user can see, keyed by the OTHER person's id:
+   * state (active / request in / request out), unread count and the latest
+   * message's preview. What the inbox lists and the badge counts.
+   */
+  userInbox: (userId: string) => `${COLLECTIONS.users}/${userId}/inbox`,
+  /** People this user blocked from messaging them; doc id = the blocked user's id. */
+  userBlocks: (userId: string) => `${COLLECTIONS.users}/${userId}/blocks`,
   /** "Save for later" bookmarks; doc id = noteId, so saving twice is a no-op. */
   savedNotes: (userId: string) => `${COLLECTIONS.users}/${userId}/savedNotes`,
   /** Availability rules belong to exactly one mentor and are read with them. */

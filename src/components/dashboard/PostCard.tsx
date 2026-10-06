@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Flag, Heart, Link2, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
-import { useT } from '@/lib/i18n/LocaleProvider';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
+import { formatDate } from '@/lib/i18n/dates';
 import { clampFeedAspect } from '@/lib/media/constants';
 import { Menu, MenuItem } from '@/components/ui/Menu';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
@@ -39,6 +40,7 @@ export type Post = {
   tags: string[];
   /** Already resolved to a servable URL by the feed mapper. */
   media: { id: string; url: string; width: number | null; height: number | null; alt: string | null }[];
+  /** ISO instant; rendered as the exact date and time on the card. */
   createdAt: string;
   likeCount: number;
   commentCount: number;
@@ -63,7 +65,7 @@ export function PostCard({
   defaultShowComments?: boolean;
   onDeleted?: (postId: string) => void;
 }) {
-  const t = useT();
+  const { locale, t } = useLocale();
   const toast = useToast();
   const confirm = useConfirm();
   const [liked, setLiked] = useState(post.likedByViewer);
@@ -212,7 +214,12 @@ export function PostCard({
             <span className="text-xs text-fg-subtle" aria-hidden="true">
               ·
             </span>
-            <time className="text-xs text-fg-subtle">{post.createdAt}</time>
+            {/* The exact moment, on the reader's clock. Cards are only ever
+                rendered from data fetched after mount, so the device time
+                zone cannot disagree with a server render. */}
+            <time dateTime={post.createdAt} className="tabular text-xs text-fg-subtle">
+              {formatDate(post.createdAt, locale, 'dateTime')}
+            </time>
           </div>
           <p className="mt-0.5 truncate text-xs text-fg-muted">{post.author.headline}</p>
         </div>

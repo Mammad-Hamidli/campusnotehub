@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AlertCircle, Link2, Loader2, Unlink } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
 import { GoogleMark } from '@/components/auth/GoogleMark';
 
@@ -126,7 +127,7 @@ export function LinkedAccountsPanel() {
                     {identity
                       ? t('auth.oauth.linkedSince', {
                           account: identity.emailHint ?? LABELS[provider],
-                          date: new Date(identity.linkedAt).toLocaleDateString(locale, { dateStyle: 'medium' }),
+                          date: formatDate(identity.linkedAt, locale, 'date'),
                         })
                       : t('auth.oauth.notLinked')}
                   </div>

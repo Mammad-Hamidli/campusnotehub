@@ -1,10 +1,10 @@
 /**
- * A minimal in-memory Firestore for repository tests: documents, queries
- * (==, in, and ranges; Dates compare by instant) with limit(), and
- * transactions whose writes apply after the
- * callback returns (as Firestore's do). No contention retries - atomicity is
- * Firestore's guarantee; what tests check is that the code puts each check and
- * its write in one transaction.
+ * A minimal in-memory Firestore for repository tests: documents and
+ * subcollections, queries (==, in, and ranges; Dates compare by instant) with
+ * orderBy(), limit(), select() and count(), and transactions whose writes
+ * apply after the callback returns (as Firestore's do). No contention retries
+ * - atomicity is Firestore's guarantee; what tests check is that the code puts
+ * each check and its write in one transaction.
  */
 type Data = Record<string, unknown>;
 
@@ -50,28 +50,55 @@ export function createFakeFirestore() {
     return op === '<' ? a < b : op === '<=' ? a <= b : op === '>' ? a > b : a >= b;
   }
 
-  function query(collection: string, filters: [string, Op, unknown][] = [], max = Infinity) {
+  type Order = [field: string, direction: 'asc' | 'desc'];
+
+  function query(collection: string, filters: [string, Op, unknown][] = [], max = Infinity, orders: Order[] = []) {
+    // Direct children only: `users/u1/inbox` holds `users/u1/inbox/x`, not deeper paths.
+    const depth = collection.split('/').length + 1;
     const run = () => {
-      const docs = [...store.keys()]
-        .filter((p) => p.startsWith(`${collection}/`) && p.split('/').length === 2)
-        .filter((p) => filters.every(([f, op, v]) => matches(store.get(p)![f], op, v)))
-        .slice(0, max)
-        .map(snapshot);
+      let paths = [...store.keys()]
+        .filter((p) => p.startsWith(`${collection}/`) && p.split('/').length === depth)
+        .filter((p) => filters.every(([f, op, v]) => matches(store.get(p)![f], op, v)));
+      if (orders.length > 0) {
+        paths = paths.sort((x, y) => {
+          for (const [field, direction] of orders) {
+            const [a, b] = [comparable(store.get(x)![field]), comparable(store.get(y)![field])];
+            if (a !== b) return (a < b ? -1 : 1) * (direction === 'desc' ? -1 : 1);
+          }
+          return 0;
+        });
+      }
+      const docs = paths.slice(0, max).map(snapshot);
       return { empty: docs.length === 0, size: docs.length, docs };
     };
-    return {
+    const self = {
       __query: true as const,
       run,
-      where: (field: string, op: Op, value: unknown) => query(collection, [...filters, [field, op, value]], max),
-      limit: (n: number) => query(collection, filters, n),
+      where: (field: string, op: Op, value: unknown) => query(collection, [...filters, [field, op, value]], max, orders),
+      orderBy: (field: string, direction: 'asc' | 'desc' = 'asc') =>
+        query(collection, filters, max, [...orders, [field, direction]]),
+      limit: (n: number) => query(collection, filters, n, orders),
+      /** Projection is a cost optimisation; the fake returns whole documents. */
+      select: () => self,
+      count: () => ({ get: async () => ({ data: () => ({ count: run().size }) }) }),
       get: async () => run(),
     };
+    return self;
   }
 
   const db = {
     collection: (name: string) => ({
       doc: (id?: string) => docRef(`${name}/${id ?? `auto${++autoId}`}`),
+      add: async (data: Data) => {
+        const ref = docRef(`${name}/auto${++autoId}`);
+        await ref.set(data);
+        return ref;
+      },
       where: (field: string, op: Op, value: unknown) => query(name).where(field, op, value),
+      orderBy: (field: string, direction: 'asc' | 'desc' = 'asc') => query(name).orderBy(field, direction),
+      limit: (n: number) => query(name).limit(n),
+      count: () => query(name).count(),
+      get: async () => query(name).run(),
     }),
     /** Batched point reads, in argument order; a missing document is `exists: false`. */
     getAll: async (...refs: Ref[]) => refs.map((r) => snapshot(r.path)),
@@ -80,6 +107,7 @@ export function createFakeFirestore() {
       const tx = {
         get: async (target: Ref | ReturnType<typeof query>) =>
           '__query' in target ? target.run() : snapshot(target.path),
+        getAll: async (...refs: Ref[]) => refs.map((r) => snapshot(r.path)),
         update: (r: Ref, d: Data) => writes.push(() => store.set(r.path, { ...store.get(r.path)!, ...structuredClone(d) })),
         set: (r: Ref, d: Data) => writes.push(() => store.set(r.path, structuredClone(d))),
         delete: (r: Ref) => writes.push(() => store.delete(r.path)),

@@ -6,6 +6,12 @@ export type Capability =
   | 'feed:comment'
   | 'feed:react'
   | 'users:follow'
+  /**
+   * Sending a direct message, or accepting a message request (which opens a
+   * channel). Not verification-gated - it is social, like following - but a
+   * view-only or frozen account cannot reach another person this way.
+   */
+  | 'messages:send'
   | 'notes:browse'
   | 'notes:review'
   | 'notes:share'

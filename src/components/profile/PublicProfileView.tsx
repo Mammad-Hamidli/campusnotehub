@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CalendarDays, Clock, GraduationCap, Loader2, Pencil, UserCheck, UserPlus } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { VerifiedBadge } from '@/components/dashboard/VerificationBanner';
@@ -49,7 +50,8 @@ export function PublicProfileView({
     return () => controller.abort();
   }, [profile.id]);
 
-  const joined = new Date(profile.joinedAt).toLocaleDateString(locale, { year: 'numeric', month: 'long' });
+  // Server-rendered, so a fixed zone: the server's clock is not the reader's.
+  const joined = formatDate(profile.joinedAt, locale, 'monthYear', { timeZone: 'UTC' });
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">

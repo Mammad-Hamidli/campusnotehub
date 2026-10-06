@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Clock, Loader2, Trash2 } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
 
 type RequestState = {
@@ -55,7 +56,7 @@ export function DeletionRequestCard() {
   }, []);
 
   const date = (value: string | null | undefined) =>
-    value ? new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(new Date(value)) : '';
+    value ? formatDate(value, locale, 'dateLong') : '';
 
   async function call(method: 'POST' | 'DELETE', body?: unknown) {
     setBusy(true);

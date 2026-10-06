@@ -26,14 +26,25 @@ const TOASTED = new Set([
   'BOOKING_REJECTED',
 ]);
 
+export type MessageCounts = {
+  /** Unread messages in open conversations. */
+  unread: number;
+  /** Message requests waiting for an answer. */
+  requests: number;
+};
+
 type LiveState = {
   unread: number;
   followRequests: number;
+  /** The direct-message badge; the messages panel also reloads when it moves. */
+  messages: MessageCounts;
   /** Re-poll now, e.g. after answering a request. */
   refresh: () => void;
 };
 
-const LiveContext = createContext<LiveState>({ unread: 0, followRequests: 0, refresh: () => {} });
+const NO_MESSAGES: MessageCounts = { unread: 0, requests: 0 };
+
+const LiveContext = createContext<LiveState>({ unread: 0, followRequests: 0, messages: NO_MESSAGES, refresh: () => {} });
 
 /**
  * In-app notifications, live: likes, comments and follow requests appear as a
@@ -57,6 +68,7 @@ export function LiveNotificationsProvider({ viewerId, children }: { viewerId: st
   const toast = useToast();
   const [unread, setUnread] = useState(0);
   const [followRequests, setFollowRequests] = useState(0);
+  const [messages, setMessages] = useState<MessageCounts>(NO_MESSAGES);
   const since = useRef<string>(new Date().toISOString());
   const seen = useRef<Set<string>>(new Set());
   const inFlight = useRef(false);
@@ -80,6 +92,7 @@ export function LiveNotificationsProvider({ viewerId, children }: { viewerId: st
     inFlight.current = false;
     setUnread(0);
     setFollowRequests(0);
+    setMessages(NO_MESSAGES);
   }, [viewerId]);
 
   const poll = useCallback(async () => {
@@ -94,6 +107,7 @@ export function LiveNotificationsProvider({ viewerId, children }: { viewerId: st
       const data = (await response.json()) as {
         unreadCount: number;
         followRequests: number;
+        messages?: MessageCounts;
         latest: SerializedNotification[];
         serverTime: string;
       };
@@ -101,6 +115,9 @@ export function LiveNotificationsProvider({ viewerId, children }: { viewerId: st
       if (owner.current !== viewerId) return;
       setUnread(data.unreadCount);
       setFollowRequests(data.followRequests);
+      // A new object only when a count moved, so listeners re-run only then.
+      const next = data.messages ?? NO_MESSAGES;
+      setMessages((prev) => (prev.unread === next.unread && prev.requests === next.requests ? prev : next));
       since.current = new Date(new Date(data.serverTime).getTime() - OVERLAP_MS).toISOString();
 
       const fresh = data.latest.filter((row) => !seen.current.has(row.id));
@@ -142,7 +159,10 @@ export function LiveNotificationsProvider({ viewerId, children }: { viewerId: st
   }, [viewerId, poll]);
 
   const refresh = useCallback(() => void poll(), [poll]);
-  const value = useMemo(() => ({ unread, followRequests, refresh }), [unread, followRequests, refresh]);
+  const value = useMemo(
+    () => ({ unread, followRequests, messages, refresh }),
+    [unread, followRequests, messages, refresh],
+  );
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;
 }
 

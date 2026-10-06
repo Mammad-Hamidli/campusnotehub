@@ -221,6 +221,34 @@ self-action and last-admin guards.
 **`GET /feed`** — `?cursor=<iso>_<id>&limit=20&filter=all|university|following&tag=examalert`
 → `{ posts: [...], nextCursor: "2026-03-14T09:12:00.000Z_clx…" | null }`
 
+**`GET /feed/ad`** → `{ ads: [...] }`, the promoted mentors whose promotion has
+not ended. Staff promote through `PATCH /admin/feed-ad { promote?, demote?, duration? }`;
+`duration` (`1d` \| `1w` \| `1m`) is required with `promote` and counts from
+now, so promoting a mentor already in the slot renews them. A lapsed promotion
+is hidden on read and swept (with a "promotion ended" notification) by the
+scheduler, the scheduled-tasks cron, or the first public read that sees it.
+
+---
+
+## Direct messages & user search
+
+| Method | Path | Auth | Limit | Notes |
+|---|---|---|---|---|
+| `GET` | `/search/users?q=` | session | `search` 120 / min | Username **prefix**, case-insensitive, leading `@` ignored. Hidden, deleted and temporary-handle accounts are left out. |
+| `GET` | `/messages` | session | — | Inbox, newest first: `{ conversations: [{ peer, state, unread, lastMessage }] }`. Passive header honoured. |
+| `GET` | `/messages/:userId?before=\|after=` | session | — | One thread plus `state`, `canSend`, `reason`, `asRequest`, `requestRoom`. Marks it read. |
+| `POST` | `/messages/:userId` | session + `messages:send` | 60 / min; new requests 20 / day | `{ body }` (1–2000 chars) → `201 { message, state }`. |
+| `POST` | `/messages/:userId/respond` | session | — | `{ action: "accept" \| "reject" \| "block" }`; `404` when no request is pending. |
+| `GET` | `/me/blocks` | session | — | People the viewer blocked. |
+| `PUT` / `DELETE` | `/me/blocks/:userId` | session | — | Block / unblock. Idempotent. |
+
+A message is delivered when the two users follow **each other**, or when the
+recipient accepted a request in that conversation; otherwise it is a message
+request (at most 3 messages while it waits). Replying to a request accepts it.
+Rejecting deletes the request's messages; blocking does that and refuses all
+later messages, reported to the sender only as `messages.errors.unavailable`.
+The rules live in `src/lib/messages/service.ts`.
+
 ---
 
 ## UniNotes

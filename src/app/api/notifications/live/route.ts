@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { countUnread, listNotifications } from '@/lib/firebase/repositories/notifications';
 import { countIncomingRequests } from '@/lib/firebase/repositories/followRequests';
+import { inboxCounts } from '@/lib/firebase/repositories/messages';
 import { serializeNotification } from '@/lib/notifications/serialize';
 
 export const runtime = 'nodejs';
@@ -12,11 +13,13 @@ const MAX_LOOKBACK_MS = 10 * 60_000;
 
 /**
  * GET /api/notifications/live?since=<iso>
- *   -> { unreadCount, followRequests, latest: Notification[], serverTime }
+ *   -> { unreadCount, followRequests, messages: { unread, requests }, latest: Notification[], serverTime }
  *
  * The heartbeat behind the live bell (LiveNotificationsProvider): the unread
- * badge, the pending follow-request count, and any notification newer than
- * `since` - likes, comments, follow requests - for the client to toast.
+ * badge, the pending follow-request count, the direct-message badge (unread
+ * messages and message requests - one heartbeat rather than a second poll),
+ * and any notification newer than `since` - likes, comments, follow requests
+ * - for the client to toast.
  *
  * ---------------------------------------------------------------------------
  * WHY A SHORT POLL AND NOT A STREAM
@@ -48,9 +51,14 @@ export async function GET(request: NextRequest) {
   const floor = new Date(now.getTime() - MAX_LOOKBACK_MS);
   const since = parsed && !Number.isNaN(parsed.getTime()) ? (parsed < floor ? floor : parsed) : null;
 
-  const [unreadCount, followRequests, latest] = await Promise.all([
+  const [unreadCount, followRequests, messages, latest] = await Promise.all([
     countUnread(userId),
     countIncomingRequests(userId),
+    inboxCounts(userId).catch((error) => {
+      // The message badge must never cost the notification badge.
+      console.error('[notifications/live] inbox counts failed', error);
+      return { unread: 0, requests: 0 };
+    }),
     since
       ? listNotifications(userId, { after: since, limit: 10 }).catch((error) => {
           // A missing index must cost the toasts, not the badge.
@@ -64,6 +72,7 @@ export async function GET(request: NextRequest) {
     {
       unreadCount,
       followRequests,
+      messages,
       latest: latest.map(serializeNotification),
       serverTime: now.toISOString(),
     },

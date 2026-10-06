@@ -11,6 +11,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  Mail,
   Menu as MenuIcon,
   MessagesSquare,
   Settings,
@@ -27,13 +28,15 @@ import { useLiveNotifications } from '@/components/notifications/LiveNotificatio
 import { UserRole } from '@/lib/enums';
 import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
 
-export type DashboardTab = 'feed' | 'notes' | 'saved' | 'mentors';
+export type DashboardTab = 'feed' | 'notes' | 'saved' | 'mentors' | 'messages';
 
-const TABS: { tab: DashboardTab; icon: LucideIcon; labelKey: string }[] = [
+/** `narrowOnly`: the right column carries it from xl up, so the tab exists only below that. */
+const TABS: { tab: DashboardTab; icon: LucideIcon; labelKey: string; narrowOnly?: boolean }[] = [
   { tab: 'feed', icon: MessagesSquare, labelKey: 'nav.feed' },
   { tab: 'notes', icon: BookOpen, labelKey: 'nav.notes' },
   { tab: 'saved', icon: Bookmark, labelKey: 'nav.saved' },
   { tab: 'mentors', icon: UserRoundSearch, labelKey: 'nav.mentors' },
+  { tab: 'messages', icon: Mail, labelKey: 'nav.messages', narrowOnly: true },
 ];
 
 /** Secondary destinations. All resolve to real 200 pages. */
@@ -73,14 +76,16 @@ export function Sidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
   const live = useLiveNotifications();
   const pending = live.unread + live.followRequests;
+  const messageBadge = live.messages.unread + live.messages.requests;
   const links = user.mentorConsole
     ? [{ href: MENTOR_DASHBOARD_PATH, icon: GraduationCap, labelKey: 'nav.mentorPanel' }, ...LINKS]
     : LINKS;
 
   const nav = (
     <nav className="space-y-0.5" aria-label="Dashboard">
-      {TABS.map(({ tab, icon: Icon, labelKey }) => {
+      {TABS.map(({ tab, icon: Icon, labelKey, narrowOnly }) => {
         const isActive = tab === active;
+        const badge = tab === 'messages' ? messageBadge : 0;
         return (
           <button
             key={tab}
@@ -91,7 +96,7 @@ export function Sidebar({
             }}
             aria-current={isActive ? 'page' : undefined}
             className={`relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm
-                        transition-colors duration-150 ${
+                        transition-colors duration-150 ${narrowOnly ? 'xl:hidden' : ''} ${
                           isActive
                             ? 'bg-surface-inset font-medium text-fg'
                             : 'text-fg-muted hover:bg-surface-muted hover:text-fg'
@@ -105,6 +110,14 @@ export function Sidebar({
             )}
             <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="min-w-0 truncate">{t(labelKey)}</span>
+            {badge > 0 && (
+              <span
+                className="ml-auto min-w-5 rounded-full bg-accent px-1.5 text-center text-2xs font-semibold leading-5 text-accent-fg"
+                aria-label={t('messages.badge', { count: badge })}
+              >
+                {badge > 99 ? '99+' : badge}
+              </span>
+            )}
           </button>
         );
       })}

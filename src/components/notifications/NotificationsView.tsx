@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { formatAge, formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { SessionRequestActions } from '@/components/mentors/SessionRequestActions';
@@ -111,17 +112,6 @@ type PendingRequest = {
 
 function iconFor(type: string) {
   return ICONS[type] ?? { icon: Bell, tone: 'text-fg-muted bg-surface-inset' };
-}
-
-/** Absolute for anything older than a week; relative while it is still news. */
-function when(iso: string, locale: string): string {
-  const date = new Date(iso);
-  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (seconds < 60) return 'now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h`;
-  if (seconds < 604_800) return `${Math.floor(seconds / 86_400)}d`;
-  return date.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 }
 
 export function NotificationsView() {
@@ -346,8 +336,13 @@ export function NotificationsView() {
                     <p className={`text-sm ${item.read ? 'text-fg-muted' : 'font-semibold text-fg'}`}>
                       {t(item.titleKey, displayParams(item.params, locale))}
                     </p>
-                    <time className="shrink-0 text-2xs text-fg-subtle">
-                      {when(item.createdAt, locale)}
+                    {/* Relative while it is still news, the date after a week. */}
+                    <time
+                      dateTime={item.createdAt}
+                      title={formatDate(item.createdAt, locale, 'dateTime')}
+                      className="shrink-0 text-2xs text-fg-subtle"
+                    >
+                      {formatAge(item.createdAt, locale, t, { absoluteAfterDays: 7 })}
                     </time>
                   </div>
                   <p className="mt-0.5 truncate text-xs text-fg-muted">

@@ -15,6 +15,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
 import { DocumentDropzone, type DocKind, type DocState } from '@/components/register/DocumentDropzone';
 import { IntegrityScanner, type ScannerPhase } from '@/components/register/IntegrityScanner';
@@ -140,10 +141,7 @@ function VerifiedState({ verifiedAt }: { verifiedAt: string | null }) {
 
   const date = useMemo(() => {
     if (!verifiedAt) return null;
-    const parsed = new Date(verifiedAt);
-    return Number.isNaN(parsed.getTime())
-      ? null
-      : new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(parsed);
+    return formatDate(verifiedAt, locale, 'dateLong') || null;
   }, [verifiedAt, locale]);
 
   return (

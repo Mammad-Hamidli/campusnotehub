@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Check, Loader2, Megaphone, Search, X } from 'lucide-react';
-import { useT } from '@/lib/i18n/LocaleProvider';
+import { Check, Clock, Loader2, Megaphone, RefreshCw, Search, X } from 'lucide-react';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
+import { formatDate } from '@/lib/i18n/dates';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { industryLabel } from '@/lib/mentors/display';
+import { DEFAULT_FEED_AD_DURATION, FEED_AD_DURATIONS, type FeedAdDuration } from '@/lib/feed/ad-duration';
 import { Badge, EmptyState, ErrorState, TableSkeleton, useAdminFetch, useToast } from './primitives';
 
 type Candidate = {
@@ -18,8 +20,9 @@ type Candidate = {
   isAcceptingBookings: boolean;
 };
 
-type Listing = { featured: string[]; max: number; mentors: Candidate[] };
-type Change = { promote?: string[]; demote?: string[] };
+/** `expiries`: each featured mentor's end as ISO, null for a promotion without one. */
+type Listing = { featured: string[]; expiries: Record<string, string | null>; max: number; mentors: Candidate[] };
+type Change = { promote?: string[]; demote?: string[]; duration?: FeedAdDuration };
 
 /**
  * The feed's ad slot, managed one mentor at a time or in bulk.
@@ -30,23 +33,28 @@ type Change = { promote?: string[]; demote?: string[] };
  * request (PATCH /api/admin/feed-ad), which notifies each mentor whose status
  * changed. The feed shows one promoted mentor per visit within about half a
  * minute (GET /api/feed/ad is CDN-cached).
+ *
+ * Every promotion runs for the duration picked above the list (a day, a week
+ * or a month) and then ends by itself; each promoted row shows when.
+ * Promoting a mentor who is already in the slot - "Renew" in the bar - starts
+ * a new duration from now.
  */
 export function FeedAdManager() {
-  const t = useT();
+  const { locale, t } = useLocale();
   const toast = useToast();
   const { data, error, loading, reload } = useAdminFetch<Listing>('/api/admin/feed-ad');
+  const [duration, setDuration] = useState<FeedAdDuration>(DEFAULT_FEED_AD_DURATION);
   /** 'bulk', a mentor id (that row's button), or null. One request at a time. */
   const [busy, setBusy] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   /** The list a successful change returned, valid until the next GET replaces `data`. */
-  const [saved, setSaved] = useState<{ base: Listing; featured: string[] } | null>(null);
+  const [saved, setSaved] = useState<{ base: Listing; featured: string[]; expiries: Listing['expiries'] } | null>(null);
 
   const max = data?.max ?? 0;
-  const featured = useMemo(
-    () => new Set(saved && saved.base === data ? saved.featured : data?.featured ?? []),
-    [saved, data],
-  );
+  const current = saved && saved.base === data ? saved : data;
+  const featured = useMemo(() => new Set(current?.featured ?? []), [current]);
+  const expiries = current?.expiries ?? {};
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -97,11 +105,19 @@ export function FeedAdManager() {
         return;
       }
 
-      const result = body as { featured: string[]; added: string[]; removed: string[] };
-      setSaved({ base: data, featured: result.featured });
+      const result = body as {
+        featured: string[];
+        expiries: Listing['expiries'];
+        added: string[];
+        removed: string[];
+        renewed: string[];
+      };
+      setSaved({ base: data, featured: result.featured, expiries: result.expiries });
       setSelected(new Set());
       if (single) {
         toast.success(t(change.promote ? 'admin.feedAd.promoted' : 'admin.feedAd.removed', { nickname: single.nickname }));
+      } else if (result.renewed.length > 0 && result.added.length + result.removed.length === 0) {
+        toast.success(t('admin.feedAd.renewed', { count: result.renewed.length }));
       } else if (result.added.length + result.removed.length === 0) {
         toast.info(t('admin.feedAd.unchanged'));
       } else {
@@ -131,19 +147,43 @@ export function FeedAdManager() {
             {t('admin.feedAd.description', { max })}
           </p>
         </div>
-        {(data?.mentors.length ?? 0) > 5 && (
-          <label className="relative block w-full sm:w-56">
-            <span className="sr-only">{t('admin.feedAd.search')}</span>
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-subtle" aria-hidden="true" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('admin.feedAd.search')}
-              className="input w-full py-1.5 pl-8 text-sm"
-            />
-          </label>
-        )}
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          {/* Applies to every promotion and renewal made below. */}
+          <div role="radiogroup" aria-label={t('admin.feedAd.duration.label')} className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 text-fg-subtle" aria-hidden="true" />
+            <span className="text-xs text-fg-muted">{t('admin.feedAd.duration.label')}</span>
+            <div className="flex rounded-lg border border-edge p-0.5">
+              {FEED_AD_DURATIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={duration === option}
+                  onClick={() => setDuration(option)}
+                  disabled={busy !== null}
+                  className={`rounded-md px-2 py-1 text-xs font-medium transition ${
+                    duration === option ? 'bg-accent text-accent-fg' : 'text-fg-muted hover:bg-surface-muted'
+                  }`}
+                >
+                  {t(`admin.feedAd.duration.${option}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+          {(data?.mentors.length ?? 0) > 5 && (
+            <label className="relative block w-full sm:w-56">
+              <span className="sr-only">{t('admin.feedAd.search')}</span>
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-subtle" aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t('admin.feedAd.search')}
+                className="input w-full py-1.5 pl-8 text-sm"
+              />
+            </label>
+          )}
+        </div>
       </header>
 
       {error ? (
@@ -175,7 +215,7 @@ export function FeedAdManager() {
                 )}
                 <button
                   type="button"
-                  onClick={() => void apply({ promote: toPromote }, 'bulk')}
+                  onClick={() => void apply({ promote: toPromote, duration }, 'bulk')}
                   disabled={busy !== null || toPromote.length === 0 || overLimit}
                   className="btn-primary px-3 py-1.5 text-xs"
                 >
@@ -185,6 +225,16 @@ export function FeedAdManager() {
                     <Megaphone className="h-3.5 w-3.5" aria-hidden="true" />
                   )}
                   {t('admin.feedAd.promoteSelected', { count: toPromote.length })}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void apply({ promote: toDemote, duration }, 'bulk')}
+                  disabled={busy !== null || toDemote.length === 0}
+                  title={t('admin.feedAd.renewHint', { duration: t(`admin.feedAd.duration.${duration}`) })}
+                  className="btn-secondary px-3 py-1.5 text-xs"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('admin.feedAd.renewSelected', { count: toDemote.length })}
                 </button>
                 <button
                   type="button"
@@ -231,11 +281,19 @@ export function FeedAdManager() {
                       {!mentor.isAcceptingBookings && <Badge tone="warning">{t('mentors.notAccepting')}</Badge>}
                     </p>
                     <p className="truncate text-xs text-fg-muted">{mentor.headline}</p>
+                    {promoted && (
+                      <p className="mt-0.5 flex items-center gap-1 text-2xs text-fg-subtle">
+                        <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        {expiries[mentor.id]
+                          ? t('admin.feedAd.endsAt', { when: formatDate(expiries[mentor.id]!, locale, 'dateTime') })
+                          : t('admin.feedAd.noEnd')}
+                      </p>
+                    )}
                   </div>
                   <button
                     type="button"
                     onClick={() =>
-                      void apply(promoted ? { demote: [mentor.id] } : { promote: [mentor.id] }, mentor.id, mentor)
+                      void apply(promoted ? { demote: [mentor.id] } : { promote: [mentor.id], duration }, mentor.id, mentor)
                     }
                     disabled={busy !== null || (!promoted && featured.size >= max)}
                     aria-pressed={promoted}

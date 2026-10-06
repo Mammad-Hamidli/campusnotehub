@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { weekdayName } from '@/lib/i18n/dates';
 import {
   GRID_END_MINUTE,
   GRID_START_MINUTE,
@@ -40,11 +41,7 @@ export function AvailabilityGrid({
       ),
     [],
   );
-  const dayName = useMemo(() => {
-    const fmt = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' });
-    // 2024-01-07 was a Sunday, so +weekday lands on the right day.
-    return (weekday: number) => fmt.format(new Date(Date.UTC(2024, 0, 7 + weekday)));
-  }, [locale]);
+  const dayName = (weekday: number) => weekdayName(weekday, locale);
 
   useEffect(() => {
     const stop = () => (painting.current = null);

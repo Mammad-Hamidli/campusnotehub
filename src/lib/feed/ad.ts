@@ -1,7 +1,7 @@
 import { findMentorsByIds, type MentorProfileRecord } from '@/lib/firebase/repositories/mentors';
 import { findUsersByIds } from '@/lib/firebase/repositories/users';
 import { findUniversitiesByIds } from '@/lib/firebase/repositories/reference';
-import { getFeedAdMentorIds } from '@/lib/firebase/repositories/feedAd';
+import { getFeedAdEntries, isLiveEntry } from '@/lib/firebase/repositories/feedAd';
 import { isPubliclyVisible, visibleAvatar } from '@/lib/profile/visibility';
 
 /** A promoted mentor as the feed's right rail shows it. */
@@ -33,18 +33,36 @@ export function isPromotable(
   return mentor?.isApproved === true && isPubliclyVisible(owner);
 }
 
+export type FeedAdSlot = {
+  ads: FeedAd[];
+  /** A stored promotion has lapsed and is waiting for sweepExpiredFeedAds(). */
+  lapsed: boolean;
+  /** The soonest end among the live promotions, so a cache can stop serving one at its end. */
+  nextExpiry: Date | null;
+};
+
 /**
  * The promoted mentors still eligible, in promotion order.
  *
  * Re-checked on every read rather than trusted from when staff promoted them:
- * a profile that has since been unapproved, or whose account was suspended or
- * deleted, silently drops out. Three batched reads however many are promoted.
- * The response is shared by every viewer (and cached by the CDN), so each
- * avatar is the one a signed-out visitor may see.
+ * a promotion whose duration has run out, a profile that has since been
+ * unapproved, or an account that was suspended or deleted silently drops out.
+ * The duration check is HERE, on the read path, so an ad stops at its end
+ * whether or not the sweep that tidies the stored list has run yet. Three
+ * batched reads however many are promoted. The response is shared by every
+ * viewer (and cached by the CDN), so each avatar is the one a signed-out
+ * visitor may see.
  */
-export async function loadFeedAds(): Promise<FeedAd[]> {
-  const ids = await getFeedAdMentorIds();
-  if (ids.length === 0) return [];
+export async function loadFeedAdSlot(now = new Date()): Promise<FeedAdSlot> {
+  const entries = await getFeedAdEntries();
+  const live = entries.filter((entry) => isLiveEntry(entry, now));
+  const lapsed = live.length < entries.length;
+  const nextExpiry = live.reduce<Date | null>(
+    (soonest, { expiresAt }) => (expiresAt && (!soonest || expiresAt < soonest) ? expiresAt : soonest),
+    null,
+  );
+  const ids = live.map((entry) => entry.mentorId);
+  if (ids.length === 0) return { ads: [], lapsed, nextExpiry };
 
   const mentors = await findMentorsByIds(ids);
   const owners = await findUsersByIds([...mentors.values()].map((m) => m.userId));
@@ -52,7 +70,7 @@ export async function loadFeedAds(): Promise<FeedAd[]> {
     [...owners.values()].map((u) => u.universityId).filter((id): id is string => Boolean(id)),
   );
 
-  return ids.flatMap((id) => {
+  const ads = ids.flatMap((id) => {
     const mentor = mentors.get(id);
     const user = mentor ? owners.get(mentor.userId) : undefined;
     if (!mentor || !user || !isPromotable(mentor, user)) return [];
@@ -72,4 +90,9 @@ export async function loadFeedAds(): Promise<FeedAd[]> {
       hourlyRateMinor: mentor.hourlyRateMinor,
     }];
   });
+  return { ads, lapsed, nextExpiry };
+}
+
+export async function loadFeedAds(now = new Date()): Promise<FeedAd[]> {
+  return (await loadFeedAdSlot(now)).ads;
 }

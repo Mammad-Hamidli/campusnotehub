@@ -1,6 +1,7 @@
 import { dueTasks, markExecuted, markFailed } from '@/lib/firebase/repositories/scheduledTasks';
 import { expireRequest } from '@/lib/mentors/request-service';
 import { provisionMeeting } from '@/lib/mentors/meeting';
+import { sweepExpiredFeedAds } from '@/lib/feed/ad-admin';
 
 /**
  * Runs work that was scheduled to happen later. Shared by the scheduler
@@ -17,8 +18,20 @@ import { provisionMeeting } from '@/lib/mentors/meeting';
  * or on two runners at once is harmless. Correctness never depends on this
  * running on time: an unanswered request stops holding its slot at its
  * deadline whether or not the task has run (src/lib/mentors/requests.ts).
+ *
+ * Also ends lapsed feed ads (sweepExpiredFeedAds). That needs no task rows:
+ * the slot is one document, so checking it every run is a single read, and
+ * nothing has to be unscheduled when staff renew or remove a promotion.
  */
-export async function runDueTasks(take = 100): Promise<{ ran: number; failed: number }> {
+export async function runDueTasks(take = 100): Promise<{ ran: number; failed: number; feedAdsExpired: number }> {
+  // First and on its own: a broken task queue must not hold up the ad slot.
+  const feedAdsExpired = await sweepExpiredFeedAds()
+    .then((ids) => ids.length)
+    .catch((error) => {
+      console.error('[scheduler] feed ad sweep failed', error);
+      return 0;
+    });
+
   const tasks = await dueTasks(new Date(), take);
   let ran = 0;
   let failed = 0;
@@ -43,5 +56,5 @@ export async function runDueTasks(take = 100): Promise<{ ran: number; failed: nu
       failed += 1;
     }
   }
-  return { ran, failed };
+  return { ran, failed, feedAdsExpired };
 }

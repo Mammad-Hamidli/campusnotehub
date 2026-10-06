@@ -11,6 +11,8 @@ import { PostCard, type Post } from './PostCard';
 import { FocusedPost } from './FocusedPost';
 import { toPost, type ApiPost } from './postMapping';
 import { FeedAdCard, GraduationCountdown, TrendingNotes, type TrendingNote } from './RightPanel';
+import { UserSearch } from './UserSearch';
+import { MessagesPanel, type ChatPeer } from '@/components/messages/MessagesPanel';
 import type { FeedAd } from '@/lib/feed/ad';
 import { NotesList } from '@/components/notes/NotesList';
 import { MentorsList } from '@/components/mentors/MentorsList';
@@ -88,6 +90,8 @@ export function DashboardShell({
   const [viewer, setViewer] = useState<Viewer | null>(null);
   const [loading, setLoading] = useState(true);
   const [universityCodes, setUniversityCodes] = useState<string[]>([]);
+  /** The conversation open in the messages panel; the search's "Message" button sets it. */
+  const [chatPeer, setChatPeer] = useState<ChatPeer | null>(null);
 
   /**
    * Filter chips come from the database on every load - no hardcoded list -
@@ -513,6 +517,13 @@ export function DashboardShell({
               <NotesList embedded canUpload={canUploadNotes} />
             ) : tab === 'saved' ? (
               <NotesList embedded source="saved" />
+            ) : tab === 'messages' ? (
+              // The right column's search and messages, full width, for
+              // screens too narrow to show that column.
+              <div className="space-y-4">
+                <UserSearch onMessage={setChatPeer} />
+                <MessagesPanel openPeer={chatPeer} onOpenPeer={setChatPeer} tall />
+              </div>
             ) : (
               <MentorsList embedded />
             )}
@@ -521,8 +532,16 @@ export function DashboardShell({
           {/* Right rail. Hidden below xl rather than stacked underneath: on a
               tablet these widgets would sit 4+ screens below the composer,
               where nobody scrolls to. The graduation prompt also arrives as a
-              notification, so nothing is lost by hiding it here. */}
+              notification, and the user search and messages have their own
+              Messages tab below xl, so nothing is lost by hiding it here. */}
           <aside className="hidden w-80 shrink-0 space-y-4 xl:block">
+            {/* Not twice: on the Messages tab these are in the main column. */}
+            {tab !== 'messages' && (
+              <>
+                <UserSearch onMessage={setChatPeer} />
+                <MessagesPanel openPeer={chatPeer} onOpenPeer={setChatPeer} />
+              </>
+            )}
             {viewer.graduationYear && viewer.graduationMonth && (
               <GraduationCountdown year={viewer.graduationYear} month={viewer.graduationMonth} />
             )}

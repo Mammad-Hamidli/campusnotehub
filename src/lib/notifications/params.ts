@@ -1,3 +1,5 @@
+import { formatDate } from '@/lib/i18n/dates';
+
 /**
  * Notification parameters as the reader should see them.
  *
@@ -7,8 +9,7 @@
  * Baku each see their own clock.
  *
  * CLIENT-ONLY on purpose: notification rows are fetched after mount, never
- * server-rendered, so this Intl call cannot cause the az hydration mismatch
- * (Node and Chromium format Azerbaijani dates differently).
+ * server-rendered, and the device's time zone is the reader's.
  */
 export function displayParams(
   params: Record<string, string | number>,
@@ -21,17 +22,7 @@ export function displayParams(
   return { ...params, when: formatInstant(date, locale) };
 }
 
+/** "Tue 6 Oct, 14:05" on the device clock - see src/lib/i18n/dates.ts for why not Intl. */
 export function formatInstant(date: Date, locale: string): string {
-  try {
-    return new Intl.DateTimeFormat(locale, {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(date);
-  } catch {
-    return date.toISOString().slice(0, 16).replace('T', ' ');
-  }
+  return formatDate(date, locale, 'weekdayDateTime');
 }

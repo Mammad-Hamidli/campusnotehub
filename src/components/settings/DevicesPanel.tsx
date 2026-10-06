@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Laptop, Loader2, LogOut, Smartphone } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
 import { LinkDeviceCard } from './LinkDeviceCard';
 
@@ -85,8 +86,7 @@ export function DevicesPanel() {
     }
   }
 
-  const format = (iso: string) =>
-    new Date(iso).toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const format = (iso: string) => formatDate(iso, locale, 'dayMonthTime');
 
   // Sessions other than this one: other devices, and this device's extras.
   const others = devices?.reduce((sum, row) => sum + (row.current ? row.sessionCount - 1 : row.sessionCount), 0) ?? 0;

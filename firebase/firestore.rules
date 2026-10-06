@@ -264,6 +264,10 @@ service cloud.firestore {
     // through /api/me/email/change and /api/me/follow-requests.
     match /emailChanges/{id}       { allow read, write: if false; }
     match /followRequests/{id}     { allow read, write: if false; }
+    // Direct messages are private correspondence: server-only, reached through
+    // /api/messages, which applies the follow / request / block rules. The
+    // per-user inbox and blocks subcollections fall to the default deny below.
+    match /conversations/{id}/{document=**} { allow read, write: if false; }
 
     // Verification cases carry fraud signals and per-check scores. Naming the
     // check that fired is free tuning feedback for whoever is forging a

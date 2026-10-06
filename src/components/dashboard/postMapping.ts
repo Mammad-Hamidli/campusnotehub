@@ -49,15 +49,6 @@ export type ApiPost = {
   }[];
 };
 
-/** Relative age, so a row does not need a date formatter to be readable. */
-function age(iso: string): string {
-  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (seconds < 60) return 'now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  return `${Math.floor(seconds / 86400)}d`;
-}
-
 /**
  * Maps one API row to the card's props.
  *
@@ -103,7 +94,8 @@ export function toPost(row: ApiPost): Post {
       height: m.height,
       alt: m.altText,
     })),
-    createdAt: age(row.createdAt),
+    // The instant itself: the card formats it in the reader's language and clock.
+    createdAt: row.createdAt,
     likeCount: row.likeCount,
     commentCount: row.commentCount,
     shareCount: row.shareCount,

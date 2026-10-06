@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Send } from 'lucide-react';
-import { useT } from '@/lib/i18n/LocaleProvider';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
+import { formatAge, formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { FollowingBadge } from '@/components/social/Following';
@@ -44,14 +45,6 @@ type ApiComment = {
   };
 };
 
-function age(iso: string): string {
-  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (seconds < 60) return 'now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  return `${Math.floor(seconds / 86400)}d`;
-}
-
 export function CommentThread({
   postId,
   onCountChange,
@@ -63,7 +56,7 @@ export function CommentThread({
   /** View-only viewer (unfinished quick-login profile): no comment box. */
   readOnly?: boolean;
 }) {
-  const t = useT();
+  const { locale, t } = useLocale();
   const toast = useToast();
   const [comments, setComments] = useState<ApiComment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,7 +182,13 @@ export function CommentThread({
                   </Link>
                   <VerifiedBadge verified={comment.author.isVerified} />
                   <FollowingBadge nickname={comment.author.nickname} />
-                  <time className="text-2xs text-fg-subtle">{age(comment.createdAt)}</time>
+                  <time
+                    dateTime={comment.createdAt}
+                    title={formatDate(comment.createdAt, locale, 'dateTime')}
+                    className="text-2xs text-fg-subtle"
+                  >
+                    {formatAge(comment.createdAt, locale, t)}
+                  </time>
                 </div>
                 <p
                   className={`mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed ${

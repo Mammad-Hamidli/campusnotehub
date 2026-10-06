@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLocale } from '@/lib/i18n/LocaleProvider';
+import { formatDate } from '@/lib/i18n/dates';
 
 type ApiSlot = { startsAt: string; endsAt: string; available: boolean };
 type Bucket = 'morning' | 'afternoon' | 'evening';
@@ -43,20 +44,10 @@ export function SlotPicker({
   const [slots, setSlots] = useState<ApiSlot[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
-  const intlLocale = { az: 'az-AZ', en: 'en-GB', ru: 'ru-RU' }[locale];
-
-  const fmtTime = useMemo(
-    () => new Intl.DateTimeFormat(intlLocale, { hour: '2-digit', minute: '2-digit', hour12: false }),
-    [intlLocale],
-  );
-  const fmtWeekday = useMemo(
-    () => new Intl.DateTimeFormat(intlLocale, { weekday: 'short' }),
-    [intlLocale],
-  );
-  const fmtLongDate = useMemo(
-    () => new Intl.DateTimeFormat(intlLocale, { day: 'numeric', month: 'long' }),
-    [intlLocale],
-  );
+  // Device clock throughout: the slots are shown in the viewer's own zone.
+  const fmtTime = (date: Date) => formatDate(date, locale, 'time');
+  const fmtWeekday = (date: Date) => formatDate(date, locale, 'weekday');
+  const fmtLongDate = (date: Date) => formatDate(date, locale, 'dayMonthLong');
 
   const days = useMemo(
     () =>
@@ -132,7 +123,7 @@ export function SlotPicker({
                                 : 'bg-surface-muted text-fg hover:bg-surface-inset'
                             }`}
               >
-                <span className="text-[0.7rem] uppercase opacity-75">{fmtWeekday.format(day)}</span>
+                <span className="text-[0.7rem] uppercase opacity-75">{fmtWeekday(day)}</span>
                 <span className="tabular text-base font-semibold">{day.getDate()}</span>
               </button>
             );
@@ -195,7 +186,7 @@ export function SlotPicker({
                                           : 'cursor-not-allowed border-transparent bg-surface-muted text-fg-subtle line-through'
                                     }`}
                       >
-                        {fmtTime.format(new Date(slot.startsAt))}
+                        {fmtTime(new Date(slot.startsAt))}
                       </button>
                     );
                   })}
@@ -210,8 +201,8 @@ export function SlotPicker({
         <div className="mt-4 animate-rise rounded-lg bg-surface-muted p-3 text-sm">
           <p className="font-medium text-fg">
             {t('mentors.booking.summary', {
-              date: fmtLongDate.format(new Date(selected)),
-              time: fmtTime.format(new Date(selected)),
+              date: fmtLongDate(new Date(selected)),
+              time: fmtTime(new Date(selected)),
               duration: sessionMinutes,
             })}
           </p>

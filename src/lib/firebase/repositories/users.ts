@@ -197,6 +197,26 @@ export async function findUserByNickname(nickname: string): Promise<UserRecord |
 }
 
 /**
+ * Accounts whose handle STARTS WITH `prefix`, in handle order - the live
+ * user search. `prefix` must already be a lowercase handle fragment.
+ *
+ * A range on `nicknameLower` alone, which the automatic single-field index
+ * serves: no composite index to deploy. Firestore has no substring search,
+ * so a prefix is what "search by username" can mean without a search
+ * service. Visibility is the caller's to filter, so it asks for a few more
+ * than it shows.
+ */
+export async function searchUsersByHandlePrefix(prefix: string, take: number): Promise<UserRecord[]> {
+  const snap = await users()
+    .where('nicknameLower', '>=', prefix)
+    .where('nicknameLower', '<', `${prefix}`)
+    .orderBy('nicknameLower')
+    .limit(take)
+    .get();
+  return docsToObjects<UserRecord>(snap.docs) as UserRecord[];
+}
+
+/**
  * Login lookup by username. `key` must already be normalised by usernameKey().
  *
  * The claim document is the source of truth: a point read, and the same

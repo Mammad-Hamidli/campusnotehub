@@ -158,6 +158,14 @@ export const LIMITS = {
   // Each join may call Google once to finish a Meet room that is not ready yet.
   'bookings:join': { limit: 30, windowMs: 15 * 60_000 },
   'search': { limit: 120, windowMs: 60_000 },
+  /**
+   * Direct messages. Sending is generous - a conversation is bursty - and only
+   * stops a script. STARTING a message request to someone who does not follow
+   * you back is the spam vector, so new requests have their own daily cap;
+   * the per-request message cap is enforced in the conversation itself.
+   */
+  'messages:send': { limit: 60, windowMs: 60_000 },
+  'messages:request': { limit: 20, windowMs: 24 * 60 * 60_000 },
   // Finishing a quick-login profile: a handful of attempts covers typos and
   // taken nicknames without letting the form probe which handles exist.
   'profile:complete': { limit: 20, windowMs: 60 * 60_000 },

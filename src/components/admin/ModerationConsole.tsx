@@ -12,7 +12,8 @@ import {
   Timer,
   X,
 } from 'lucide-react';
-import { useT } from '@/lib/i18n/LocaleProvider';
+import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
 
 type QueueItem = {
@@ -205,7 +206,7 @@ export function ModerationConsole() {
 }
 
 function ReviewPanel({ caseId, onDecided }: { caseId: string; onDecided: () => void }) {
-  const t = useT();
+  const { locale, t } = useLocale();
   const toast = useToast();
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [expired, setExpired] = useState(false);
@@ -309,7 +310,7 @@ function ReviewPanel({ caseId, onDecided }: { caseId: string; onDecided: () => v
           <h2 className="text-lg font-semibold text-fg">{detail.applicant.fullName}</h2>
           <p className="mt-0.5 text-xs text-fg-muted">
             {detail.applicant.university?.nameEn ?? '—'} ·{' '}
-            {new Date(detail.applicant.memberSince).toLocaleDateString()}
+            {formatDate(detail.applicant.memberSince, locale, 'date')}
           </p>
         </div>
         <ExpiryPill

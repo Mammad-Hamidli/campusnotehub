@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Check, ChevronLeft, Copy, Download, KeyRound, Loader2, ShieldCheck } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
 
 type Status = {
@@ -233,7 +234,7 @@ export function TwoFactorPanel() {
               {status.enrolledAt && (
                 <div>
                   {t('settings.security.enabledSince', {
-                    date: new Date(status.enrolledAt).toLocaleDateString(locale, { dateStyle: 'medium' }),
+                    date: formatDate(status.enrolledAt, locale, 'date'),
                   })}
                 </div>
               )}

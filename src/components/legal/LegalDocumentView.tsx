@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ArrowRight, ArrowUp, FileText, ShieldCheck } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { formatDate } from '@/lib/i18n/dates';
 import type { LegalBlock, LocalizedLegalDocument } from '@/content/legal/types';
 
 export type LegalSlug = 'terms' | 'privacy';
@@ -38,9 +39,8 @@ export function LegalDocumentView({
   const { title, summary, sections } = doc.content[locale];
   const active = useActiveSection(sections.map((section) => section.id));
 
-  const effective = new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone: 'UTC' }).format(
-    new Date(doc.effective),
-  );
+  // Server-rendered: formatDate prints the same string on Node and in the browser.
+  const effective = formatDate(doc.effective, locale, 'dateLong', { timeZone: 'UTC' });
   const related = RELATED[slug === 'terms' ? 'privacy' : 'terms'];
   const RelatedIcon = related.icon;
 
