@@ -12,7 +12,8 @@ import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
 
 /**
  * The last step of every successful sign-in: device bookkeeping, the session,
- * the audit row and the post-login destination.
+ * the audit row, a provider photo for an account without a picture, and the
+ * post-login destination.
  *
  * Shared by POST /api/auth/login (accounts without a second factor) and
  * POST /api/auth/mfa/verify (accounts with one), so the two paths cannot drift
@@ -31,6 +32,12 @@ export async function completeLogin(params: {
   method: string;
   /** Extra fields for the JSON body, e.g. how many recovery codes are left. */
   extra?: Record<string, unknown>;
+  /**
+   * A provider photo URL, already vetted by providerAvatarFor(), to copy onto
+   * the account once the session exists. On an account with 2FA it arrives
+   * from the login ticket, i.e. only after the second factor was proven.
+   */
+  providerPicture?: string | null;
   /**
    * Answer with a 303 redirect instead of JSON - for a provider callback,
    * which is a browser navigation, not a fetch. The value is the requested
@@ -94,6 +101,20 @@ export async function completeLogin(params: {
     // How, never with what: the identifier itself stays out of the trail.
     after: { method: params.method, amr: params.amr },
   });
+
+  // The session exists, so the sign-in is complete: only now may it change the
+  // profile. Loaded on demand - the image pipeline (sharp, storage) has no
+  // business in a password sign-in's cold start - and run after the response.
+  // Best effort like the import itself: a photo must never fail a sign-in.
+  const picture = params.providerPicture;
+  if (picture) {
+    await import('@/lib/media/import-avatar')
+      .then(({ importProviderAvatarAsync }) => importProviderAvatarAsync(user.id, picture))
+      .catch((error: unknown) =>
+        // Never the URL: it identifies the Google account.
+        console.warn('[avatar] provider photo import not started:', error instanceof Error ? error.message : 'unknown'),
+      );
+  }
 
   /**
    * Where this account belongs after signing in, decided HERE rather than on

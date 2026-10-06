@@ -269,6 +269,46 @@ describe('login tickets', () => {
     expect(JSON.stringify(store.get(paths[0]))).not.toContain(token);
   });
 
+  describe('a provider photo waiting for the second factor', () => {
+    const PHOTO = 'https://lh3.googleusercontent.com/a/photo=s96-c';
+    const ticketPaths = () => [...store.keys()].filter((p) => p.startsWith('loginTickets/'));
+
+    it('is sealed at rest and handed over only with a proven factor', async () => {
+      const { secret } = await enrolled();
+      const { token } = await mfa.createLoginTicket({ userId: USER, userAgent: UA, amr: ['fed'], providerPicture: PHOTO });
+
+      const [path] = ticketPaths();
+      expect(store.get(path)!.providerPictureSealed).toMatch(/^v1\./);
+      expect(JSON.stringify(store.get(path))).not.toContain('googleusercontent');
+
+      const wrong = await mfa.redeemLoginTicket({ token, userAgent: UA, input: { code: '000000' } });
+      expect(wrong).toMatchObject({ ok: false, reason: 'invalid' });
+      expect(wrong).not.toHaveProperty('providerPicture');
+
+      vi.setSystemTime(T0 + 30_000);
+      const redeemed = await mfa.redeemLoginTicket({ token, userAgent: UA, input: { code: codeAt(secret, Date.now()) } });
+      expect(redeemed).toMatchObject({ ok: true, amr: ['fed', 'otp'], providerPicture: PHOTO });
+      // ...and it was deleted with the ticket.
+      expect(ticketPaths()).toHaveLength(0);
+    });
+
+    it('does not open in another ticket, and a password ticket carries none', async () => {
+      const { secret } = await enrolled();
+      await mfa.createLoginTicket({ userId: USER, userAgent: UA, amr: ['fed'], providerPicture: PHOTO });
+      const [source] = ticketPaths();
+      const { token } = await mfa.createLoginTicket({ userId: USER, userAgent: UA, amr: ['pwd'] });
+      const target = ticketPaths().find((p) => p !== source)!;
+      expect(store.get(target)!.providerPictureSealed).toBeNull();
+
+      // Bound to its own ticket id: transplanted, it fails to open - quietly.
+      store.set(target, { ...store.get(target)!, providerPictureSealed: store.get(source)!.providerPictureSealed });
+      vi.setSystemTime(T0 + 30_000);
+      expect(
+        await mfa.redeemLoginTicket({ token, userAgent: UA, input: { code: codeAt(secret, Date.now()) } }),
+      ).toMatchObject({ ok: true, providerPicture: null });
+    });
+  });
+
   it('rejects a malformed token without touching the database', async () => {
     expect(await mfa.redeemLoginTicket({ token: '../mfa/user_1', userAgent: UA, input: { code: '123456' } })).toEqual({
       ok: false,

@@ -49,6 +49,13 @@ export type UserRecord = {
   nickname: string;
   nicknameLower: string;
   avatarUrl: string | null;
+  /**
+   * When the owner removed their picture. A provider photo is never imported
+   * onto such an account (see providerAvatarFor): removing a picture is a
+   * choice, and the next Google sign-in must not undo it. Absent on documents
+   * written before the field existed.
+   */
+  avatarRemovedAt?: Date | null;
   headline: string | null;
   bio: string | null;
   locale: string;
@@ -717,14 +724,15 @@ export async function updateUser(id: string, patch: Record<string, unknown>): Pr
 /**
  * Sets the profile picture ONLY while the account has none. For the Google
  * photo import, which runs after the sign-in response: by then the owner may
- * already have uploaded a picture, and a background task must never replace
- * it. False when the account is gone or already has an avatar.
+ * already have uploaded a picture - or uploaded and removed one - and a
+ * background task must never override either. False when the account is
+ * gone, has an avatar, or its owner removed one.
  */
 export async function setAvatarIfEmpty(id: string, avatarUrl: string): Promise<boolean> {
   return adminDb().runTransaction(async (tx) => {
     const ref = users().doc(id);
     const snap = await tx.get(ref);
-    if (!snap.exists || snap.get('avatarUrl')) return false;
+    if (!snap.exists || snap.get('avatarUrl') || snap.get('avatarRemovedAt')) return false;
     tx.update(ref, forFirestore({ avatarUrl, updatedAt: new Date() }));
     return true;
   });

@@ -127,7 +127,11 @@ export function DashboardShell({
       // sidebar ad must never be able to take the feed down with it.
       fetch('/api/feed/ad', { signal: controller.signal })
         .then((res) => (res.ok ? res.json() : null))
-        .then((body) => setFeedAd(body?.ad ?? null))
+        .then((body: { ads?: FeedAd[] } | null) => {
+          const ads = body?.ads ?? [];
+          // One of the promoted mentors per visit, so each of them gets seen.
+          setFeedAd(ads.length > 0 ? ads[Math.floor(Math.random() * ads.length)] : null);
+        })
         .catch(() => {});
 
       try {

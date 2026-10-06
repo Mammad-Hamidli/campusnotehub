@@ -105,6 +105,9 @@ export async function POST(request: NextRequest) {
     method: `${result.amr.filter((m) => m !== 'otp' && m !== 'recovery').join('+') || 'unknown'}+${result.method}`,
     // Tells the client to warn when recovery codes are running out.
     extra: result.method === 'recovery' ? { recoveryCodesRemaining: result.recoveryCodesRemaining } : undefined,
+    // A Google sign-in's photo, carried sealed in the ticket until now: the
+    // second factor is proven and the account re-checked, so it may be copied.
+    providerPicture: result.providerPicture,
   });
   response.headers.set('Cache-Control', 'no-store, max-age=0');
   return clearMfaTicketCookie(response);

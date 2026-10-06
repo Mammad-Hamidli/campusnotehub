@@ -26,6 +26,8 @@ type User = {
   lockedUntil: Date | null;
   profileIncomplete?: boolean;
   passwordSetupRequired?: boolean;
+  avatarUrl?: string | null;
+  avatarRemovedAt?: Date | null;
 };
 const users = new Map<string, User>();
 /** Accounts that have never had a password (Google-only). Everyone else has one. */
@@ -64,6 +66,12 @@ const createQuickAccount = vi.fn(async (p: ProviderProfile) => {
   return { ok: true as const, user: created };
 });
 const sendEmailAsync = vi.fn();
+type TicketParams = { userId: string; providerPicture?: string | null };
+const createLoginTicket = vi.fn<(p: TicketParams) => Promise<{ token: string; expiresAt: Date }>>(async () => ({
+  token: 't'.repeat(43),
+  expiresAt: new Date(),
+}));
+const importProviderAvatarAsync = vi.fn();
 
 vi.mock('./flow', async () => {
   const actual = await vi.importActual<typeof import('./flow')>('./flow');
@@ -104,7 +112,10 @@ vi.mock('@/lib/crypto/hash', async () => {
 vi.mock('@/lib/firebase/repositories/mfa', () => ({
   getMfa: async (id: string) => (mfaEnrolled.has(id) ? { totpSecretSealed: 'x' } : null),
   isEnrolled: (r: unknown) => !!r,
-  createLoginTicket: async () => ({ token: 't'.repeat(43), expiresAt: new Date() }),
+  createLoginTicket: (p: { userId: string }) => createLoginTicket(p),
+}));
+vi.mock('@/lib/media/import-avatar', () => ({
+  importProviderAvatarAsync: (...a: unknown[]) => importProviderAvatarAsync(...a),
 }));
 vi.mock('@/lib/firebase/repositories/sessions', () => ({
   findSessionById: async (id: string) => sessions.get(id) ?? null,
@@ -400,6 +411,64 @@ describe('owed local password', () => {
     await callback();
     expect(updateUser).not.toHaveBeenCalledWith('u1', { passwordSetupRequired: true });
     expect(completeLogin).toHaveBeenCalledWith(expect.objectContaining({ redirectTo: '/notes' }));
+  });
+});
+
+describe('provider photo for an account that has none', () => {
+  const PHOTO = 'https://lh3.googleusercontent.com/a/admin-photo=s96-c';
+
+  beforeEach(() => {
+    // A bootstrapped admin: never created by a Google sign-in, no picture.
+    user('admin1', { role: 'ADMIN' });
+    identities.set('google:g-sub', { userId: 'admin1', provider: 'google' });
+    profile = google({ picture: PHOTO });
+  });
+
+  it('without 2FA: hands the vetted photo to completeLogin, which imports it once the session exists', async () => {
+    await callback();
+    expect(completeLogin).toHaveBeenCalledWith(expect.objectContaining({ providerPicture: PHOTO }));
+    // Not imported on the provider's word here - that is completeLogin's job.
+    expect(importProviderAvatarAsync).not.toHaveBeenCalled();
+  });
+
+  it('with 2FA: imports NOTHING before the code - the photo waits in the login ticket', async () => {
+    mfaEnrolled.add('admin1');
+    const { location } = await callback();
+    expect(location.searchParams.get('mfa')).toBe('1');
+    expect(createLoginTicket).toHaveBeenCalledWith(expect.objectContaining({ userId: 'admin1', providerPicture: PHOTO }));
+    expect(completeLogin).not.toHaveBeenCalled();
+    expect(importProviderAvatarAsync).not.toHaveBeenCalled();
+    // The URL never reaches the browser.
+    expect(location.href).not.toContain('googleusercontent');
+  });
+
+  it('never for an account with a picture, a removed one, or one a Google sign-in created', async () => {
+    for (const patch of [
+      { avatarUrl: '/api/media/mine' },
+      { avatarRemovedAt: new Date() },
+      { profileIncomplete: false },
+    ]) {
+      Object.assign(users.get('admin1')!, { avatarUrl: null, avatarRemovedAt: null, profileIncomplete: undefined }, patch);
+      completeLogin.mockClear();
+      consumed = loginState();
+      await callback();
+      expect(completeLogin, JSON.stringify(patch)).toHaveBeenCalledWith(expect.objectContaining({ providerPicture: null }));
+    }
+  });
+
+  it('never carries a URL outside the photo-host allowlist', async () => {
+    mfaEnrolled.add('admin1');
+    profile = google({ picture: 'https://evil.example/tracker.png' });
+    await callback();
+    expect(createLoginTicket).toHaveBeenCalledWith(expect.objectContaining({ providerPicture: null }));
+  });
+
+  it('linking from settings imports at once: the session behind it is already live', async () => {
+    identities.clear();
+    sessions.set('sess1', { userId: 'admin1', revokedAt: null, expiresAt: new Date(Date.now() + 60_000) });
+    consumed = { provider: 'google', intent: 'link', userId: 'admin1', sessionId: 'sess1', returnTo: '/settings/security', nonceHash: 'n', verifier: 'v' };
+    await callback();
+    expect(importProviderAvatarAsync).toHaveBeenCalledWith('admin1', PHOTO);
   });
 });
 

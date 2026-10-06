@@ -188,9 +188,10 @@ export function TrendingNotes({ notes }: { notes: TrendingNote[] }) {
 }
 
 /**
- * The feed's ad slot: one mentor, promoted by staff from the admin dashboard
- * (GET /api/feed/ad, set through /api/admin/feed-ad). Sits above Trending
- * notes in the right rail. Renders nothing when the slot is empty.
+ * The feed's ad slot: one of the mentors staff promote from the admin
+ * dashboard, picked per visit (GET /api/feed/ad, set through
+ * /api/admin/feed-ad). Sits above Trending notes in the right rail. Not
+ * rendered at all when nobody is promoted.
  *
  * Labelled as an ad on purpose - a promoted profile that looks like an
  * organic recommendation would be misleading.

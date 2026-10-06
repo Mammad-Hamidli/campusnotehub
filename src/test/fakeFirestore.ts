@@ -73,6 +73,8 @@ export function createFakeFirestore() {
       doc: (id?: string) => docRef(`${name}/${id ?? `auto${++autoId}`}`),
       where: (field: string, op: Op, value: unknown) => query(name).where(field, op, value),
     }),
+    /** Batched point reads, in argument order; a missing document is `exists: false`. */
+    getAll: async (...refs: Ref[]) => refs.map((r) => snapshot(r.path)),
     runTransaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
       const writes: (() => void)[] = [];
       const tx = {

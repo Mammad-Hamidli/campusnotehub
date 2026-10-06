@@ -1,4 +1,5 @@
 import { BadgeCheck } from 'lucide-react';
+import { AvatarImage } from './AvatarImage';
 
 const SIZES = {
   sm: { box: 'h-8 w-8', text: 'text-2xs', badge: 'h-3 w-3', px: 32 },
@@ -22,8 +23,9 @@ export function initialsOf(nickname: string): string {
  * everyone else gets a plain hairline. The ring is decoration, the badge and
  * its label carry the meaning, so the state is not colour-only.
  *
- * Server- and client-safe (no hooks), so feed rows, comments and the
- * server-rendered profile page all share it.
+ * Server- and client-safe (no hooks of its own; the picture is a small client
+ * island, AvatarImage), so feed rows, comments and the server-rendered
+ * profile page all share it.
  */
 export function UserAvatar({
   nickname,
@@ -42,6 +44,8 @@ export function UserAvatar({
   className?: string;
 }) {
   const s = SIZES[size];
+  // Shown when there is no picture, and when the picture fails to load.
+  const initials = <span aria-hidden="true">{initialsOf(nickname)}</span>;
 
   return (
     <span className={`relative inline-flex shrink-0 ${s.box} ${className}`}>
@@ -58,20 +62,9 @@ export function UserAvatar({
                     font-bold text-accent ${s.text} ${verified ? 'h-[calc(100%-6px)] w-[calc(100%-6px)] ring-2 ring-surface' : 'h-full w-full'}`}
       >
         {src ? (
-          // Plain <img>: same-origin /api/media URLs, already re-encoded to a
-          // small square WebP, and immutable-cached by that route.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={src}
-            alt=""
-            width={s.px}
-            height={s.px}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover"
-          />
+          <AvatarImage src={src} size={s.px} fallback={initials} />
         ) : (
-          <span aria-hidden="true">{initialsOf(nickname)}</span>
+          initials
         )}
       </span>
 

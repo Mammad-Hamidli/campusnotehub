@@ -321,34 +321,60 @@ export type LoginTicket = {
   deviceFingerprint: string | null;
   /** Factors already proven when the ticket was issued, e.g. ['pwd']. */
   amr: string[];
+  /**
+   * A provider sign-in's profile photo URL, to import only once the second
+   * factor is proven (see completeLogin). Sealed, never stored in the clear:
+   * it identifies the person's Google account, and an abandoned ticket waits
+   * for its TTL with it. Absent on password sign-ins and older tickets.
+   */
+  providerPictureSealed?: string | null;
   attempts: number;
   expiresAt: Date;
   createdAt: Date;
 };
+
+/** Binds a sealed photo URL to its ticket: copied into another ticket, it does not open. */
+const pictureContext = (ticketId: string) => ({ ticketId, purpose: 'login-ticket-picture' });
 
 export async function createLoginTicket(params: {
   userId: string;
   userAgent: string;
   deviceFingerprint?: string;
   amr: string[];
+  /** Already vetted by providerAvatarFor(); omit when there is nothing to import. */
+  providerPicture?: string | null;
 }): Promise<{ token: string; expiresAt: Date }> {
   const token = newOpaqueToken();
+  const id = hashToken(token);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + TICKET_TTL_MS);
   await tickets()
-    .doc(hashToken(token))
+    .doc(id)
     .create(
       forFirestore({
         userId: params.userId,
         uaHash: hashUserAgent(params.userAgent),
         deviceFingerprint: params.deviceFingerprint ?? null,
         amr: params.amr,
+        providerPictureSealed: params.providerPicture
+          ? seal(Buffer.from(params.providerPicture, 'utf8'), pictureContext(id))
+          : null,
         attempts: 0,
         expiresAt,
         createdAt: now,
       } satisfies LoginTicket),
     );
   return { token, expiresAt };
+}
+
+/** Never fails a sign-in: a photo URL that does not open is simply not imported. */
+function ticketPicture(ticket: LoginTicket & { id: string }): string | null {
+  if (!ticket.providerPictureSealed) return null;
+  try {
+    return open(ticket.providerPictureSealed, pictureContext(ticket.id)).toString('utf8');
+  } catch {
+    return null;
+  }
 }
 
 export type TicketResult =
@@ -359,6 +385,8 @@ export type TicketResult =
       method: SecondFactorMethod;
       deviceFingerprint: string | null;
       recoveryCodesRemaining: number;
+      /** The ticket's photo URL, opened now that the factor is proven - for completeLogin only. */
+      providerPicture: string | null;
     }
   /** `userId` is set whenever the ticket itself was genuine - for the audit trail. */
   | { ok: false; reason: 'ticket' | 'not_enrolled' | 'locked' | 'invalid'; userId?: string };
@@ -405,6 +433,8 @@ export async function redeemLoginTicket(params: {
         method: result.method,
         deviceFingerprint: ticket.deviceFingerprint,
         recoveryCodesRemaining: result.recoveryCodesRemaining,
+        // Opened only on this branch: a wrong code or an expired ticket never decrypts it.
+        providerPicture: ticketPicture(ticket),
       } as const;
     }
 

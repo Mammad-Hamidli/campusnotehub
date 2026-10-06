@@ -92,11 +92,13 @@ export type ProviderProfile = {
   firstName: string | null;
   lastName: string | null;
   /**
-   * The provider's profile photo URL, UNTRUSTED and transient. Read once, when
-   * a sign-in creates an account, to import a re-encoded copy (see
-   * lib/media/import-avatar.ts, which applies the host allowlist). Never
-   * stored and never rendered: hotlinking it would leak every viewer's address
-   * to the provider and break the day the person changes their photo.
+   * The provider's profile photo URL, UNTRUSTED and transient. Read when a
+   * sign-in creates an account, or completes one into an account that never
+   * had a picture, to import a re-encoded copy (see lib/media/import-avatar.ts
+   * and providerAvatarFor, which apply the host allowlist). Never stored in
+   * the clear - while a second factor is pending it waits sealed in the login
+   * ticket - and never rendered: hotlinking it would leak every viewer's
+   * address to the provider and break the day the person changes their photo.
    */
   picture: string | null;
 };

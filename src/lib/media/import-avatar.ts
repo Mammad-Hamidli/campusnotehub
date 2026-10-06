@@ -7,7 +7,18 @@ import { avatarUrlFor, storeAvatar } from './avatars';
 import { avatarSourceUrl, withPhotoSize } from './avatar-source';
 
 /**
- * One-time import of the provider's profile photo into a new account.
+ * One-time import of the provider's profile photo into an account with no
+ * picture: a new account (quick-signup.ts), or an older one at a provider
+ * sign-in or link (who qualifies: providerAvatarFor in ./avatar-source.ts).
+ *
+ * ---------------------------------------------------------------------------
+ * ONLY ONCE THE SIGN-IN IS COMPLETE
+ * ---------------------------------------------------------------------------
+ * Started by completeLogin() after the session exists - never on the
+ * strength of the provider alone. An account with 2FA gets there only through
+ * /api/auth/mfa/verify, the URL having waited in the login ticket, sealed.
+ * Linking runs it directly: that flow already holds a live, re-authenticated
+ * session.
  *
  * ---------------------------------------------------------------------------
  * BEST EFFORT, AFTER THE RESPONSE
@@ -26,11 +37,11 @@ import { avatarSourceUrl, withPhotoSize } from './avatar-source';
  * Google who looks at whose profile, and break when the person changes photo.
  *
  * ---------------------------------------------------------------------------
- * NEVER OVER AN EXISTING PICTURE
+ * NEVER OVER AN EXISTING PICTURE, NOR A REMOVED ONE
  * ---------------------------------------------------------------------------
  * Checked before the download, and again in the same transaction that sets
- * it (setAvatarIfEmpty): the owner may upload a picture while this runs, and
- * theirs wins. The imported copy is then deleted.
+ * it (setAvatarIfEmpty): the owner may upload - or remove - a picture while
+ * this runs, and their choice wins. The imported copy is then deleted.
  */
 
 const FETCH_TIMEOUT_MS = 5_000;
@@ -82,7 +93,7 @@ export async function importProviderAvatar(userId: string, picture: string | nul
 
   try {
     const user = await findUserById(userId);
-    if (!user || user.avatarUrl) return 'skipped';
+    if (!user || user.avatarUrl || user.avatarRemovedAt) return 'skipped';
 
     const bytes = await download(withPhotoSize(source, AVATAR_SIZE));
     if (!bytes) return 'rejected';

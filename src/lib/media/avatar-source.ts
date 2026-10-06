@@ -1,5 +1,6 @@
 /**
- * Where an imported profile photo may be fetched from.
+ * Where an imported profile photo may be fetched from, and which accounts
+ * receive one.
  *
  * The URL arrives in a Google id_token, so it is Google-asserted - but the
  * server is about to make an outbound request to it, and "whatever URL a
@@ -30,6 +31,29 @@ export function avatarSourceUrl(raw: unknown): URL | null {
   if (url.port) return null;
   if (!url.hostname.endsWith(ALLOWED_HOST_SUFFIX)) return null;
   return url;
+}
+
+/**
+ * The provider photo to copy onto an EXISTING account at a provider sign-in
+ * or link - as a vetted URL string - or null when that account gets none.
+ *
+ * A new account gets its copy at creation (quick-signup.ts). An account made
+ * any other way - a password signup, a bootstrapped admin - never had that
+ * moment, so it gets the same one-time copy here, on the same terms:
+ *  - no picture now, and the owner never removed one (`avatarRemovedAt`);
+ *  - NOT created by a provider sign-in: those carry `profileIncomplete`
+ *    (true or false) and already had their one import. With no picture now,
+ *    their owner may have removed it before removals were recorded, and that
+ *    choice stands;
+ *  - the URL passes the allowlist above. Only this vetted form travels on -
+ *    through a 2FA login ticket only sealed (see mfa.ts).
+ */
+export function providerAvatarFor(
+  user: { avatarUrl: string | null; avatarRemovedAt?: Date | null; profileIncomplete?: boolean },
+  picture: unknown,
+): string | null {
+  if (user.avatarUrl || user.avatarRemovedAt || typeof user.profileIncomplete === 'boolean') return null;
+  return avatarSourceUrl(picture)?.href ?? null;
 }
 
 /**

@@ -38,8 +38,9 @@ export type QuickSignupResult =
  * merged here (that is the callback's rule 2 / nOAuth - see callback.ts).
  *
  * The provider's photo, if any, is copied in AFTER the response (see
- * import-avatar.ts) - only here, at creation, and only onto an account with
- * no picture. A later sign-in never touches the avatar again.
+ * import-avatar.ts) - here, at creation, onto an account with no picture. A
+ * later sign-in never touches THIS account's avatar again; only accounts made
+ * some other way get a copy at sign-in (see providerAvatarFor).
  */
 export async function createQuickAccount(
   profile: ProviderProfile,

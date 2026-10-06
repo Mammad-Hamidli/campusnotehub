@@ -26,6 +26,8 @@ import { completeLogin } from '@/lib/auth/complete-login';
 import { setMfaTicketCookie } from '@/lib/auth/mfa-http';
 import { createQuickAccount } from '@/lib/auth/quick-signup';
 import { LOCALE_COOKIE } from '@/lib/i18n/dictionaries';
+import { providerAvatarFor } from '@/lib/media/avatar-source';
+import { importProviderAvatarAsync } from '@/lib/media/import-avatar';
 import { can } from '@/lib/permissions';
 import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
 import { maskAddress, saveCalendarLink } from '@/lib/firebase/repositories/calendarLinks';
@@ -267,6 +269,11 @@ async function handleLink(request: NextRequest, state: ConsumedState, profile: P
     });
   }
 
+  // A link already runs inside a live, re-authenticated session, so there is
+  // no factor left to prove: an account without a picture gets the photo now.
+  const picture = providerAvatarFor(user, profile.picture);
+  if (picture) importProviderAvatarAsync(user.id, picture);
+
   return clearBindingCookie(redirectTo(request, `${page}?linked=${profile.provider}`));
 }
 
@@ -392,11 +399,21 @@ async function handleLogin(request: NextRequest, state: ConsumedState, profile: 
     await updateUser(user.id, { passwordSetupRequired: true });
   }
 
+  /**
+   * The provider's photo, for an account that has never had a picture - a
+   * bootstrapped admin, a password signup (see providerAvatarFor). Vetted
+   * here, copied only once the sign-in COMPLETES: by completeLogin below, or,
+   * when a second factor is owed, after /api/auth/mfa/verify proves it. Until
+   * then it waits sealed in the login ticket; Google alone never changes the
+   * profile of an account that has 2FA.
+   */
+  const providerPicture = providerAvatarFor(user, profile.picture);
+
   // 'fed' (RFC 8176: federated) is a FIRST factor. It does not satisfy the
   // staff MFA gate, and an enrolled account still owes its code.
   const amr = ['fed'];
   if (isEnrolled(mfa)) {
-    const ticket = await createLoginTicket({ userId: user.id, userAgent, amr });
+    const ticket = await createLoginTicket({ userId: user.id, userAgent, amr, providerPicture });
     const next = state.returnTo ? `&next=${encodeURIComponent(state.returnTo)}` : '';
     const response = redirectTo(request, `/login?mfa=1${next}`);
     setMfaTicketCookie(response, ticket.token);
@@ -410,6 +427,7 @@ async function handleLogin(request: NextRequest, state: ConsumedState, profile: 
     mfaAt: null,
     method: `oauth_${profile.provider}`,
     redirectTo: owesPassword ? '/set-password' : state.returnTo,
+    providerPicture,
   });
   response.headers.set('Referrer-Policy', 'no-referrer');
   return clearBindingCookie(response);

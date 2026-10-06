@@ -135,7 +135,7 @@ export const COLLECTIONS = {
   mentorApplications: 'mentorApplications',
   /** User-filed account deletion requests, keyed by user id; reviewed by an admin. */
   accountDeletionRequests: 'accountDeletionRequests',
-  /** Staff-set switches, one document each - `feedAd` is the promoted mentor. Server-only. */
+  /** Staff-set switches, one document each - `feedAd` lists the promoted mentors. Server-only. */
   siteConfig: 'siteConfig',
 } as const;
 

@@ -1038,6 +1038,14 @@
     "calendarDisconnected": {
       "title": "Google Calendar-ı yenidən qoşun",
       "body": "{when} tarixli görüşünüz Google Meet linkini gözləyir."
+    },
+    "mentorFeatured": {
+      "title": "Lentdə seçilmiş mentorsunuz",
+      "body": "Mentor profiliniz artıq lentdəki «Seçilmiş mentor» blokunda reklam olunur."
+    },
+    "mentorUnfeatured": {
+      "title": "Seçilmiş mentorlardan çıxarıldınız",
+      "body": "Mentor profiliniz lentdəki «Seçilmiş mentor» blokundan çıxarıldı."
     }
   },
   "errors": {
@@ -1301,17 +1309,27 @@
       "queueNote": "İşarələnmiş sənədlər sərt TTL ilə şifrələnmiş buferdə saxlanılır. Müddət bitdikdə iş baxıla bilmir və namizəd yenidən göndərməlidir."
     },
     "feedAd": {
-      "title": "Lentdə reklam yeri",
-      "description": "Bir mentor hər kəsə lentin sağ sütununda, «Populyar konspektlər» blokunun üstündə göstərilir. Mentoru ora yerləşdirmək üçün «Reklam et» düyməsini basın (cari mentor əvəzlənir); çıxarmaq üçün düyməni yenidən basın. Dəyişikliklər təxminən 30 saniyəyə görünür.",
+      "title": "Lentdə reklam",
+      "description": "Reklam edilən mentorlar lentin sağ sütununda, «Populyar konspektlər» blokunun üstündə göstərilir - hər girişdə onlardan biri. Mentoru sətrindəki düymə ilə reklam edin və ya çıxarın, yaxud bir neçəsini seçib siyahının üstündəki paneldən istifadə edin. Hər mentora bildiriş göndərilir. Eyni anda ən çox {max} mentor; dəyişikliklər təxminən 30 saniyəyə görünür.",
+      "count": "{count} / {max} reklamda",
       "promote": "Reklam et",
       "inSlot": "Lentdədir",
       "remove": "Lentdən çıxar",
-      "promoted": "@{nickname} artıq lentdəki reklam yerindədir.",
-      "removed": "@{nickname} lentdəki reklam yerindən çıxarıldı.",
+      "promoted": "@{nickname} artıq lentdə reklam olunur.",
+      "removed": "@{nickname} lentdəki reklamdan çıxarıldı.",
+      "updated": "Lent reklamları yeniləndi: {added} əlavə edildi, {removed} çıxarıldı.",
+      "unchanged": "Dəyişiklik yoxdur: seçilmiş mentorlar artıq bu vəziyyətdədir.",
+      "selectAll": "Hamısını seç",
+      "selectRow": "Seç: @{nickname}",
+      "selected": "{count} seçilib",
+      "promoteSelected": "Reklam et ({count})",
+      "removeSelected": "Çıxar ({count})",
+      "clearSelection": "Seçimi təmizlə",
       "search": "Mentor axtar",
       "empty": "Hələ təsdiqlənmiş mentor yoxdur",
       "errors": {
-        "notEligible": "Bu mentoru reklam etmək mümkün deyil: profil təsdiqlənməyib və ya hesab aktiv deyil."
+        "notEligible": "Reklam etmək mümkün deyil: seçilmiş profillərdən biri təsdiqlənməyib və ya hesabı aktiv deyil. Siyahı yeniləndi.",
+        "limit": "Eyni anda ən çox {max} mentor reklam oluna bilər."
       }
     },
     "stats": {

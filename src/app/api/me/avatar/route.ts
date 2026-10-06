@@ -83,7 +83,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** DELETE /api/me/avatar - back to the initials fallback. */
+/**
+ * DELETE /api/me/avatar - back to the initials fallback, for good: the removal
+ * is recorded, so a later Google sign-in never imports a photo over it.
+ */
 export async function DELETE(request: NextRequest) {
   const auth = await session(request);
   if (!auth) return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
@@ -91,7 +94,7 @@ export async function DELETE(request: NextRequest) {
   const user = await findUserById(auth.userId);
   if (!user) return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
 
-  await updateUser(auth.userId, { avatarUrl: null });
+  await updateUser(auth.userId, { avatarUrl: null, avatarRemovedAt: new Date() });
   await releaseAvatar(auth.userId, user.avatarUrl);
   return NextResponse.json({ avatarUrl: null });
 }

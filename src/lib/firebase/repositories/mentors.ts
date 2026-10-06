@@ -142,6 +142,23 @@ export async function findMentorById(id: string): Promise<MentorProfileRecord | 
   ) as MentorProfileRecord | null;
 }
 
+/**
+ * Profiles by id in one batched read, for lists that name several (the feed
+ * ad). Missing ids are simply absent from the map. Callers bound the list.
+ */
+export async function findMentorsByIds(ids: string[]): Promise<Map<string, MentorProfileRecord>> {
+  const unique = [...new Set(ids)].filter(Boolean);
+  const out = new Map<string, MentorProfileRecord>();
+  if (unique.length === 0) return out;
+
+  const snaps = await adminDb().getAll(...unique.map((id) => mentors().doc(id)));
+  for (const snap of snaps) {
+    const row = docToObject<MentorProfileRecord>(snap);
+    if (row) out.set(row.id, row as MentorProfileRecord);
+  }
+  return out;
+}
+
 export async function findMentorByUserId(userId: string): Promise<MentorProfileRecord | null> {
   const snap = await mentors().where('userId', '==', userId).limit(1).get();
   return (docsToObjects<MentorProfileRecord>(snap.docs)[0] as MentorProfileRecord) ?? null;

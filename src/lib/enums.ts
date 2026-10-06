@@ -168,6 +168,9 @@ export const NotificationType = {
   BOOKING_EXPIRED: 'BOOKING_EXPIRED',
   /** Google revoked the mentor's calendar access; Meet links cannot be made until they reconnect. */
   CALENDAR_DISCONNECTED: 'CALENDAR_DISCONNECTED',
+  /** Staff put the mentor's profile in the feed's ad slot / took it out. */
+  MENTOR_FEATURED: 'MENTOR_FEATURED',
+  MENTOR_UNFEATURED: 'MENTOR_UNFEATURED',
   POST_REPLY: 'POST_REPLY',
   POST_LIKE: 'POST_LIKE',
   NEW_FOLLOWER: 'NEW_FOLLOWER',

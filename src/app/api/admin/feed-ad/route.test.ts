@@ -12,13 +12,13 @@ vi.mock('@/lib/auth/admin', () => ({
   adminAudit: (...args: unknown[]) => adminAudit(...(args as [])),
 }));
 
-const { PUT } = await import('./route');
-const { loadFeedAd } = await import('@/lib/feed/ad');
+const { GET, PATCH } = await import('./route');
+const { loadFeedAds } = await import('@/lib/feed/ad');
 
-const put = (body: unknown) =>
-  PUT(
+const patch = (body: unknown) =>
+  PATCH(
     new NextRequest('http://localhost/api/admin/feed-ad', {
-      method: 'PUT',
+      method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     }),
@@ -36,6 +36,7 @@ async function mentor(id: string, userId: string, isApproved = true, accountStat
   await fake.db.collection('mentorProfiles').doc(id).set({
     userId,
     isApproved,
+    isAcceptingBookings: true,
     headline: 'Senior engineer',
     industry: 'IT',
     jobTitle: 'Engineer',
@@ -47,79 +48,187 @@ async function mentor(id: string, userId: string, isApproved = true, accountStat
   });
 }
 
+const suspend = (userId: string) =>
+  fake.db.collection('users').doc(userId).set({ nickname: `nick_${userId}`, accountStatus: 'SUSPENDED', deletedAt: null });
+
 const slot = () => fake.store.get('siteConfig/feedAd');
+const notifications = () =>
+  [...fake.store.entries()].filter(([path]) => path.startsWith('notifications/')).map(([, doc]) => doc);
+const notified = (type: string) =>
+  notifications()
+    .filter((n) => n.type === type)
+    .map((n) => n.userId)
+    .sort();
 
 beforeEach(() => {
   fake.store.clear();
   adminAudit.mockClear();
 });
 
-describe('PUT /api/admin/feed-ad', () => {
-  it('promotes an approved mentor in one call, audited, and the feed shows it', async () => {
-    await mentor('m1', 'u1');
-
-    const response = await put({ mentorId: 'm1' });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ current: 'm1' });
-    expect(slot()).toMatchObject({ mentorId: 'm1', updatedBy: 'staff1' });
-    expect(adminAudit).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'ADMIN_FEED_AD_SET', before: { mentorId: null }, after: { mentorId: 'm1' } }),
-    );
-
-    expect(await loadFeedAd()).toMatchObject({
-      mentorId: 'm1',
-      nickname: 'nick_u1',
-      avatarUrl: '/api/media/avatar1',
-      industry: 'IT',
-      hourlyRateMinor: 2500,
-    });
-  });
-
-  it('replaces the current mentor, and null empties the slot', async () => {
+describe('PATCH /api/admin/feed-ad', () => {
+  it('promotes several mentors in one call: one write, one audit row, one notification each', async () => {
     await mentor('m1', 'u1');
     await mentor('m2', 'u2');
-    await put({ mentorId: 'm1' });
+    await mentor('m3', 'u3');
 
-    await put({ mentorId: 'm2' });
-    expect(slot()).toMatchObject({ mentorId: 'm2' });
+    const response = await patch({ promote: ['m1', 'm2', 'm3'] });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ featured: ['m1', 'm2', 'm3'], added: ['m1', 'm2', 'm3'], removed: [] });
+    expect(slot()).toMatchObject({ mentorIds: ['m1', 'm2', 'm3'], updatedBy: 'staff1' });
 
-    const cleared = await put({ mentorId: null });
-    expect(cleared.status).toBe(200);
-    expect(slot()).toMatchObject({ mentorId: null });
-    expect(adminAudit).toHaveBeenLastCalledWith(
-      expect.objectContaining({ action: 'ADMIN_FEED_AD_CLEARED', before: { mentorId: 'm2' } }),
+    expect(notifications()).toHaveLength(3);
+    expect(notifications()[0]).toMatchObject({
+      type: 'MENTOR_FEATURED',
+      titleKey: 'notifications.mentorFeatured.title',
+      bodyKey: 'notifications.mentorFeatured.body',
+      linkUrl: '/mentors/m1',
+      readAt: null,
+    });
+    expect(notified('MENTOR_FEATURED')).toEqual(['u1', 'u2', 'u3']);
+
+    expect(adminAudit).toHaveBeenCalledTimes(1);
+    expect(adminAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'ADMIN_FEED_AD_UPDATED',
+        before: { mentorIds: [] },
+        after: { mentorIds: ['m1', 'm2', 'm3'], added: ['m1', 'm2', 'm3'], removed: [], pruned: [] },
+      }),
     );
-    expect(await loadFeedAd()).toBeNull();
+
+    const ads = await loadFeedAds();
+    expect(ads.map((ad) => ad.mentorId)).toEqual(['m1', 'm2', 'm3']);
+    expect(ads[0]).toMatchObject({ nickname: 'nick_u1', avatarUrl: '/api/media/avatar1', industry: 'IT', hourlyRateMinor: 2500 });
   });
 
-  it('refuses an unapproved profile, a suspended account and an unknown id', async () => {
-    await mentor('pending', 'u1', false);
-    await mentor('frozen', 'u2', true, 'SUSPENDED');
+  it('removes and promotes in the same request, notifying only the mentors whose status changed', async () => {
+    for (const n of [1, 2, 3, 4]) await mentor(`m${n}`, `u${n}`);
+    await patch({ promote: ['m1', 'm2', 'm3'] });
+    fake.store.forEach((_, path) => path.startsWith('notifications/') && fake.store.delete(path));
 
-    for (const mentorId of ['pending', 'frozen', 'missing']) {
-      const response = await put({ mentorId });
-      expect(response.status).toBe(409);
-      expect(await response.json()).toEqual({ error: 'admin.feedAd.errors.notEligible' });
-    }
-    expect(slot()).toBeUndefined();
+    const response = await patch({ promote: ['m2', 'm4'], demote: ['m1', 'm3'] });
+    expect(await response.json()).toEqual({ featured: ['m2', 'm4'], added: ['m4'], removed: ['m1', 'm3'] });
+    expect(slot()).toMatchObject({ mentorIds: ['m2', 'm4'] });
+    expect(notified('MENTOR_FEATURED')).toEqual(['u4']);
+    expect(notified('MENTOR_UNFEATURED')).toEqual(['u1', 'u3']);
+  });
+
+  it('is idempotent: re-promoting a featured mentor or removing an absent one writes and notifies nothing', async () => {
+    await mentor('m1', 'u1');
+    await mentor('m2', 'u2');
+    await patch({ promote: ['m1'] });
+    const stored = slot();
+    adminAudit.mockClear();
+
+    const response = await patch({ promote: ['m1'], demote: ['m2'] });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ featured: ['m1'], added: [], removed: [] });
+    expect(slot()).toEqual(stored);
+    expect(notifications()).toHaveLength(1);
     expect(adminAudit).not.toHaveBeenCalled();
   });
 
-  it('rejects a malformed id', async () => {
-    expect((await put({ mentorId: '../users/x' })).status).toBe(400);
-    expect((await put({})).status).toBe(400);
+  it('rejects the whole request when any promoted profile is not eligible', async () => {
+    await mentor('m1', 'u1');
+    await mentor('pending', 'u2', false);
+    await mentor('frozen', 'u3', true, 'SUSPENDED');
+
+    const response = await patch({ promote: ['m1', 'pending', 'frozen', 'missing'] });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: 'admin.feedAd.errors.notEligible',
+      ineligible: ['pending', 'frozen', 'missing'],
+    });
+    expect(slot()).toBeUndefined();
+    expect(notifications()).toHaveLength(0);
+    expect(adminAudit).not.toHaveBeenCalled();
+  });
+
+  it('enforces the cap without writing anything', async () => {
+    const ids = Array.from({ length: 11 }, (_, i) => `m${i}`);
+    for (const id of ids) await mentor(id, `u_${id}`);
+
+    const tooMany = await patch({ promote: ids });
+    expect(tooMany.status).toBe(409);
+    expect(await tooMany.json()).toEqual({ error: 'admin.feedAd.errors.limit', max: 10 });
+    expect(slot()).toBeUndefined();
+
+    expect((await patch({ promote: ids.slice(0, 10) })).status).toBe(200);
+    expect((await patch({ promote: [ids[10]] })).status).toBe(409);
+    expect(slot()?.mentorIds).toEqual(ids.slice(0, 10));
+    expect(notifications()).toHaveLength(10);
+
+    // Swapping one out for one in fits, in a single request.
+    expect((await patch({ promote: [ids[10]], demote: [ids[0]] })).status).toBe(200);
+    expect(slot()?.mentorIds).toEqual([...ids.slice(1, 10), ids[10]]);
+  });
+
+  it('drops a promoted mentor who stopped being eligible, without notifying them', async () => {
+    await mentor('m1', 'u1');
+    await mentor('m2', 'u2');
+    await mentor('m3', 'u3');
+    await patch({ promote: ['m1', 'm2'] });
+    await suspend('u1');
+
+    const response = await patch({ promote: ['m3'] });
+    expect(await response.json()).toEqual({ featured: ['m2', 'm3'], added: ['m3'], removed: [] });
+    expect(adminAudit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ after: { mentorIds: ['m2', 'm3'], added: ['m3'], removed: [], pruned: ['m1'] } }),
+    );
+    expect(notified('MENTOR_UNFEATURED')).toEqual([]);
+  });
+
+  it('reads the single-mentor document written before bulk promotion, and replaces it on write', async () => {
+    await mentor('m1', 'u1');
+    await mentor('m2', 'u2');
+    fake.store.set('siteConfig/feedAd', { mentorId: 'm1', updatedBy: 'staff0', updatedAt: new Date() });
+    expect((await loadFeedAds()).map((ad) => ad.mentorId)).toEqual(['m1']);
+
+    await patch({ promote: ['m2'] });
+    expect(slot()).toEqual({ mentorIds: ['m1', 'm2'], updatedBy: 'staff1', updatedAt: expect.any(Date) });
+  });
+
+  it('rejects malformed bodies', async () => {
+    for (const body of [
+      null,
+      {},
+      { promote: [] },
+      { promote: 'm1' },
+      { promote: ['../users/x'] },
+      { promote: ['m1'], demote: ['m1'] },
+      { demote: Array.from({ length: 51 }, (_, i) => `m${i}`) },
+    ]) {
+      expect((await patch(body)).status).toBe(400);
+    }
   });
 });
 
-describe('loadFeedAd', () => {
-  it('drops a promoted mentor whose account was suspended or profile unapproved since', async () => {
+describe('GET /api/admin/feed-ad', () => {
+  it('lists promotable mentors, and only the featured ids that are still promotable', async () => {
     await mentor('m1', 'u1');
-    await put({ mentorId: 'm1' });
+    await mentor('m2', 'u2');
+    await mentor('pending', 'u3', false);
+    await patch({ promote: ['m1', 'm2'] });
+    await suspend('u2');
 
-    await fake.db.collection('users').doc('u1').set({ nickname: 'nick_u1', accountStatus: 'SUSPENDED', deletedAt: null });
-    expect(await loadFeedAd()).toBeNull();
+    const response = await GET(new NextRequest('http://localhost/api/admin/feed-ad'));
+    const body = await response.json();
+    expect(body.featured).toEqual(['m1']);
+    expect(body.max).toBe(10);
+    expect(body.mentors.map((m: { id: string }) => m.id)).toEqual(['m1']);
+    expect(body.mentors[0]).toMatchObject({ nickname: 'nick_u1', avatarUrl: '/api/media/avatar1', isAcceptingBookings: true });
+  });
+});
 
-    await mentor('m1', 'u1', false);
-    expect(await loadFeedAd()).toBeNull();
+describe('loadFeedAds', () => {
+  it('drops promoted mentors whose account was suspended or profile unapproved since', async () => {
+    await mentor('m1', 'u1');
+    await mentor('m2', 'u2');
+    await patch({ promote: ['m1', 'm2'] });
+
+    await suspend('u1');
+    expect((await loadFeedAds()).map((ad) => ad.mentorId)).toEqual(['m2']);
+
+    await mentor('m2', 'u2', false);
+    expect(await loadFeedAds()).toEqual([]);
   });
 });

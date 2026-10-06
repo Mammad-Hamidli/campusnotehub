@@ -1038,6 +1038,14 @@
     "calendarDisconnected": {
       "title": "Reconnect Google Calendar",
       "body": "Your session on {when} is waiting for its Google Meet link."
+    },
+    "mentorFeatured": {
+      "title": "You're featured in the feed",
+      "body": "Your mentor profile is now promoted in the feed's Featured mentor spot."
+    },
+    "mentorUnfeatured": {
+      "title": "No longer featured",
+      "body": "Your mentor profile has been removed from the feed's Featured mentor spot."
     }
   },
   "errors": {
@@ -1301,17 +1309,27 @@
       "queueNote": "Flagged documents are held in an encrypted buffer with a hard TTL. When it lapses the case can no longer be reviewed and the applicant must resubmit."
     },
     "feedAd": {
-      "title": "Feed ad slot",
-      "description": "One mentor is shown to everyone in the feed's right column, above Trending notes. Click Promote to put a mentor there (it replaces the current one); click the button again to remove them. Changes appear within about 30 seconds.",
+      "title": "Feed ads",
+      "description": "Promoted mentors appear in the feed's right column, above Trending notes - one of them on each visit. Promote or remove a mentor with the button on its row, or tick several and use the bar above the list. Each mentor is notified. Up to {max} at a time; changes appear within about 30 seconds.",
+      "count": "{count} / {max} promoted",
       "promote": "Promote",
       "inSlot": "In feed",
       "remove": "Remove from the feed",
-      "promoted": "@{nickname} is now in the feed ad slot.",
-      "removed": "@{nickname} was removed from the feed ad slot.",
+      "promoted": "@{nickname} is now promoted in the feed.",
+      "removed": "@{nickname} was removed from the feed.",
+      "updated": "Feed ads updated: {added} added, {removed} removed.",
+      "unchanged": "Nothing to change: the selected mentors were already in that state.",
+      "selectAll": "Select all",
+      "selectRow": "Select @{nickname}",
+      "selected": "{count} selected",
+      "promoteSelected": "Promote ({count})",
+      "removeSelected": "Remove ({count})",
+      "clearSelection": "Clear selection",
       "search": "Search mentors",
       "empty": "No approved mentors yet",
       "errors": {
-        "notEligible": "This mentor can't be promoted: the profile is not approved or the account is not active."
+        "notEligible": "Can't promote: a selected profile is not approved or its account is not active. The list has been refreshed.",
+        "limit": "At most {max} mentors can be promoted at once."
       }
     },
     "stats": {

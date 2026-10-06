@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { avatarSourceUrl, withPhotoSize } from './avatar-source';
+import { avatarSourceUrl, providerAvatarFor, withPhotoSize } from './avatar-source';
 
 const GOOGLE = 'https://lh3.googleusercontent.com/a/ACg8ocJ_example-Photo_Id=s96-c';
 
@@ -48,6 +48,31 @@ describe('avatarSourceUrl', () => {
   it('refuses non-strings, empty, malformed and oversized values', () => {
     for (const value of [null, undefined, 42, {}, '', 'not a url', `${GOOGLE}${'a'.repeat(2048)}`]) {
       expect(avatarSourceUrl(value)).toBeNull();
+    }
+  });
+});
+
+describe('providerAvatarFor', () => {
+  /** A bootstrapped admin or a password signup: never created by a provider sign-in. */
+  const older = { avatarUrl: null };
+
+  it('vets the photo for an account that has never had a picture', () => {
+    expect(providerAvatarFor(older, GOOGLE)).toBe(GOOGLE);
+  });
+
+  it('gives nothing to an account with a picture, or whose owner removed one', () => {
+    expect(providerAvatarFor({ avatarUrl: '/api/media/a1' }, GOOGLE)).toBeNull();
+    expect(providerAvatarFor({ avatarUrl: null, avatarRemovedAt: new Date() }, GOOGLE)).toBeNull();
+  });
+
+  it('gives nothing to an account a provider sign-in created: it already had its one import', () => {
+    expect(providerAvatarFor({ avatarUrl: null, profileIncomplete: false }, GOOGLE)).toBeNull();
+    expect(providerAvatarFor({ avatarUrl: null, profileIncomplete: true }, GOOGLE)).toBeNull();
+  });
+
+  it('never passes on a URL outside the allowlist', () => {
+    for (const picture of [null, '', 'https://evil.example/a.png', GOOGLE.replace('https:', 'http:')]) {
+      expect(providerAvatarFor(older, picture), String(picture)).toBeNull();
     }
   });
 });
