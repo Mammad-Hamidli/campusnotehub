@@ -76,3 +76,48 @@ describe('GET /api/search/users', () => {
     ]);
   });
 });
+
+describe('GET /api/search/users pagination', () => {
+  const page = async (query: string) => {
+    const response = await GET(new NextRequest(`http://localhost/api/search/users?${query}`));
+    const body = (await response.json()) as { users: { nickname: string }[]; nextCursor: string | null };
+    return { names: body.users.map((u) => u.nickname), next: body.nextCursor };
+  };
+
+  beforeEach(() => {
+    // 25 visible "zz" handles, with hidden ones interleaved to be skipped.
+    for (let i = 0; i < 25; i += 1) user(`z${i}`, `zz${String(i).padStart(2, '0')}`);
+    user('zh1', 'zz04x', { accountStatus: 'SUSPENDED' });
+    user('zh2', 'zz10x', { deletedAt: new Date() });
+  });
+
+  it('returns ten by default, with a cursor while more remain', async () => {
+    const first = await page('q=zz');
+    expect(first.names).toEqual(Array.from({ length: 10 }, (_, i) => `zz${String(i).padStart(2, '0')}`));
+    expect(first.next).toBe('zz09');
+  });
+
+  it('walks every visible match exactly once, then stops', async () => {
+    const seen: string[] = [];
+    let after: string | null = null;
+    do {
+      const result: { names: string[]; next: string | null } = await page(
+        `q=zz&limit=7${after ? `&after=${after}` : ''}`,
+      );
+      seen.push(...result.names);
+      after = result.next;
+    } while (after);
+    expect(seen).toHaveLength(25);
+    expect(new Set(seen).size).toBe(25);
+    expect(seen).not.toContain('zz04x');
+  });
+
+  it('gives no cursor when everything fits', async () => {
+    expect(await page('q=ays')).toEqual({ names: ['Aysel_01', 'ayshan'], next: null });
+  });
+
+  it('caps the page size and ignores a cursor outside the prefix', async () => {
+    expect((await page('q=zz&limit=500')).names).toHaveLength(25);
+    expect(await page('q=zz&after=aaa')).toEqual({ names: [], next: null });
+  });
+});

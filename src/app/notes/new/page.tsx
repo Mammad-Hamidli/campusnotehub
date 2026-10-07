@@ -5,6 +5,7 @@ import { listUniversities } from '@/lib/firebase/repositories/reference';
 import { requirePageSession } from '@/lib/auth/page-guard';
 import { can, denialKey } from '@/lib/permissions';
 import { NoteUploadForm } from '@/components/notes/NoteUploadForm';
+import { BackLink } from '@/components/ui/BackLink';
 import {
   DEFAULT_LOCALE,
   DICTIONARIES,
@@ -51,6 +52,7 @@ export default async function NewNotePage() {
     return (
       <main id="main" className="min-h-dvh bg-surface-muted">
         <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+          <BackLink fallbackHref="/dashboard?tab=notes" className="mb-3" />
           <h1 className="text-xl font-bold tracking-tight text-fg">{t('notes.upload.title')}</h1>
           <p className="mt-1 text-sm text-fg-muted">{t('notes.upload.subtitle')}</p>
 

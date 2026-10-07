@@ -50,7 +50,14 @@
     "mentorSchedule": "Mentor cədvəli",
     "mentorPanel": "Mentor paneli",
     "backToAdmin": "Admin panelinə qayıt",
-    "messages": "Mesajlar"
+    "messages": "Mesajlar",
+    "short": {
+      "feed": "Lent",
+      "notes": "Notlar",
+      "saved": "Saxlanan",
+      "mentors": "Mentorlar",
+      "messages": "Mesajlar"
+    }
   },
   "auth": {
     "register": {
@@ -686,7 +693,6 @@
     "verifiedOnly": "Sessiya sifariş etmək üçün hesabınızı təsdiqləyin.",
     "notFound": "Mentor tapılmadı",
     "notFoundHint": "Bu profil silinib və ya hələ təsdiqlənməyib.",
-    "backToList": "Bütün mentorlar",
     "about": "Haqqında",
     "reviews": "Rəylər",
     "noReviews": "Hələ rəy yoxdur.",
@@ -862,7 +868,6 @@
   "mentorDashboard": {
     "title": "Mentor paneli",
     "subtitle": "@{nickname} kimi daxil olmusunuz",
-    "backToFeed": "Lentə qayıt",
     "viewProfile": "İctimai profilə bax",
     "checklist": {
       "title": "Kataloqa çıxmaq üçün",
@@ -1266,7 +1271,8 @@
       "empty": "“{query}” ilə başlayan istifadəçi adı yoxdur.",
       "error": "Axtarış hazırda əlçatan deyil. Yenidən cəhd edin.",
       "results": "Nəticələr: {count}",
-      "message": "@{nickname} istifadəçisinə yaz"
+      "message": "@{nickname} istifadəçisinə yaz",
+      "viewAll": "Bütün nəticələrə bax"
     }
   },
   "admin": {
@@ -1415,7 +1421,6 @@
       },
       "detail": {
         "title": "İstifadəçi",
-        "back": "İstifadəçilərə qayıt",
         "profile": "Profil",
         "verification": "Doğrulama",
         "activity": "Son fəaliyyət",
@@ -1537,6 +1542,30 @@
       "deletedAccount": "Silinmiş hesab",
       "errors": {
         "undecided": "Bu iş hələ qərar gözləyir və siyahıdan çıxarıla bilməz."
+      },
+      "ai": {
+        "title": "AI doğrulama",
+        "queued": "Növbədə: {count}",
+        "running": "İcra olunur…",
+        "schedule": "Hər gecə saat 00:00-da (Bakı) avtomatik işləyir. \"İndi işə sal\" növbəni dərhal yoxlayır; gecə yoxlaması yenə də olacaq.",
+        "lastRun": "Son yoxlama {when}: {approved} təsdiqləndi, {flagged} işarələndi, {remaining} qaldı",
+        "runNow": "İndi işə sal",
+        "confirmTitle": "AI yoxlaması indi işə salınsın?",
+        "confirmBody": "Növbədəki {count} müraciət ən köhnədən başlayaraq indi yoxlanılacaq. Gecə yoxlaması ilə eyni gündəlik AI limitindən istifadə olunur.",
+        "started": "Növbədəki {count} müraciət üçün AI yoxlaması başladı.",
+        "stop": {
+          "QUEUE_EMPTY": "növbə boşaldı",
+          "AI_QUOTA": "dayandı: gündəlik AI limiti bitdi",
+          "AI_UNAVAILABLE": "dayandı: Workers AI cavab vermədi",
+          "AI_CONFIG": "dayandı: Workers AI tənzimləməsi və ya lisenziya problemi",
+          "STORAGE_UNAVAILABLE": "dayandı: sənədlər yüklənə bilmədi",
+          "TIME_BUDGET": "vaxt limiti doldu, davam edir",
+          "LEASE_HELD": "başqa yoxlama artıq gedirdi"
+        },
+        "errors": {
+          "running": "AI yoxlaması artıq gedir.",
+          "empty": "AI yoxlamasını gözləyən müraciət yoxdur."
+        }
       }
     },
     "universities": {
@@ -1789,7 +1818,6 @@
     },
     "security": {
       "title": "Təhlükəsizlik",
-      "back": "Parametrlər",
       "heading": "İki mərhələli doğrulama",
       "description": "Hər girişdə şifrədən əlavə autentifikator tətbiqindəki kod tələb olunur.",
       "statusOn": "Aktiv",
@@ -1875,7 +1903,6 @@
       }
     },
     "export": {
-      "back": "Parametrlər",
       "title": "Məlumatlarınızı yükləyin",
       "intro": "CampusNoteHub profil məlumatlarınızın surətini istənilən mətn redaktorunda aça biləcəyiniz JSON faylı şəklində əldə edin.",
       "includedTitle": "Faylda nələr var",
@@ -1960,8 +1987,6 @@
     }
   },
   "publicProfile": {
-    "backToFeed": "Lentə qayıt",
-    "backHome": "Ana səhifə",
     "joined": "Qoşulub: {date}",
     "posts": "Paylaşımlar",
     "noPosts": "Hələ paylaşım yoxdur.",
@@ -2121,5 +2146,10 @@
       "requestGone": "Bu sorğu artıq cavablandırılıb və ya geri götürülüb.",
       "invalid": "2000 simvoladək mesaj yazın."
     }
+  },
+  "search": {
+    "title": "Axtarış nəticələri",
+    "shownSoFar": "Hələlik {count} göstərilir",
+    "loadMore": "Daha çox yüklə"
   }
 }

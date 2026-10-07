@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { BackLink } from '@/components/ui/BackLink';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, CalendarClock } from 'lucide-react';
+import { CalendarClock } from 'lucide-react';
 import { requirePageSession } from '@/lib/auth/page-guard';
 import { findBookingById, mentorUserIdOf } from '@/lib/firebase/repositories/mentors';
 import { findUserById } from '@/lib/firebase/repositories/users';
@@ -82,13 +83,7 @@ export default async function SessionPage({ params, searchParams }: Props) {
   return (
     <main id="main" className="min-h-dvh bg-surface-muted">
       <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
-        <Link
-          href={role === 'mentor' ? '/mentors/dashboard' : '/notifications'}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-fg-muted transition hover:text-fg"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          {t(role === 'mentor' ? 'mentorDashboard.title' : 'notifications.title')}
-        </Link>
+        <BackLink fallbackHref={role === 'mentor' ? '/mentors/dashboard' : '/notifications'} />
 
         <section className="card mt-3 p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">

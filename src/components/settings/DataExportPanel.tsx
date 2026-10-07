@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import Link from 'next/link';
-import { AlertCircle, CheckCircle2, ChevronLeft, Download, Loader2 } from 'lucide-react';
+import { BackLink } from '@/components/ui/BackLink';
+import { AlertCircle, CheckCircle2, Download, Loader2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 
@@ -97,10 +97,7 @@ export function DataExportPanel() {
   return (
     <div className="mx-auto w-full max-w-xl px-4 py-8">
       <div className="mb-6">
-        <Link href="/settings" className="btn-ghost -ml-2 h-8 text-xs">
-          <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('settings.export.back')}
-        </Link>
+        <BackLink fallbackHref="/settings" />
         <h1 className="mt-3 text-2xl font-semibold tracking-tight text-fg">{t('settings.export.title')}</h1>
         <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{t('settings.export.intro')}</p>
       </div>

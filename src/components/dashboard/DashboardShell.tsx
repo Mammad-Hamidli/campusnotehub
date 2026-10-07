@@ -399,7 +399,8 @@ export function DashboardShell({
         user={viewer}
       />
 
-      <main id="main" className="w-full min-w-0 max-w-full flex-1">
+      {/* Bottom padding below lg clears the Sidebar's fixed tab bar (h-14 + safe area). */}
+      <main id="main" className="w-full min-w-0 max-w-full flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
         <div className="mx-auto flex w-full max-w-6xl gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
           <div className="min-w-0 flex-1">
             {mentorTodo && (

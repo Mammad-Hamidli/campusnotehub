@@ -49,7 +49,7 @@ vi.mock('./workersAi', async (importOriginal) => {
   };
 });
 
-const { runAiVerificationBatch, enqueueSubmission } = await import('./aiQueue');
+const { runAiVerificationBatch, enqueueSubmission, aiBatchStatus } = await import('./aiQueue');
 const { WorkersAiStopError } = await import('./workersAi');
 
 const DAY = 86_400_000;
@@ -240,6 +240,25 @@ describe('runAiVerificationBatch', () => {
     expect(get('siteConfig/verificationAiBatch')).toMatchObject({ holder: null });
     // A time stop hands over to the next invocation; it is not news for staff.
     expect(sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('aiBatchStatus', () => {
+  it('reports a held lease as running, and the last run once it is released', async () => {
+    fake.store.set('siteConfig/verificationAiBatch', { holder: 'other', leaseUntil: new Date(Date.now() + 60_000), startedAt: new Date() });
+    expect(await aiBatchStatus()).toMatchObject({ running: true, lastRun: null });
+
+    fake.store.delete('siteConfig/verificationAiBatch');
+    expect(await aiBatchStatus()).toEqual({ running: false, startedAt: null, lastRun: null });
+
+    seedCase('c1', { name: ['Aysel', 'Məmmədova'] }, 1);
+    await runAiVerificationBatch({ deadline: Date.now() + 1_000 });
+    expect(await aiBatchStatus()).toMatchObject({ running: false, lastRun: { stoppedReason: 'TIME_BUDGET', remaining: 1 } });
+  });
+
+  it('treats an expired lease as not running', async () => {
+    fake.store.set('siteConfig/verificationAiBatch', { holder: 'crashed', leaseUntil: new Date(Date.now() - 1_000) });
+    expect((await aiBatchStatus()).running).toBe(false);
   });
 });
 

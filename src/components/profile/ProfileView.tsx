@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BadgeCheck, ExternalLink, Loader2, Pencil, ShieldAlert } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { BackLink } from '@/components/ui/BackLink';
 import { CreatorHandle, type CreatorStats } from '@/components/notes/CreatorHandle';
 import { AvatarUploader } from './AvatarUploader';
 
@@ -91,6 +92,7 @@ export function ProfileView() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+      <BackLink fallbackHref="/dashboard" className="mb-3" />
       <header className="card flex flex-wrap items-start gap-4 p-5">
         <AvatarUploader
           nickname={me.nickname}

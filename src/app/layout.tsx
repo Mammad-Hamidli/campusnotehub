@@ -12,6 +12,7 @@ import { FollowingProvider } from '@/components/social/Following';
 import { LiveNotificationsProvider } from '@/components/notifications/LiveNotifications';
 import { getViewer } from '@/lib/auth/session';
 import { WarmBackdrop } from '@/components/ui/WarmBackdrop';
+import { NavigationTrail } from '@/components/ui/BackLink';
 // Imported from constants.ts, NOT from the 'use client' provider: a plain
 // export read across that boundary resolves to undefined on the server.
 // See src/lib/theme/constants.ts.
@@ -147,6 +148,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 Inside LocaleProvider so their built-in labels are translated. */}
             <FeedbackProvider>
               <SessionKeeper />
+              {/* Lets every BackLink tell in-app history from an outside referrer. */}
+              <NavigationTrail />
               {/* Renders only inside the desktop app, when a newer build exists. */}
               <DesktopUpdateNotice />
               {/*

@@ -233,6 +233,11 @@ export async function expiredReviewCases(
  * composite index, and those are not deployed. The id breaks ties so two runs
  * over the same rows always walk them in the same order.
  */
+/** How many cases wait for the AI check: a count aggregation, no documents read. */
+export async function countAiQueuedCases(): Promise<number> {
+  return (await cases().where('aiCheckState', '==', AiCheckState.QUEUED).count().get()).data().count;
+}
+
 export async function aiQueuedCases(): Promise<VerificationCaseRecord[]> {
   const snap = await cases()
     .where('aiCheckState', '==', AiCheckState.QUEUED)

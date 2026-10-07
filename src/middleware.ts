@@ -14,6 +14,7 @@ import { MENTOR_JOIN_PATH } from '@/lib/site';
 /** Routes that require a session. */
 const PROTECTED = [
   /^\/(dashboard|settings|notifications|profile|bookmarks|verify|onboarding|set-password|sessions)/,
+  /^\/search(\/|$)/,
   /^\/notes\/new/,
   // The mentor panel and schedule. Anchored so a mentor profile id can never
   // be mistaken for one of them; /mentors/[mentorId] stays public.
@@ -65,6 +66,7 @@ const PROTECTED = [
  */
 const NO_STORE = [
   /^\/(admin|dashboard|settings|notifications|profile|bookmarks|verify|sessions)/,
+  /^\/search(\/|$)/,
   /^\/notes\/new/,
   // The panel shows the mentor's own data; /mentors/join, like /register,
   // answers differently for a signed-in visitor (it redirects them).

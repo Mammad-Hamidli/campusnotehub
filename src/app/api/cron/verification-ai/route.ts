@@ -1,16 +1,11 @@
-import { after, NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { constantTimeEqual } from '@/lib/crypto/hash';
-import { runAiVerificationBatch } from '@/lib/verification/aiQueue';
+import { AI_BATCH_MAX_HOPS, scheduleAiBatch } from '@/lib/verification/aiBatchTrigger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 // The Hobby ceiling with Fluid compute. The batch stops itself well before it.
 export const maxDuration = 300;
-
-/** How long one invocation spends on cases before handing over. */
-const BUDGET_MS = 200_000;
-/** Hand-overs per night: a runaway chain stops here whatever the queue says. */
-const MAX_HOPS = 30;
 
 /**
  * GET /api/cron/verification-ai
@@ -20,11 +15,11 @@ const MAX_HOPS = 30;
  * On the Hobby plan Vercel may fire it at any minute within that hour.
  * Authenticated with `Authorization: Bearer $CRON_SECRET`, like every cron.
  *
- * Answers 202 at once and runs the batch in after(), so the caller never waits
- * on a model. When the batch stops for TIME (not quota, not an outage) it
- * calls this route again, and that fresh invocation carries on from the head
- * of the queue - the queue itself is the cursor. Quota and outage stops do not
- * hand over: they wait for the next night, which is the point.
+ * Answers 202 at once and runs a time-boxed batch in after(); a run that
+ * stops for TIME hands over to this route again with `?hop=n+1` (see
+ * scheduleAiBatch). Admins can start the same chain on demand from
+ * /admin/verifications (POST /api/admin/verification/ai-batch); the nightly
+ * schedule is unaffected by that.
  *
  * The scheduler worker runs the same batch at Baku midnight without a time
  * limit, for deployments with a long-running process.
@@ -36,25 +31,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'errors.forbidden' }, { status: 401 });
   }
 
-  const hop = Math.max(0, Math.min(MAX_HOPS, Number(request.nextUrl.searchParams.get('hop') ?? 0) || 0));
-  const next = new URL(request.nextUrl.pathname, request.nextUrl.origin);
-  next.searchParams.set('hop', String(hop + 1));
-
-  after(async () => {
-    const result = await runAiVerificationBatch({ deadline: Date.now() + BUDGET_MS }).catch((error) => {
-      console.error('[verification-ai] batch failed', error);
-      return null;
-    });
-    if (result?.stoppedReason !== 'TIME_BUDGET' || hop + 1 >= MAX_HOPS) return;
-
-    // The next invocation answers 202 straight away, so this only waits for
-    // the hand-over itself, not for the work.
-    await fetch(next, {
-      headers: { authorization: `Bearer ${secret}` },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(15_000),
-    }).catch((error) => console.error('[verification-ai] hand-over to hop %d failed', hop + 1, error));
-  });
+  const hop = Math.max(0, Math.min(AI_BATCH_MAX_HOPS, Number(request.nextUrl.searchParams.get('hop') ?? 0) || 0));
+  scheduleAiBatch(request.nextUrl.origin, hop);
 
   return NextResponse.json({ accepted: true, hop }, { status: 202 });
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { requirePageSession } from '@/lib/auth/page-guard';
 import { MentorScheduleSettings } from '@/components/mentors/MentorScheduleSettings';
+import { BackLink } from '@/components/ui/BackLink';
 import { cookies } from 'next/headers';
 import { DEFAULT_LOCALE, DICTIONARIES, LOCALE_COOKIE, isLocale, translate } from '@/lib/i18n/dictionaries';
 
@@ -16,6 +17,7 @@ export default async function MentorSchedulePage() {
   return (
     <main id="main" className="min-h-dvh bg-surface-muted">
       <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+        <BackLink fallbackHref="/dashboard" className="mb-3" />
         <h1 className="text-xl font-bold tracking-tight text-fg">{translate(dict, 'mentors.schedule.title')}</h1>
         <p className="mb-5 mt-1 text-sm text-fg-muted">{translate(dict, 'mentors.schedule.subtitle')}</p>
         <MentorScheduleSettings />

@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { BackLink } from '@/components/ui/BackLink';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { ArrowLeft, ArrowUpRight, CalendarClock, FileText, MessagesSquare, type LucideIcon } from 'lucide-react';
+import { ArrowUpRight, CalendarClock, FileText, MessagesSquare, type LucideIcon } from 'lucide-react';
 import { requirePageSession } from '@/lib/auth/page-guard';
 import { can } from '@/lib/permissions';
 import { findUserById } from '@/lib/firebase/repositories/users';
@@ -129,13 +130,7 @@ export default async function MentorDashboardPage({
   return (
     <main id="main" className="min-h-dvh bg-surface-muted">
       <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-fg-muted transition hover:text-fg"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('mentorDashboard.backToFeed')}
-        </Link>
+        <BackLink fallbackHref="/dashboard" />
 
         <header className="mt-3 flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">

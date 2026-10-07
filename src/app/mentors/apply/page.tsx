@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getViewer } from '@/lib/auth/session';
 import { MentorApplyForm } from '@/components/mentors/MentorApplyForm';
+import { BackLink } from '@/components/ui/BackLink';
 import { MENTOR_JOIN_PATH } from '@/lib/site';
 import {
   DEFAULT_LOCALE,
@@ -51,6 +52,7 @@ export default async function Page() {
     return (
       <main id="main" className="min-h-dvh bg-surface-muted">
         <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+          <BackLink fallbackHref="/" className="mb-3" />
           <h1 className="text-xl font-bold tracking-tight text-fg">
             {t('mentors.apply.title')}
           </h1>

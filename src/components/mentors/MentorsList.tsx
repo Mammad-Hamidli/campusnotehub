@@ -6,6 +6,7 @@ import { Briefcase, GraduationCap, Search, ShieldAlert, Star, UserRoundSearch, V
 import { useLocale } from '@/lib/i18n/LocaleProvider';
 import { FollowingBadge } from '@/components/social/Following';
 import { SectionHeading } from '@/components/ui/SectionHeading';
+import { BackLink } from '@/components/ui/BackLink';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { MENTOR_INDUSTRIES, industryLabel } from '@/lib/mentors/display';
 import { MentorRate } from './MentorRate';
@@ -48,8 +49,14 @@ type Mentor = {
   };
 };
 
-/** `embedded` drops the page gutter and demotes the heading, for the dashboard tab. */
-export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
+/**
+ * `embedded` drops the page gutter and demotes the heading, for the dashboard tab.
+ * `backHref` (standalone page only) is where Back leads with no in-app history.
+ */
+export function MentorsList({
+  embedded = false,
+  backHref = '/dashboard',
+}: { embedded?: boolean; backHref?: string } = {}) {
   const Heading = embedded ? 'h2' : 'h1';
   const { t } = useLocale();
 
@@ -125,6 +132,7 @@ export function MentorsList({ embedded = false }: { embedded?: boolean } = {}) {
 
   return (
     <div className={embedded ? 'w-full' : 'mx-auto w-full max-w-5xl px-4 py-8 sm:px-6'}>
+      {!embedded && <BackLink fallbackHref={backHref} className="mb-3" />}
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <SectionHeading
           as={Heading}

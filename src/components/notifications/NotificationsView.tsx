@@ -24,6 +24,7 @@ import {
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { formatAge, formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
+import { BackLink } from '@/components/ui/BackLink';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { SessionRequestActions } from '@/components/mentors/SessionRequestActions';
 import { displayParams, formatInstant } from '@/lib/notifications/params';
@@ -253,6 +254,7 @@ export function NotificationsView() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+      <BackLink fallbackHref="/dashboard" className="mb-3" />
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-xl font-bold tracking-tight text-fg">{t('notifications.title')}</h1>

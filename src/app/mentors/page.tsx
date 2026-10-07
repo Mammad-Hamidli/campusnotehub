@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { MentorsList } from '@/components/mentors/MentorsList';
+import { getViewer } from '@/lib/auth/session';
 
 export const metadata: Metadata = { title: 'PocketMentor' };
 
@@ -14,10 +15,12 @@ export const dynamic = 'force-dynamic';
  * see until they sign up cannot attract the students it exists for. Booking is
  * the gated action, and it is gated server-side.
  */
-export default function MentorsPage() {
+export default async function MentorsPage() {
+  // The root layout already made this (memoised) read; a guest's Back goes home.
+  const viewer = await getViewer();
   return (
     <main id="main" className="min-h-dvh bg-surface-muted">
-      <MentorsList />
+      <MentorsList backHref={viewer ? '/dashboard' : '/'} />
     </main>
   );
 }

@@ -205,10 +205,19 @@ export async function findUserByNickname(nickname: string): Promise<UserRecord |
  * so a prefix is what "search by username" can mean without a search
  * service. Visibility is the caller's to filter, so it asks for a few more
  * than it shows.
+ *
+ * `after` continues a listing: handles strictly after it (the last one the
+ * previous page consumed). Handles are unique (username claims), so the
+ * handle alone is a complete cursor; it is still one field, one index.
  */
-export async function searchUsersByHandlePrefix(prefix: string, take: number): Promise<UserRecord[]> {
+export async function searchUsersByHandlePrefix(
+  prefix: string,
+  take: number,
+  after?: string,
+): Promise<UserRecord[]> {
+  const continuing = after !== undefined && after >= prefix;
   const snap = await users()
-    .where('nicknameLower', '>=', prefix)
+    .where('nicknameLower', continuing ? '>' : '>=', continuing ? after : prefix)
     .where('nicknameLower', '<', `${prefix}`)
     .orderBy('nicknameLower')
     .limit(take)

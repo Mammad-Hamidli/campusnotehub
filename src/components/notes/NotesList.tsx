@@ -6,6 +6,7 @@ import { Bookmark, BookOpenText, Download, FileText, Loader2, Plus, Star } from 
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
 import { SectionHeading } from '@/components/ui/SectionHeading';
+import { BackLink } from '@/components/ui/BackLink';
 import { FileChip } from './FileChip';
 import { CreatorHandle, type CreatorStats } from './CreatorHandle';
 import { StarRating } from './StarRating';
@@ -44,10 +45,13 @@ export function NotesList({
   canUpload = false,
   embedded = false,
   source = 'all',
+  backHref = '/dashboard',
 }: {
   canUpload?: boolean;
   embedded?: boolean;
   source?: 'all' | 'saved';
+  /** Standalone page only: where Back leads when there is no in-app history. */
+  backHref?: string;
 } = {}) {
   const t = useT();
   const toast = useToast();
@@ -110,6 +114,7 @@ export function NotesList({
 
   return (
     <div className={embedded ? 'w-full' : 'mx-auto w-full max-w-3xl px-4 py-8 sm:px-6'}>
+      {!embedded && <BackLink fallbackHref={backHref} className="mb-3" />}
       <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <SectionHeading
           as={Heading}

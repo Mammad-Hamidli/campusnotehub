@@ -169,8 +169,11 @@ runs the batch in `after()` ([aiQueue.ts](../src/lib/verification/aiQueue.ts)):
 - A moderator can decide a queued case at any time; the batch re-checks each
   case in a transaction and never overwrites a human decision.
 
-Manual run: `npm run cron:verification-ai`. The scheduler worker also runs it
-at 00:00 Baku.
+Manual run: `npm run cron:verification-ai`, or **Run now** on
+`/admin/verifications` (ADMIN, `POST /admin/verification/ai-batch`), which starts
+the same time-boxed run and hand-over chain without touching the nightly
+schedule. The scheduler worker also runs it at 00:00 Baku. A lease
+(`siteConfig/verificationAiBatch`) keeps any two of these from overlapping.
 
 Errors are specific for quality (they help an honest user) and generic for
 anything fraud-adjacent (specifics would help a forger):
@@ -195,6 +198,8 @@ can be 15 minutes stale and a demoted moderator must lose access immediately.
 | Method | Path | Notes |
 |---|---|---|
 | `GET` | `/admin/verification/queue` | Flagged cases, priority desc then oldest first. No images, no secrets. |
+| `GET` | `/admin/verification/ai-batch` | AI check state: `queued` count, `running`, `lastRun` tally, `canRun` (ADMIN). |
+| `POST` | `/admin/verification/ai-batch` | **ADMIN.** Starts the AI batch now → `202 { queued }`. `409` when a run holds the lease or the queue is empty. Audited as `ADMIN_AI_VERIFICATION_TRIGGERED`. |
 | `GET` | `/admin/verification/:caseId?secret=…` | Streams the buffered images as `data:` URLs. **Writes an audit row before responding.** |
 | `POST` | `/admin/verification/:caseId` | `{ decision: "APPROVE" \| "REJECT" \| "BAN", reason, codes }` |
 | `POST` | `/admin/users/:id/unban` | Removes blocklist rows; keeps the audit trail. |
@@ -273,7 +278,7 @@ the key was refused - the last is logged server-side).
 
 | Method | Path | Auth | Limit | Notes |
 |---|---|---|---|---|
-| `GET` | `/search/users?q=` | session | `search` 120 / min | Username **prefix**, case-insensitive, leading `@` ignored. Hidden, deleted and temporary-handle accounts are left out. |
+| `GET` | `/search/users?q=&limit=&after=` | session | `search` 120 / min | Username **prefix**, case-insensitive, leading `@` ignored. Hidden, deleted and temporary-handle accounts are left out. `limit` 10 by default (max 30); `{ users, nextCursor }`, pass `nextCursor` back as `after` for the next page. |
 | `GET` | `/messages` | session | — | Inbox, newest first: `{ conversations: [{ peer, state, unread, lastMessage }] }`. Passive header honoured. |
 | `GET` | `/messages/:userId?before=\|after=` | session | — | One thread plus `state`, `canSend`, `reason`, `asRequest`, `requestRoom`. Marks it read. |
 | `POST` | `/messages/:userId` | session + `messages:send` | 60 / min; new requests 20 / day | `{ body }` (1–2000 chars) → `201 { message, state }`. |

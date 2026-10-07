@@ -30,13 +30,16 @@ import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
 
 export type DashboardTab = 'feed' | 'notes' | 'saved' | 'mentors' | 'messages';
 
-/** `narrowOnly`: the right column carries it from xl up, so the tab exists only below that. */
-const TABS: { tab: DashboardTab; icon: LucideIcon; labelKey: string; narrowOnly?: boolean }[] = [
-  { tab: 'feed', icon: MessagesSquare, labelKey: 'nav.feed' },
-  { tab: 'notes', icon: BookOpen, labelKey: 'nav.notes' },
-  { tab: 'saved', icon: Bookmark, labelKey: 'nav.saved' },
-  { tab: 'mentors', icon: UserRoundSearch, labelKey: 'nav.mentors' },
-  { tab: 'messages', icon: Mail, labelKey: 'nav.messages', narrowOnly: true },
+/**
+ * `narrowOnly`: the right column carries it from xl up, so the tab exists only below that.
+ * `shortKey`: the bottom tab bar's label, short enough for a fifth of a 320px screen.
+ */
+const TABS: { tab: DashboardTab; icon: LucideIcon; labelKey: string; shortKey: string; narrowOnly?: boolean }[] = [
+  { tab: 'feed', icon: MessagesSquare, labelKey: 'nav.feed', shortKey: 'nav.short.feed' },
+  { tab: 'notes', icon: BookOpen, labelKey: 'nav.notes', shortKey: 'nav.short.notes' },
+  { tab: 'saved', icon: Bookmark, labelKey: 'nav.saved', shortKey: 'nav.short.saved' },
+  { tab: 'mentors', icon: UserRoundSearch, labelKey: 'nav.mentors', shortKey: 'nav.short.mentors' },
+  { tab: 'messages', icon: Mail, labelKey: 'nav.messages', shortKey: 'nav.short.messages', narrowOnly: true },
 ];
 
 /** Secondary destinations. All resolve to real 200 pages. */
@@ -81,7 +84,12 @@ export function Sidebar({
     ? [{ href: MENTOR_DASHBOARD_PATH, icon: GraduationCap, labelKey: 'nav.mentorPanel' }, ...LINKS]
     : LINKS;
 
-  const nav = (
+  const select = (tab: DashboardTab) => {
+    onSelect(tab);
+    setMobileOpen(false);
+  };
+
+  const tabs = (
     <nav className="space-y-0.5" aria-label="Dashboard">
       {TABS.map(({ tab, icon: Icon, labelKey, narrowOnly }) => {
         const isActive = tab === active;
@@ -90,10 +98,7 @@ export function Sidebar({
           <button
             key={tab}
             type="button"
-            onClick={() => {
-              onSelect(tab);
-              setMobileOpen(false);
-            }}
+            onClick={() => select(tab)}
             aria-current={isActive ? 'page' : undefined}
             className={`relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm
                         transition-colors duration-150 ${narrowOnly ? 'xl:hidden' : ''} ${
@@ -121,9 +126,11 @@ export function Sidebar({
           </button>
         );
       })}
+    </nav>
+  );
 
-      <div className="my-2 h-px bg-edge" aria-hidden="true" />
-
+  const secondary = (
+    <div className="space-y-0.5">
       {links.map(({ href, icon: Icon, labelKey }) => (
         <Link
           key={href}
@@ -144,6 +151,57 @@ export function Sidebar({
           )}
         </Link>
       ))}
+    </div>
+  );
+
+  /**
+   * Mobile tab bar. Five equal cells (grid, not flex) so no label can push an
+   * icon off-screen; each label truncates inside its own cell, and the icon is
+   * a fixed 20px box centred above it. The Messages badge hangs off the icon's
+   * corner instead of sitting in the text flow, where it widened its cell.
+   */
+  const tabBar = (
+    <nav
+      aria-label="Dashboard"
+      data-tab-bar
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-edge bg-canvas/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+    >
+      <ul className="mx-auto grid max-w-lg grid-cols-5">
+        {TABS.map(({ tab, icon: Icon, shortKey }) => {
+          const isActive = tab === active;
+          const badge = tab === 'messages' ? messageBadge : 0;
+          return (
+            <li key={tab} className="min-w-0">
+              <button
+                type="button"
+                onClick={() => select(tab)}
+                aria-current={isActive ? 'page' : undefined}
+                className={`relative flex h-14 w-full min-w-0 flex-col items-center justify-center gap-1 px-1 transition-colors duration-150 ${
+                  isActive ? 'text-accent' : 'text-fg-muted hover:text-fg'
+                }`}
+              >
+                {isActive && (
+                  <span className="absolute inset-x-3 top-0 h-0.5 rounded-b bg-accent" aria-hidden="true" />
+                )}
+                <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                  {badge > 0 && (
+                    <span
+                      className="absolute -right-2.5 -top-1.5 min-w-4 rounded-full bg-accent px-1 text-center text-[0.625rem] font-semibold leading-4 text-accent-fg"
+                      aria-label={t('messages.badge', { count: badge })}
+                    >
+                      {badge > 9 ? '9+' : badge}
+                    </span>
+                  )}
+                </span>
+                <span className={`block max-w-full truncate text-2xs leading-none ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                  {t(shortKey)}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 
@@ -259,18 +317,23 @@ export function Sidebar({
       {mobileOpen && (
         // Overlay drawer under the bar: fixed so it does not push the feed down,
         // and scrollable so the account menu stays reachable on short phones.
+        // The tabs live in the bottom bar, so the drawer holds the rest.
         <div className="fixed inset-x-0 top-14 z-40 max-h-[calc(100dvh-3.5rem)] animate-fade-in overflow-y-auto border-b border-edge bg-canvas p-3 shadow-raised lg:hidden">
-          {nav}
+          {secondary}
           <div className="mt-3">{account}</div>
         </div>
       )}
+
+      {tabBar}
 
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col justify-between border-r border-edge px-3 py-4 lg:flex">
         <div>
           <div className="mb-6 px-2">
             <Logo href="/dashboard" />
           </div>
-          {nav}
+          {tabs}
+          <div className="my-2 h-px bg-edge" aria-hidden="true" />
+          {secondary}
         </div>
 
         <div className="space-y-2">

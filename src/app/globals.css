@@ -734,3 +734,10 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Toasts stack above the dashboard's mobile tab bar (Sidebar) while it is on screen. */
+@media (max-width: 1023.98px) {
+  body:has([data-tab-bar]) [data-toast-stack] {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}

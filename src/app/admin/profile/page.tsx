@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AdminProfile } from '@/components/admin/AdminProfile';
+import { BackLink } from '@/components/ui/BackLink';
 
 export const metadata: Metadata = { title: 'My profile' };
 
@@ -12,5 +13,10 @@ export const metadata: Metadata = { title: 'My profile' };
  * here would be a second copy of a guard that is easy to get subtly different.
  */
 export default function AdminProfilePage() {
-  return <AdminProfile />;
+  return (
+    <>
+      <BackLink fallbackHref="/admin" className="mb-2" />
+      <AdminProfile />
+    </>
+  );
 }

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { useToast } from '@/components/ui/Feedback';
+import { BackLink } from '@/components/ui/BackLink';
 import { cellsToRules, rulesToCells, type WeeklyRule } from '@/lib/mentors/schedule';
 import { AvailabilityGrid } from './AvailabilityGrid';
 import { timezones } from './MentorScheduleSettings';
@@ -162,6 +163,7 @@ export function MentorApplyForm() {
 
   const shell = (children: React.ReactNode) => (
     <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+      <BackLink fallbackHref="/dashboard" className="mb-3" />
       <h1 className="text-xl font-bold tracking-tight text-fg">{t('mentors.apply.title')}</h1>
       <p className="mt-1 text-sm text-fg-muted">{t('mentors.apply.subtitle')}</p>
       <div className="mt-5">{children}</div>

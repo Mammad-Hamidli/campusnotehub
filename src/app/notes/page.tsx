@@ -18,7 +18,7 @@ export default async function NotesPage() {
   const viewer = await getViewer();
   return (
     <main id="main" className="min-h-dvh bg-surface-muted">
-      <NotesList canUpload={can(viewer, 'notes:share')} />
+      <NotesList canUpload={can(viewer, 'notes:share')} backHref={viewer ? '/dashboard' : '/'} />
     </main>
   );
 }

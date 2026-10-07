@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { BackLink } from '@/components/ui/BackLink';
 import { useSearchParams } from 'next/navigation';
 import {
   AtSign,
@@ -339,9 +340,7 @@ export function SettingsView() {
             <ChevronRight className="h-3.5 w-3.5 text-fg-subtle" aria-hidden="true" />
             <span className="text-sm font-medium text-fg">{t('settings.title')}</span>
           </div>
-          <Link href="/dashboard" className="btn-ghost h-8 text-xs">
-            {t('nav.feed')}
-          </Link>
+          <BackLink fallbackHref="/dashboard" />
         </div>
       </header>
 

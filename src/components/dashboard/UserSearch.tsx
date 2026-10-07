@@ -2,17 +2,35 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, MessageCircle, Search, UserRoundSearch, X } from 'lucide-react';
+import { ArrowRight, Loader2, MessageCircle, Search, UserRoundSearch, X } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import type { ChatPeer } from '@/components/messages/MessagesPanel';
 
 export type UserHit = ChatPeer & { headline: string | null };
+export type UserPage = { users: UserHit[]; nextCursor: string | null };
 
 /** Long enough to skip the keystrokes of a word being typed, short enough to feel live. */
 const DEBOUNCE_MS = 200;
 /** What a username can contain, as the server matches it (lowercase, no "@"). */
-const FRAGMENT = /^[a-z0-9_]{1,24}$/;
+export const HANDLE_FRAGMENT = /^[a-z0-9_]{1,24}$/;
+/** Rows in the dropdown; the rest are one click away on /search. */
+const DROPDOWN_LIMIT = 10;
+
+/** Normalises typed input to what the server matches: lowercase, no leading "@". */
+export const toFragment = (query: string) => query.trim().replace(/^@/, '').toLowerCase();
+
+/** One page of GET /api/search/users. Rejects on a non-2xx answer. */
+export async function fetchUserPage(
+  fragment: string,
+  options: { limit: number; after?: string | null; signal?: AbortSignal },
+): Promise<UserPage> {
+  const params = new URLSearchParams({ q: fragment, limit: String(options.limit) });
+  if (options.after) params.set('after', options.after);
+  const response = await fetch(`/api/search/users?${params}`, { signal: options.signal, cache: 'no-store' });
+  if (!response.ok) throw new Error(String(response.status));
+  return (await response.json()) as UserPage;
+}
 
 /**
  * Live search for people by USERNAME (GET /api/search/users), matching from
@@ -23,6 +41,9 @@ const FRAGMENT = /^[a-z0-9_]{1,24}$/;
  * never overwrite a newer one, and every answer kept for the life of the
  * component, so backspacing re-shows a result without asking again. Input a
  * handle cannot contain is answered here, with a hint, without a request.
+ *
+ * At most ten rows: when the server reports more, a "View all results" link
+ * opens /search with the full, paginated list.
  *
  * `pick` turns each row into a single button (the messages panel's "new
  * message" picker); otherwise a row links to the profile and, with
@@ -42,40 +63,45 @@ export function UserSearch({
   const t = useT();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UserHit[]>([]);
+  const [hasMore, setHasMore] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
-  const cache = useRef(new Map<string, UserHit[]>());
+  const cache = useRef(new Map<string, UserPage>());
   const inputId = useId();
   const statusId = useId();
 
-  const fragment = query.trim().replace(/^@/, '').toLowerCase();
-  const valid = FRAGMENT.test(fragment);
+  const fragment = toFragment(query);
+  const valid = HANDLE_FRAGMENT.test(fragment);
 
   useEffect(() => {
+    const show = (page: UserPage) => {
+      setResults(page.users);
+      setHasMore(page.nextCursor !== null);
+      setStatus('done');
+    };
     if (!valid) {
       setResults([]);
+      setHasMore(false);
       setStatus('idle');
       return;
     }
     const known = cache.current.get(fragment);
     if (known) {
-      setResults(known);
-      setStatus('done');
+      show(known);
       return;
     }
 
     setStatus('loading');
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      fetch(`/api/search/users?q=${encodeURIComponent(fragment)}`, { signal: controller.signal, cache: 'no-store' })
-        .then((response) => (response.ok ? response.json() : Promise.reject(new Error(String(response.status)))))
-        .then((body: { users: UserHit[] }) => {
-          cache.current.set(fragment, body.users);
-          setResults(body.users);
-          setStatus('done');
+      fetchUserPage(fragment, { limit: DROPDOWN_LIMIT, signal: controller.signal })
+        .then((page) => {
+          cache.current.set(fragment, page);
+          show(page);
         })
         .catch((error: Error) => {
           if (error.name === 'AbortError') return;
           setResults([]);
+          setHasMore(false);
           setStatus('error');
         });
     }, DEBOUNCE_MS);
@@ -153,7 +179,7 @@ export function UserSearch({
       )}
 
       {results.length > 0 && (
-        <ul className="mt-2 max-h-80 space-y-0.5 overflow-y-auto">
+        <ul className="mt-2 max-h-96 space-y-0.5 overflow-y-auto">
           {results.map((user) => (
             <li key={user.id}>
               {onPick ? (
@@ -189,11 +215,23 @@ export function UserSearch({
           ))}
         </ul>
       )}
+
+      {/* The picker keeps narrowing by typing; the people search links out. */}
+      {hasMore && !onPick && (
+        <Link
+          href={`/search?q=${encodeURIComponent(fragment)}`}
+          className="mt-2 flex items-center justify-center gap-1.5 rounded-lg border border-edge px-3 py-2 text-xs font-medium text-accent transition hover:bg-surface-muted"
+        >
+          {t('dashboard.search.viewAll')}
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
+      )}
     </section>
   );
 }
 
-function Hit({ user }: { user: UserHit }) {
+/** Avatar, handle and headline: one search result, in the dropdown and on /search. */
+export function Hit({ user }: { user: UserHit }) {
   const t = useT();
   return (
     <>

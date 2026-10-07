@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { findUserById } from '@/lib/firebase/repositories/users';
 import { getAdminViewer } from '@/lib/auth/admin';
 import { AdminSettings } from '@/components/admin/AdminSettings';
+import { BackLink } from '@/components/ui/BackLink';
 
 export const metadata: Metadata = { title: 'My settings' };
 
@@ -20,5 +21,10 @@ export default async function AdminSettingsPage() {
 
   const account = await findUserById(viewer.id);
 
-  return <AdminSettings nickname={account?.nickname ?? '—'} />;
+  return (
+    <>
+      <BackLink fallbackHref="/admin" className="mb-2" />
+      <AdminSettings nickname={account?.nickname ?? '—'} />
+    </>
+  );
 }

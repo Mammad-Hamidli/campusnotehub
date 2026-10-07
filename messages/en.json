@@ -50,7 +50,14 @@
     "mentorSchedule": "Mentor schedule",
     "mentorPanel": "Mentor panel",
     "backToAdmin": "Back to admin dashboard",
-    "messages": "Messages"
+    "messages": "Messages",
+    "short": {
+      "feed": "Feed",
+      "notes": "Notes",
+      "saved": "Saved",
+      "mentors": "Mentors",
+      "messages": "Messages"
+    }
   },
   "auth": {
     "register": {
@@ -686,7 +693,6 @@
     "verifiedOnly": "Verify your account to book a session.",
     "notFound": "Mentor not found",
     "notFoundHint": "This profile may have been removed or is not yet approved.",
-    "backToList": "All mentors",
     "about": "About",
     "reviews": "Reviews",
     "noReviews": "No reviews yet.",
@@ -862,7 +868,6 @@
   "mentorDashboard": {
     "title": "Mentor panel",
     "subtitle": "Signed in as @{nickname}",
-    "backToFeed": "Back to feed",
     "viewProfile": "View public profile",
     "checklist": {
       "title": "Getting listed",
@@ -1266,7 +1271,8 @@
       "empty": "No username starts with “{query}”.",
       "error": "Search is unavailable right now. Try again.",
       "results": "Results: {count}",
-      "message": "Message @{nickname}"
+      "message": "Message @{nickname}",
+      "viewAll": "View all results"
     }
   },
   "admin": {
@@ -1415,7 +1421,6 @@
       },
       "detail": {
         "title": "User",
-        "back": "Back to users",
         "profile": "Profile",
         "verification": "Verification",
         "activity": "Recent activity",
@@ -1537,6 +1542,30 @@
       "deletedAccount": "Deleted account",
       "errors": {
         "undecided": "This case is still awaiting a decision and cannot be cleared."
+      },
+      "ai": {
+        "title": "AI verification",
+        "queued": "Queued: {count}",
+        "running": "Running…",
+        "schedule": "Runs automatically every night at 00:00 (Baku). \"Run now\" checks the queue immediately; the nightly run still happens.",
+        "lastRun": "Last run {when}: {approved} approved, {flagged} flagged, {remaining} left",
+        "runNow": "Run now",
+        "confirmTitle": "Run the AI check now?",
+        "confirmBody": "{count} queued submissions will be checked now, oldest first. This uses the same daily AI allowance as the nightly run.",
+        "started": "AI check started for {count} queued submissions.",
+        "stop": {
+          "QUEUE_EMPTY": "queue cleared",
+          "AI_QUOTA": "stopped: daily AI allowance used up",
+          "AI_UNAVAILABLE": "stopped: Workers AI did not answer",
+          "AI_CONFIG": "stopped: Workers AI configuration or licence problem",
+          "STORAGE_UNAVAILABLE": "stopped: documents could not be fetched",
+          "TIME_BUDGET": "time limit reached, continuing",
+          "LEASE_HELD": "another run was in progress"
+        },
+        "errors": {
+          "running": "An AI check is already running.",
+          "empty": "Nothing is waiting for the AI check."
+        }
       }
     },
     "universities": {
@@ -1789,7 +1818,6 @@
     },
     "security": {
       "title": "Security",
-      "back": "Settings",
       "heading": "Two-factor authentication",
       "description": "A code from an authenticator app is needed every time you sign in, in addition to your password.",
       "statusOn": "On",
@@ -1875,7 +1903,6 @@
       }
     },
     "export": {
-      "back": "Settings",
       "title": "Download your data",
       "intro": "Get a copy of your CampusNoteHub profile details as a JSON file you can open in any text editor.",
       "includedTitle": "What the file contains",
@@ -1960,8 +1987,6 @@
     }
   },
   "publicProfile": {
-    "backToFeed": "Back to feed",
-    "backHome": "Home",
     "joined": "Joined {date}",
     "posts": "Posts",
     "noPosts": "No posts yet.",
@@ -2121,5 +2146,10 @@
       "requestGone": "This request was already answered or withdrawn.",
       "invalid": "Write a message of up to 2000 characters."
     }
+  },
+  "search": {
+    "title": "Search results",
+    "shownSoFar": "Showing {count} so far",
+    "loadMore": "Load more"
   }
 }

@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { BackLink } from '@/components/ui/BackLink';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Ban, KeyRound, ShieldCheck, Snowflake, Sun, Trash2, UserCog } from 'lucide-react';
+import { Ban, KeyRound, ShieldCheck, Snowflake, Sun, Trash2, UserCog } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { PageHeader } from './AdminShell';
 import {
@@ -274,10 +275,7 @@ export function UserDetail({ userId }: { userId: string }) {
 
   return (
     <>
-      <Link href="/admin/users" className="btn-ghost mb-2 -ml-2 px-2">
-        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-        {t('admin.users.detail.back')}
-      </Link>
+      <BackLink fallbackHref="/admin/users" className="mb-2" />
 
       <PageHeader
         title={user.fullName}

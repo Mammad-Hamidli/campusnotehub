@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { AccountStatus, FraudVerdict, VerificationStatus } from '@/lib/enums';
 import { adminDb } from '@/lib/firebase/admin.core';
 import { COLLECTIONS } from '@/lib/firebase/collections';
-import { forFirestore } from '@/lib/firebase/convert';
+import { forFirestore, fromFirestore } from '@/lib/firebase/convert';
 import {
   AiCheckState,
   aiQueuedCases,
@@ -41,6 +41,10 @@ import { runVisionModel, WorkersAiStopError } from './workersAi';
  *            worker -> runAiVerificationBatch().
  *   per case complete match  -> VERIFIED, documents destroyed, user told;
  *            anything else     -> stays NEEDS_REVIEW, FLAGGED, staff emailed.
+ *
+ *   on demand  POST /api/admin/verification/ai-batch (an admin's "Run now"),
+ *            the same budgeted run and hand-over as the cron route; see
+ *            aiBatchTrigger.ts. The lease below keeps it from overlapping one.
  *
  * Moderators can decide a queued case at any time from /admin/verifications;
  * the batch re-reads every case inside a transaction before writing and never
@@ -170,6 +174,25 @@ async function releaseLease(runId: string, result: BatchResult): Promise<void> {
       { merge: true },
     );
   });
+}
+
+export type BatchStatus = {
+  /** A run holds the lease right now (cron, worker, CLI or an admin's trigger). */
+  running: boolean;
+  startedAt: Date | null;
+  lastRun: (BatchResult & { finishedAt: Date }) | null;
+};
+
+/** What the admin panel shows: read from the lease document, nothing else. */
+export async function aiBatchStatus(): Promise<BatchStatus> {
+  const data = fromFirestore<{
+    holder?: string | null;
+    leaseUntil?: Date;
+    startedAt?: Date;
+    lastRun?: BatchStatus['lastRun'];
+  }>((await leaseRef().get()).data() ?? {});
+  const running = Boolean(data.holder) && (data.leaseUntil?.getTime() ?? 0) > Date.now();
+  return { running, startedAt: running ? (data.startedAt ?? null) : null, lastRun: data.lastRun ?? null };
 }
 
 /**

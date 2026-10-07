@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { MentorReviewForm, type ViewerReview } from './MentorReviewForm';
 import Link from 'next/link';
+import { BackLink } from '@/components/ui/BackLink';
 import {
-  ArrowLeft,
   BadgeCheck,
   Briefcase,
   CalendarClock,
@@ -14,7 +14,7 @@ import {
   Star,
   UserRoundSearch,
 } from 'lucide-react';
-import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
+import { useLocale } from '@/lib/i18n/LocaleProvider';
 import { weekdayName } from '@/lib/i18n/dates';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { industryLabel } from '@/lib/mentors/display';
@@ -147,7 +147,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
   if (notFound) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-        <BackLink />
+        <BackLink fallbackHref="/mentors" />
         <div className="card mt-3 flex flex-col items-center px-6 py-16 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-inset">
             <UserRoundSearch className="h-6 w-6 text-fg-subtle" aria-hidden="true" />
@@ -167,7 +167,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
   if (error || !mentor) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-        <BackLink />
+        <BackLink fallbackHref="/mentors" />
         <div className="card mt-3 p-8 text-center">
           <p className="text-sm text-fg-muted">{t(error ?? 'errors.generic')}</p>
           <button type="button" onClick={() => void load()} className="btn-secondary mt-3 px-3 py-1.5 text-sm">
@@ -180,7 +180,7 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-      <BackLink />
+      <BackLink fallbackHref="/mentors" />
 
       <header className="card mt-3 p-5">
         <div className="flex flex-wrap items-start gap-4">
@@ -435,15 +435,5 @@ export function MentorProfile({ mentorId }: { mentorId: string }) {
         </aside>
       </div>
     </div>
-  );
-}
-
-function BackLink() {
-  const t = useT();
-  return (
-    <Link href="/mentors" className="btn-ghost -ml-2 px-2 py-1 text-sm">
-      <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-      {t('mentors.backToList')}
-    </Link>
   );
 }

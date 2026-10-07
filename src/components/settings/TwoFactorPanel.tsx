@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
+import { BackLink } from '@/components/ui/BackLink';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, Check, ChevronLeft, Copy, Download, KeyRound, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Check, Copy, Download, KeyRound, Loader2, ShieldCheck } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
 import { formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
@@ -145,10 +145,7 @@ export function TwoFactorPanel() {
 
   const header = (
     <div className="mb-6">
-      <Link href="/settings" className="btn-ghost -ml-2 h-8 text-xs">
-        <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
-        {t('settings.security.back')}
-      </Link>
+      <BackLink fallbackHref="/settings" />
       <h1 className="mt-3 text-2xl font-semibold tracking-tight text-fg">{t('settings.security.title')}</h1>
     </div>
   );

@@ -15,6 +15,7 @@ import {
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
 import { formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
+import { BackLink } from '@/components/ui/BackLink';
 
 type QueueItem = {
   id: string;
@@ -92,6 +93,7 @@ export function ModerationConsole() {
 
   return (
     <div className="mx-auto max-w-shell px-4 py-8 sm:px-6 lg:px-8">
+      <BackLink fallbackHref="/admin/verifications" className="mb-3" />
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-fg">{t('admin.title')}</h1>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-fg-muted">

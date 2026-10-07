@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, Clock, GraduationCap, Loader2, Pencil, UserCheck, UserPlus } from 'lucide-react';
+import { BackLink } from '@/components/ui/BackLink';
+import { CalendarDays, Clock, GraduationCap, Loader2, Pencil, UserCheck, UserPlus } from 'lucide-react';
 import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
 import { formatDate } from '@/lib/i18n/dates';
 import { useToast } from '@/components/ui/Feedback';
@@ -55,13 +56,7 @@ export function PublicProfileView({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
-      <Link
-        href={signedIn ? '/dashboard' : '/'}
-        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-fg-muted transition hover:bg-surface-inset hover:text-fg"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        {t(signedIn ? 'publicProfile.backToFeed' : 'publicProfile.backHome')}
-      </Link>
+      <BackLink fallbackHref={signedIn ? '/dashboard' : '/'} />
 
       <header className="card mt-3 overflow-hidden">
         {/* A colourful cover strip - the same palette as the verified ring. */}

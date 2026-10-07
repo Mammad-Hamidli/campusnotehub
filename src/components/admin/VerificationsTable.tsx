@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { EyeOff, ExternalLink, RotateCcw } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { PageHeader } from './AdminShell';
+import { AiBatchControl } from './AiBatchControl';
 import {
   Badge,
   ConfirmDialog,
@@ -177,6 +178,9 @@ export function VerificationsTable() {
           </Link>
         }
       />
+
+      {/* Run the nightly AI check now; a finished run refreshes the list. */}
+      <AiBatchControl onFinished={reload} />
 
       <div className="card mb-3 flex flex-wrap items-end gap-2 p-3">
         <label className="w-full min-w-0 flex-1 basis-56">

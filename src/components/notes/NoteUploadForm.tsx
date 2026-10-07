@@ -6,6 +6,7 @@ import { FileText, Loader2, Upload, X } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { NOTE_UPLOAD_ACCEPT, MAX_NOTE_BYTES, MAX_NOTE_MB } from '@/lib/notes/fileTypes';
 import { useToast } from '@/components/ui/Feedback';
+import { BackLink } from '@/components/ui/BackLink';
 import { FileChip } from './FileChip';
 
 /**
@@ -171,6 +172,7 @@ export function NoteUploadForm({ universities }: { universities: { id: string; c
 
   return (
     <form onSubmit={submit} className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+      <BackLink fallbackHref="/dashboard?tab=notes" className="mb-3" />
       <h1 className="text-xl font-bold tracking-tight text-fg">{t('notes.upload.title')}</h1>
       <p className="mt-1 text-sm text-fg-muted">{t('notes.upload.subtitle')}</p>
 
