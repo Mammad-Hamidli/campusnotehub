@@ -1,16 +1,18 @@
 'use client';
 
-import { Check, Globe, Lock, ShieldCheck } from 'lucide-react';
+import { Check, Globe, Lock, ShieldCheck, Users, UserRoundCheck } from 'lucide-react';
 import { Menu, MenuItem } from '@/components/ui/Menu';
 import { useT } from '@/lib/i18n/LocaleProvider';
 
-export type Visibility = 'PUBLIC' | 'VERIFIED_ONLY' | 'PRIVATE';
+export type Visibility = 'PUBLIC' | 'VERIFIED_ONLY' | 'FOLLOWING' | 'MUTUAL_FOLLOWERS' | 'PRIVATE';
 
-export const VISIBILITY_OPTIONS: Visibility[] = ['PUBLIC', 'VERIFIED_ONLY', 'PRIVATE'];
+export const VISIBILITY_OPTIONS: Visibility[] = ['PUBLIC', 'VERIFIED_ONLY', 'FOLLOWING', 'MUTUAL_FOLLOWERS', 'PRIVATE'];
 
 const ICONS = {
   PUBLIC: Globe,
   VERIFIED_ONLY: ShieldCheck,
+  FOLLOWING: Users,
+  MUTUAL_FOLLOWERS: UserRoundCheck,
   PRIVATE: Lock,
 } as const;
 

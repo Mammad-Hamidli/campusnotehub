@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   BadgeCheck,
@@ -23,12 +23,70 @@ import { Logo } from '@/components/ui/Logo';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Menu, MenuItem, MenuSeparator } from '@/components/ui/Menu';
-import { useT } from '@/lib/i18n/LocaleProvider';
+import { useLocale, useT } from '@/lib/i18n/LocaleProvider';
 import { useLiveNotifications } from '@/components/notifications/LiveNotifications';
 import { UserRole } from '@/lib/enums';
 import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
 
 export type DashboardTab = 'feed' | 'notes' | 'saved' | 'mentors' | 'messages';
+
+type RankingData = {
+  universities: { code: string; nameAz: string; nameEn: string; nameRu: string; count: number }[];
+  topNoteSharers: { id: string; nickname: string; count: number }[];
+};
+
+function CommunityRankings() {
+  const t = useT();
+  const { locale } = useLocale();
+  const [data, setData] = useState<RankingData | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/dashboard/rankings', { signal: controller.signal, cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((result: RankingData | null) => { if (result) setData(result); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  if (!data) return null;
+  const universityName = (u: RankingData['universities'][number]) =>
+    locale === 'en' ? u.nameEn : locale === 'ru' ? u.nameRu : u.nameAz;
+  const medals = [
+    'bg-amber-100 text-amber-800 ring-amber-300',
+    'bg-slate-100 text-slate-700 ring-slate-300',
+    'bg-orange-100 text-orange-800 ring-orange-300',
+  ];
+
+  return (
+    <div className="mt-4 space-y-4 border-t border-edge pt-4">
+      <section aria-labelledby="university-ranking-title">
+        <h2 id="university-ranking-title" className="px-2 text-xs font-semibold text-fg">{t('dashboard.rankings.universities')}</h2>
+        <ol className="mt-1 space-y-0.5">
+          {data.universities.map((university, index) => (
+            <li key={university.code} className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-xs">
+              <span className="tabular w-4 shrink-0 text-right text-fg-subtle">{index + 1}</span>
+              <span className="min-w-0 flex-1 truncate text-fg-muted" title={universityName(university)}>{universityName(university)}</span>
+              <span className="tabular shrink-0 font-medium text-fg">{university.count}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <section aria-labelledby="note-sharers-title">
+        <h2 id="note-sharers-title" className="px-2 text-xs font-semibold text-fg">{t('dashboard.rankings.noteSharers')}</h2>
+        <ol className="mt-1 space-y-0.5">
+          {data.topNoteSharers.map((user, index) => (
+            <li key={user.id} className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-xs">
+              <span role="img" aria-label={t('dashboard.rankings.rank', { rank: index + 1 })} className={`tabular flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.65rem] font-bold ring-1 ${medals[index] ?? 'bg-surface-inset text-fg-muted ring-edge'}`}>{index + 1}</span>
+              <Link href={`/u/${encodeURIComponent(user.nickname)}`} className="min-w-0 flex-1 truncate text-fg-muted hover:text-fg">@{user.nickname}</Link>
+              <span className="tabular shrink-0 text-fg-subtle">{user.count}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+    </div>
+  );
+}
 
 /**
  * `narrowOnly`: the right column carries it from xl up, so the tab exists only below that.
@@ -326,7 +384,7 @@ export function Sidebar({
 
       {tabBar}
 
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col justify-between border-r border-edge px-3 py-4 lg:flex">
+  <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col justify-between overflow-y-auto border-r border-edge px-3 py-4 lg:flex">
         <div>
           <div className="mb-6 px-2">
             <Logo href="/dashboard" />
@@ -334,6 +392,7 @@ export function Sidebar({
           {tabs}
           <div className="my-2 h-px bg-edge" aria-hidden="true" />
           {secondary}
+          <CommunityRankings />
         </div>
 
         <div className="space-y-2">

@@ -7,6 +7,7 @@ import { findUniversitiesByIds, findUniversityByCode } from '@/lib/firebase/repo
 import { getViewer } from '@/lib/auth/session';
 import { isPubliclyVisible, visibleAvatar } from '@/lib/profile/visibility';
 import { can } from '@/lib/permissions';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -84,6 +85,7 @@ export async function GET(request: NextRequest) {
    * directory - so it happens before the page is assembled, not in the client.
    */
   const users = await findUsersByIds(rows.map((m) => m.userId));
+  const relationships = await visibilityRelationshipsFor([...users.keys()], viewer);
   const visible = rows.filter((m) => {
     const user = users.get(m.userId);
     if (universityFilter !== undefined && (!universityFilter || user?.universityId !== universityFilter.id)) {
@@ -131,7 +133,7 @@ export async function GET(request: NextRequest) {
           user: user
             ? {
                 nickname: user.nickname,
-                avatarUrl: visibleAvatar(user, viewer),
+                avatarUrl: visibleAvatar(user, viewer, relationships.get(user.id)),
                 isVerified: user.isVerified,
                 university: university ? { code: university.code } : null,
               }

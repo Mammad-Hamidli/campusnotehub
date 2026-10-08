@@ -9,6 +9,7 @@ import { loadVisiblePost } from '@/lib/feed/visibility';
 import { serializePost } from '@/lib/feed/serialize';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { mediaIdFromKey } from '@/lib/media/constants';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,9 +48,10 @@ export async function GET(
   }
   const { post, author } = found;
 
-  const [universities, liked] = await Promise.all([
+  const [universities, liked, relationships] = await Promise.all([
     findUniversitiesByIds(author.universityId ? [author.universityId] : []),
     viewer ? likedPostIds([post.id], viewer.id) : Promise.resolve(new Set<string>()),
+    visibilityRelationshipsFor([author.id], viewer),
   ]);
 
   return NextResponse.json(
@@ -59,6 +61,7 @@ export async function GET(
         university: author.universityId ? universities.get(author.universityId) ?? null : null,
         viewerId: viewer?.id,
         viewer,
+        relationship: relationships.get(author.id),
         likedByViewer: liked.has(post.id),
       }),
     },

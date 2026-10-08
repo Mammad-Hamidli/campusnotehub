@@ -13,6 +13,7 @@ import { LiveNotificationsProvider } from '@/components/notifications/LiveNotifi
 import { getViewer } from '@/lib/auth/session';
 import { WarmBackdrop } from '@/components/ui/WarmBackdrop';
 import { NavigationTrail } from '@/components/ui/BackLink';
+import { SupportWidget } from '@/components/contact/SupportWidget';
 // Imported from constants.ts, NOT from the 'use client' provider: a plain
 // export read across that boundary resolves to undefined on the server.
 // See src/lib/theme/constants.ts.
@@ -165,6 +166,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 at all; see IdentityPromptSlot for why the session read is free.
               */}
               <IdentityPromptSlot />
+              <SupportWidget />
               {/* "Following" badges next to names, and the live notification
                   bell (likes, comments, follow requests), on every route. */}
               <FollowingProvider viewerId={viewer?.id ?? null}>

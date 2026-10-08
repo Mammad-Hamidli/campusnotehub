@@ -1257,6 +1257,7 @@
       "subtitle": "Most bought this week",
       "viewAll": "View all"
     },
+    "rankings": { "universities": "Top universities", "noteSharers": "Top note sharers", "rank": "Rank {rank}", "meow": "Make the kitten meow" },
     "feedAd": {
       "title": "Featured mentor",
       "badge": "Ad"
@@ -1738,6 +1739,10 @@
         "PUBLIC_hint": "Including signed-out visitors",
         "VERIFIED_ONLY": "Verified students",
         "VERIFIED_ONLY_hint": "Only document-verified users",
+        "FOLLOWING": "Following",
+        "FOLLOWING_hint": "People you follow",
+        "MUTUAL_FOLLOWERS": "Mutual followers",
+        "MUTUAL_FOLLOWERS_hint": "People who follow you and whom you follow",
         "PRIVATE": "Only me",
         "PRIVATE_hint": "Nobody else can see it"
       },

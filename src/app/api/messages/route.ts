@@ -4,6 +4,7 @@ import { listInbox } from '@/lib/firebase/repositories/messages';
 import { findUsersByIds } from '@/lib/firebase/repositories/users';
 import { chatPeer } from '@/lib/messages/serialize';
 import { isPubliclyVisible } from '@/lib/profile/visibility';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,13 +34,14 @@ export async function GET(request: NextRequest) {
 
   const rows = await listInbox(auth.userId);
   const people = await findUsersByIds(rows.map((row) => row.peerId));
+  const relationships = await visibilityRelationshipsFor([...people.keys()], auth.viewer);
 
   const conversations = rows.flatMap((row) => {
     const peer = people.get(row.peerId);
     if (!isPubliclyVisible(peer)) return [];
     return [
       {
-        peer: chatPeer(peer, auth.viewer),
+        peer: chatPeer(peer, auth.viewer, relationships.get(peer.id)),
         state: row.state,
         unread: row.unread,
         lastMessage: {

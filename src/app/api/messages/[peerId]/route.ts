@@ -7,6 +7,7 @@ import { listMessages, markInboxRead } from '@/lib/firebase/repositories/message
 import { loadThread, MAX_MESSAGE_LENGTH, MAX_REQUEST_MESSAGES, sendMessage } from '@/lib/messages/service';
 import { chatMessage, chatPeer, isMessageable, USER_ID } from '@/lib/messages/serialize';
 import { clientIp, rateLimit } from '@/lib/security/ratelimit';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   return NextResponse.json(
     {
-      peer: chatPeer(peer, auth.viewer),
+      peer: chatPeer(peer, auth.viewer, (await visibilityRelationshipsFor([peer.id], auth.viewer)).get(peer.id)),
       state: thread.state,
       canSend: reason === null,
       reason,

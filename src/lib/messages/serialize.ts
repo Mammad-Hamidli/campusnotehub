@@ -1,6 +1,6 @@
 import type { UserRecord } from '@/lib/firebase/repositories/users';
 import type { MessageRecord } from '@/lib/firebase/repositories/messages';
-import { visibleAvatar, type VisibilityViewer } from '@/lib/profile/visibility';
+import { visibleAvatar, type VisibilityRelationship, type VisibilityViewer } from '@/lib/profile/visibility';
 
 /** The other person in a conversation, as much as a chat header needs. Never the legal name. */
 export type ChatPeer = {
@@ -17,11 +17,11 @@ export type ChatMessage = {
   fromMe: boolean;
 };
 
-export function chatPeer(user: UserRecord, viewer: VisibilityViewer): ChatPeer {
+export function chatPeer(user: UserRecord, viewer: VisibilityViewer, relationship?: VisibilityRelationship): ChatPeer {
   return {
     id: user.id,
     nickname: user.nickname,
-    avatarUrl: visibleAvatar(user, viewer),
+    avatarUrl: visibleAvatar(user, viewer, relationship),
     isVerified: user.isVerified,
   };
 }

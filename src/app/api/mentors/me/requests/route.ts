@@ -5,6 +5,7 @@ import { findMentorByUserId, listPendingRequests } from '@/lib/firebase/reposito
 import { findCalendarLink } from '@/lib/firebase/repositories/calendarLinks';
 import { findUsersByIds } from '@/lib/firebase/repositories/users';
 import { visibleAvatar } from '@/lib/profile/visibility';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
 
   const pending = await listPendingRequests(profile.id, new Date());
   const mentees = await findUsersByIds(pending.map((b) => b.menteeId));
+  const relationships = await visibilityRelationshipsFor([...mentees.keys()], auth.viewer);
 
   const requests = pending.flatMap((booking) => {
     const mentee = mentees.get(booking.menteeId);
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
         menteeNote: booking.menteeNote,
         mentee: {
           nickname: mentee.nickname,
-          avatarUrl: visibleAvatar(mentee, auth.viewer),
+          avatarUrl: visibleAvatar(mentee, auth.viewer, relationships.get(mentee.id)),
           isVerified: mentee.isVerified,
         },
       },

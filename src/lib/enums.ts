@@ -94,6 +94,8 @@ export type BlocklistType = (typeof BlocklistType)[keyof typeof BlocklistType];
 export const FieldVisibility = {
   PUBLIC: 'PUBLIC',
   VERIFIED_ONLY: 'VERIFIED_ONLY',
+  FOLLOWING: 'FOLLOWING',
+  MUTUAL_FOLLOWERS: 'MUTUAL_FOLLOWERS',
   PRIVATE: 'PRIVATE',
 } as const;
 export type FieldVisibility = (typeof FieldVisibility)[keyof typeof FieldVisibility];

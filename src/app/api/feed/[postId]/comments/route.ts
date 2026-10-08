@@ -15,6 +15,7 @@ import {
 import { findUserById, findUsersByIds } from '@/lib/firebase/repositories/users';
 import { createNotification } from '@/lib/firebase/repositories/notifications';
 import { isPubliclyVisible, visibleAvatar } from '@/lib/profile/visibility';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -134,6 +135,7 @@ export async function GET(
    * than one per comment.
    */
   const authors = await findUsersByIds(rows.map((c) => c.authorId));
+  const relationships = await visibilityRelationshipsFor([...authors.keys()], viewer);
 
   /**
    * Content from banned accounts disappears without a separate cleanup job,
@@ -158,7 +160,7 @@ export async function GET(
             ? {
                 id: author.id,
                 nickname: author.nickname,
-                avatarUrl: visibleAvatar(author, viewer),
+                avatarUrl: visibleAvatar(author, viewer, relationships.get(author.id)),
                 isVerified: author.isVerified,
                 headline: author.headline,
               }
@@ -283,7 +285,7 @@ export async function POST(
           ? {
               id: author.id,
               nickname: author.nickname,
-              avatarUrl: visibleAvatar(author, viewer),
+              avatarUrl: visibleAvatar(author, viewer, (await visibilityRelationshipsFor([author.id], viewer)).get(author.id)),
               isVerified: author.isVerified,
               headline: author.headline,
             }

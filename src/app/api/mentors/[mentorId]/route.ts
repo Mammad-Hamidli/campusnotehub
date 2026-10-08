@@ -10,6 +10,7 @@ import { findUniversityById } from '@/lib/firebase/repositories/reference';
 import { getViewer } from '@/lib/auth/session';
 import { isPubliclyVisible, visibleAvatar } from '@/lib/profile/visibility';
 import { can } from '@/lib/permissions';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -115,7 +116,7 @@ export async function GET(
         sessionsCompleted: mentor.sessionsCompleted,
         user: {
           nickname: owner.nickname,
-          avatarUrl: visibleAvatar(owner, viewer),
+          avatarUrl: visibleAvatar(owner, viewer, (await visibilityRelationshipsFor([owner.id], viewer)).get(owner.id)),
           isVerified: owner.isVerified,
           headline: owner.headline,
           bio: owner.bio,

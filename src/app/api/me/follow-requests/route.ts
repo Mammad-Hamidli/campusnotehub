@@ -3,6 +3,7 @@ import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { listIncomingRequests } from '@/lib/firebase/repositories/followRequests';
 import { findUsersByIds } from '@/lib/firebase/repositories/users';
 import { visibleAvatar } from '@/lib/profile/visibility';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
 
   const rows = await listIncomingRequests(auth.userId);
   const people = await findUsersByIds(rows.map((r) => r.requesterId));
+  const relationships = await visibilityRelationshipsFor([...people.keys()], auth.viewer);
 
   const requests = rows.flatMap((row) => {
     const user = people.get(row.requesterId);
@@ -36,7 +38,7 @@ export async function GET(request: NextRequest) {
         createdAt: row.createdAt.toISOString(),
         requester: {
           nickname: user.nickname,
-          avatarUrl: visibleAvatar(user, auth.viewer),
+          avatarUrl: visibleAvatar(user, auth.viewer, relationships.get(user.id)),
           isVerified: user.isVerified,
           headline: user.headline,
         },

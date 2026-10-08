@@ -3,6 +3,7 @@ import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { listBlocked } from '@/lib/firebase/repositories/messages';
 import { findUsersByIds } from '@/lib/firebase/repositories/users';
 import { chatPeer } from '@/lib/messages/serialize';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,10 +27,11 @@ export async function GET(request: NextRequest) {
 
   const rows = await listBlocked(auth.userId);
   const people = await findUsersByIds(rows.map((row) => row.blockedId));
+  const relationships = await visibilityRelationshipsFor([...people.keys()], auth.viewer);
   const blocked = rows.flatMap((row) => {
     const user = people.get(row.blockedId);
     if (!user || user.deletedAt) return [];
-    return [{ ...chatPeer(user, auth.viewer), blockedAt: row.createdAt.toISOString() }];
+    return [{ ...chatPeer(user, auth.viewer, relationships.get(user.id)), blockedAt: row.createdAt.toISOString() }];
   });
 
   return NextResponse.json({ blocked }, { headers: { 'Cache-Control': 'no-store' } });

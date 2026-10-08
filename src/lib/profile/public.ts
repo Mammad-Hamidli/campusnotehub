@@ -2,9 +2,9 @@ import 'server-only';
 import { AccountStatus } from '@/lib/enums';
 import { findUserByNickname, profileCounts, type UserRecord } from '@/lib/firebase/repositories/users';
 import { findUniversityById } from '@/lib/firebase/repositories/reference';
-import { isFollowing } from '@/lib/firebase/repositories/follows';
 import { hasPendingRequest } from '@/lib/firebase/repositories/followRequests';
 import { visibleAvatar, visibleTo } from '@/lib/profile/visibility';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 import type { Viewer } from '@/lib/permissions';
 
 /**
@@ -52,11 +52,15 @@ export async function loadPublicProfile(
   if (!user || !listable(user)) return null;
 
   const isSelf = viewer?.id === user.id;
-  const [university, counts, following, requested] = await Promise.all([
-    user.universityId && visibleTo(user.showUniversity, viewer, isSelf) ? findUniversityById(user.universityId) : null,
-    profileCounts(user.id),
-    viewer && !isSelf ? isFollowing(viewer.id, user.id) : false,
+  const [relationshipMap, requested] = await Promise.all([
+    visibilityRelationshipsFor([user.id], viewer),
     viewer && !isSelf ? hasPendingRequest(viewer.id, user.id) : false,
+  ]);
+  const relationship = relationshipMap.get(user.id) ?? 'NONE';
+  const following = relationship !== 'NONE';
+  const [university, counts] = await Promise.all([
+    user.universityId && visibleTo(user.showUniversity, viewer, isSelf, relationship) ? findUniversityById(user.universityId) : null,
+    profileCounts(user.id),
   ]);
 
   const name = (u: NonNullable<typeof university>) =>
@@ -65,8 +69,8 @@ export async function loadPublicProfile(
   return {
     id: user.id,
     nickname: user.nickname,
-    fullName: visibleTo(user.showRealName, viewer, isSelf) && user.fullName ? user.fullName : null,
-    avatarUrl: visibleAvatar(user, viewer),
+    fullName: visibleTo(user.showRealName, viewer, isSelf, relationship) && user.fullName ? user.fullName : null,
+    avatarUrl: visibleAvatar(user, viewer, relationship),
     headline: user.headline,
     bio: user.bio,
     role: user.role,

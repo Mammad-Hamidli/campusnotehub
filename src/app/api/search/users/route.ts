@@ -4,6 +4,7 @@ import { searchUsersByHandlePrefix, type UserRecord } from '@/lib/firebase/repos
 import { clientIp, rateLimit } from '@/lib/security/ratelimit';
 import { isMessageable } from '@/lib/messages/serialize';
 import { visibleAvatar } from '@/lib/profile/visibility';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -94,10 +95,11 @@ export async function GET(request: NextRequest) {
   }
 
   const { hits, next } = await page(raw, limit, after, auth.userId);
+  const relationships = await visibilityRelationshipsFor(hits.map((user) => user.id), auth.viewer);
   const users = hits.map((user) => ({
     id: user.id,
     nickname: user.nickname,
-    avatarUrl: visibleAvatar(user, auth.viewer),
+    avatarUrl: visibleAvatar(user, auth.viewer, relationships.get(user.id)),
     isVerified: user.isVerified,
     headline: user.headline,
   }));

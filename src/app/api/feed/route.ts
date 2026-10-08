@@ -15,6 +15,7 @@ import { upsertTags } from '@/lib/firebase/repositories/tags';
 import { MAX_POST_TAGS, TAG_PATTERN } from '@/lib/feed/hashtags';
 import { mediaIdFromKey } from '@/lib/media/images';
 import { isPubliclyVisible } from '@/lib/profile/visibility';
+import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
 
 export const runtime = 'nodejs';
 
@@ -100,11 +101,12 @@ export async function GET(request: NextRequest) {
    */
   const authors = await findUsersByIds(rows.map((p) => p.authorId));
 
-  const [universities, liked] = await Promise.all([
+  const [universities, liked, relationships] = await Promise.all([
     findUniversitiesByIds(
       [...authors.values()].map((a) => a.universityId).filter((id): id is string => Boolean(id)),
     ),
     viewer ? likedPostIds(rows.map((p) => p.id), viewer.id) : Promise.resolve(new Set<string>()),
+    visibilityRelationshipsFor([...authors.keys()], viewer),
   ]);
 
   /**
@@ -137,6 +139,7 @@ export async function GET(request: NextRequest) {
             : null,
           viewerId: viewer?.id,
           viewer,
+          relationship: author ? relationships.get(author.id) : undefined,
           likedByViewer: liked.has(post.id),
         });
       }),

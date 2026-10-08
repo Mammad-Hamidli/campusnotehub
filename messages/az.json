@@ -1257,6 +1257,7 @@
       "subtitle": "Bu həftə ən çox alınanlar",
       "viewAll": "Hamısına bax"
     },
+    "rankings": { "universities": "Ən çox tələbəsi olan universitetlər", "noteSharers": "Ən çox konspekt paylaşanlar", "rank": "Reytinq: {rank}", "meow": "Pişiyin miyoldamasını eşit" },
     "feedAd": {
       "title": "Seçilmiş mentor",
       "badge": "Reklam"
@@ -1738,6 +1739,10 @@
         "PUBLIC_hint": "Qeydiyyatsız ziyarətçilər də daxil",
         "VERIFIED_ONLY": "Doğrulanmış tələbələr",
         "VERIFIED_ONLY_hint": "Yalnız sənədi təsdiqlənmiş istifadəçilər",
+        "FOLLOWING": "İzlədiklərim",
+        "FOLLOWING_hint": "Sənin izlədiyin şəxslər",
+        "MUTUAL_FOLLOWERS": "Qarşılıqlı izləyicilər",
+        "MUTUAL_FOLLOWERS_hint": "Səni izləyən və sənin də izlədiyin şəxslər",
         "PRIVATE": "Yalnız mən",
         "PRIVATE_hint": "Heç kim görməyəcək"
       },

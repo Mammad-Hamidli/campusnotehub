@@ -741,3 +741,31 @@
     padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
   }
 }
+@keyframes support-kitten-wander {
+  0% {
+    left: 0;
+    transform: scaleX(-1);
+    animation-timing-function: ease-in-out;
+  }
+  49.999% {
+    left: calc(100% - 2.25rem);
+    transform: scaleX(-1);
+    animation-timing-function: steps(1, end);
+  }
+  50% {
+    left: calc(100% - 2.25rem);
+    transform: scaleX(1);
+    animation-timing-function: ease-in-out;
+  }
+  100% {
+    left: 0;
+    transform: scaleX(1);
+  }
+}
+
+/* Keep the floating controls above the fixed dashboard tabs on small screens. */
+@media (max-width: 1023.98px) {
+  body:has([data-tab-bar]) [data-support-controls] {
+    bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
