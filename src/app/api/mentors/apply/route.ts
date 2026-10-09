@@ -11,6 +11,7 @@ import {
 } from '@/lib/firebase/repositories/mentorApplications';
 import { writeAuditLog } from '@/lib/firebase/repositories/audit';
 import { sendEmailAsync } from '@/lib/email/send';
+import { notifyAdminReviewQueue } from '@/lib/email/admin-review';
 import { timezoneSchema, weeklyRulesSchema } from '@/lib/mentors/schedule';
 
 export const runtime = 'nodejs';
@@ -189,6 +190,7 @@ export async function POST(request: NextRequest) {
   if (user) {
     sendEmailAsync(user.email, 'mentorApplicationSubmitted', { nickname: user.nickname });
   }
+  notifyAdminReviewQueue('mentor', userId);
 
   return NextResponse.json(
     { application: { status: application.status, submittedAt: application.submittedAt } },

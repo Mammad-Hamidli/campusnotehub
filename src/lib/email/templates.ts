@@ -73,6 +73,7 @@ export type TemplateName =
   | 'emailChangeRequested'
   | 'emailChanged'
   | 'contactMessage'
+  | 'adminReviewQueue'
   | 'verificationAiDigest';
 
 /** Greeting line. Nickname, never the legal name - see the User model. */
@@ -925,6 +926,16 @@ export const TEMPLATES = {
    * guard on top of the validator. The route sends it with Reply-To set to
    * the visitor, so "Reply" answers them directly.
    */
+  adminReviewQueue: (p: { item: string; url: string }): EmailContent => ({
+    subject: `${p.item} waiting for review`,
+    heading: 'Review queue update',
+    preheader: `A ${p.item.toLowerCase()} is waiting in the review queue.`,
+    blocks: [
+      { kind: 'paragraph', text: `A new ${p.item.toLowerCase()} is waiting in the queue.` },
+      { kind: 'button', label: 'Open admin queue', href: p.url },
+    ],
+  }),
+
   contactMessage: (p: { name: string; email: string; subject: string; message: string; locale?: string | null }): EmailContent => {
     const oneLine = (value: string) => value.replace(/\s+/g, ' ').trim();
     return {

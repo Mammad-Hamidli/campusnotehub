@@ -171,6 +171,8 @@ export const SUBCOLLECTIONS = {
   userBlocks: (userId: string) => `${COLLECTIONS.users}/${userId}/blocks`,
   /** "Save for later" bookmarks; doc id = noteId, so saving twice is a no-op. */
   savedNotes: (userId: string) => `${COLLECTIONS.users}/${userId}/savedNotes`,
+  /** Private post bookmarks, keyed by post id. */
+  savedPosts: (userId: string) => `${COLLECTIONS.users}/${userId}/savedPosts`,
   /** Availability rules belong to exactly one mentor and are read with them. */
   availability: (mentorId: string) => `${COLLECTIONS.mentorProfiles}/${mentorId}/availability`,
   /**

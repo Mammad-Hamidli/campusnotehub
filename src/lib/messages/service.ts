@@ -202,6 +202,60 @@ export async function sendMessage(params: {
   });
 }
 
+/** Edit the sender's newest message in a thread. */
+export async function editSentMessage(params: { senderId: string; recipientId: string; messageId: string; body: string }): Promise<boolean> {
+  const id = conversationId(params.senderId, params.recipientId);
+  const ownMessages = messagesOf(id).where('senderId', '==', params.senderId).orderBy('createdAt', 'desc').limit(1);
+  return adminDb().runTransaction(async (tx) => {
+    const [latest, target, conversation, mine, theirs] = await Promise.all([
+      tx.get(ownMessages),
+      tx.get(messagesOf(id).doc(params.messageId)),
+      tx.get(conversationRef(id)),
+      tx.get(inboxRef(params.senderId, params.recipientId)),
+      tx.get(inboxRef(params.recipientId, params.senderId)),
+    ]);
+    if (latest.empty || latest.docs[0].id !== params.messageId || !target.exists || !conversation.exists) return false;
+    const editedAt = new Date(Math.max(
+      Date.now(),
+      Number(conversation.get('lastMessageAt')?.toMillis?.() ?? 0) + 1,
+      Number(target.get('editedAt')?.toMillis?.() ?? 0) + 1,
+    ));
+    tx.update(target.ref, { body: params.body, editedAt });
+    const createdAt = target.get('createdAt');
+    if (conversation.get('lastMessageAt')?.toMillis?.() === createdAt?.toMillis?.()) {
+      [mine, theirs].forEach((row) => { if (row.exists) tx.update(row.ref, { lastBody: params.body.slice(0, PREVIEW_LENGTH) }); });
+    }
+    return true;
+  });
+}
+
+/** Delete any message sent by the caller; leave a safe preview if it was newest. */
+export async function deleteSentMessage(params: { senderId: string; recipientId: string; messageId: string }): Promise<boolean> {
+  const id = conversationId(params.senderId, params.recipientId);
+  return adminDb().runTransaction(async (tx) => {
+    const targetRef = messagesOf(id).doc(params.messageId);
+    const [target, conversation, mine, theirs] = await tx.getAll(
+      targetRef,
+      conversationRef(id),
+      inboxRef(params.senderId, params.recipientId),
+      inboxRef(params.recipientId, params.senderId),
+    );
+    if (!target.exists || target.get('senderId') !== params.senderId) return false;
+    const createdAt = target.get('createdAt');
+    const isLatest = conversation.exists && conversation.get('lastMessageAt')?.toMillis?.() === createdAt?.toMillis?.();
+    const deletedAt = new Date(Math.max(
+      Date.now(),
+      Number(conversation.get('lastMessageAt')?.toMillis?.() ?? 0) + 1,
+      Number(target.get('editedAt')?.toMillis?.() ?? 0) + 1,
+    ));
+    tx.update(targetRef, { body: '', deletedAt, editedAt: deletedAt });
+    if (isLatest) {
+      for (const row of [mine, theirs]) if (row.exists) tx.update(row.ref, { lastBody: 'Message deleted' });
+    }
+    return true;
+  });
+}
+
 /**
  * Removes a pending request inside `tx`: its messages, both inbox rows, and
  * the conversation itself when nothing else was ever said in it. Earlier

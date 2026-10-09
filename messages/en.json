@@ -32,6 +32,7 @@
   },
   "nav": {
     "feed": "Feed",
+    "search": "Search",
     "notes": "UniNotes",
     "mentors": "PocketMentor",
     "notifications": "Notifications",
@@ -53,6 +54,7 @@
     "messages": "Messages",
     "short": {
       "feed": "Feed",
+      "search": "Search",
       "notes": "Notes",
       "saved": "Saved",
       "mentors": "Mentors",
@@ -452,6 +454,7 @@
       "tag": "#{tag}"
     },
     "empty": "No posts yet. Be the first.",
+    "saved": { "title": "Saved posts", "empty": "You have no saved posts yet." },
     "loadNew": "{count} new posts",
     "deleted": "This post was deleted",
     "characterCount": "{remaining} characters left",
@@ -489,7 +492,10 @@
       "deleteTitle": "Delete this post?",
       "deleteBody": "It will be removed from the feed for everyone. This cannot be undone.",
       "deleted": "Your post was deleted successfully.",
-      "likeFailed": "Your like could not be saved. Try again."
+      "likeFailed": "Your like could not be saved. Try again.",
+      "savePost": "Save post",
+      "removeSavedPost": "Remove saved post",
+      "saveFailed": "Could not update saved posts. Please try again."
     },
     "translate": {
       "action": "Translate",
@@ -2117,6 +2123,11 @@
     "menu": "Conversation actions",
     "loadEarlier": "Load earlier messages",
     "startHint": "Say hello to @{nickname}.",
+    "edit": "Edit message",
+    "edited": "edited",
+    "deleted": "Message deleted",
+    "delete": "Delete message",
+    "deleteConfirm": { "title": "Delete this message?", "body": "It will be removed for everyone in this conversation." },
     "sending": "Sending…",
     "placeholder": "Write a message…",
     "send": "Send",
@@ -2149,6 +2160,8 @@
       "requestLimit": "Your request is waiting for an answer. You can write more once it's accepted.",
       "requestQuota": "You've started too many message requests today. Try again tomorrow.",
       "requestGone": "This request was already answered or withdrawn.",
+      "editLatestOnly": "Only your latest sent message can be edited.",
+      "messageNotFound": "That message could not be found.",
       "invalid": "Write a message of up to 2000 characters."
     }
   },

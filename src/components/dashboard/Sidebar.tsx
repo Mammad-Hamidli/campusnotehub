@@ -15,6 +15,7 @@ import {
   Menu as MenuIcon,
   MessagesSquare,
   Settings,
+  Search,
   UserRoundSearch,
   X,
   type LucideIcon,
@@ -28,7 +29,7 @@ import { useLiveNotifications } from '@/components/notifications/LiveNotificatio
 import { UserRole } from '@/lib/enums';
 import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
 
-export type DashboardTab = 'feed' | 'notes' | 'saved' | 'mentors' | 'messages';
+export type DashboardTab = 'feed' | 'search' | 'notes' | 'saved' | 'mentors' | 'messages';
 
 type RankingData = {
   universities: { code: string; nameAz: string; nameEn: string; nameRu: string; count: number }[];
@@ -89,15 +90,15 @@ function CommunityRankings() {
 }
 
 /**
- * `narrowOnly`: the right column carries it from xl up, so the tab exists only below that.
- * `shortKey`: the bottom tab bar's label, short enough for a fifth of a 320px screen.
+ * `shortKey`: the bottom tab bar's compact label, sized to fit a six-column 320px screen.
  */
-const TABS: { tab: DashboardTab; icon: LucideIcon; labelKey: string; shortKey: string; narrowOnly?: boolean }[] = [
+const TABS: { tab: DashboardTab; icon: LucideIcon; labelKey: string; shortKey: string }[] = [
   { tab: 'feed', icon: MessagesSquare, labelKey: 'nav.feed', shortKey: 'nav.short.feed' },
+  { tab: 'search', icon: Search, labelKey: 'nav.search', shortKey: 'nav.short.search' },
   { tab: 'notes', icon: BookOpen, labelKey: 'nav.notes', shortKey: 'nav.short.notes' },
   { tab: 'saved', icon: Bookmark, labelKey: 'nav.saved', shortKey: 'nav.short.saved' },
   { tab: 'mentors', icon: UserRoundSearch, labelKey: 'nav.mentors', shortKey: 'nav.short.mentors' },
-  { tab: 'messages', icon: Mail, labelKey: 'nav.messages', shortKey: 'nav.short.messages', narrowOnly: true },
+  { tab: 'messages', icon: Mail, labelKey: 'nav.messages', shortKey: 'nav.short.messages' },
 ];
 
 /** Secondary destinations. All resolve to real 200 pages. */
@@ -149,7 +150,7 @@ export function Sidebar({
 
   const tabs = (
     <nav className="space-y-0.5" aria-label="Dashboard">
-      {TABS.map(({ tab, icon: Icon, labelKey, narrowOnly }) => {
+      {TABS.map(({ tab, icon: Icon, labelKey }) => {
         const isActive = tab === active;
         const badge = tab === 'messages' ? messageBadge : 0;
         return (
@@ -159,7 +160,7 @@ export function Sidebar({
             onClick={() => select(tab)}
             aria-current={isActive ? 'page' : undefined}
             className={`relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm
-                        transition-colors duration-150 ${narrowOnly ? 'xl:hidden' : ''} ${
+                        transition-colors duration-150 ${
                           isActive
                             ? 'bg-surface-inset font-medium text-fg'
                             : 'text-fg-muted hover:bg-surface-muted hover:text-fg'
@@ -213,7 +214,7 @@ export function Sidebar({
   );
 
   /**
-   * Mobile tab bar. Five equal cells (grid, not flex) so no label can push an
+   * Mobile tab bar. Six equal cells (grid, not flex) so no label can push an
    * icon off-screen; each label truncates inside its own cell, and the icon is
    * a fixed 20px box centred above it. The Messages badge hangs off the icon's
    * corner instead of sitting in the text flow, where it widened its cell.
@@ -224,7 +225,7 @@ export function Sidebar({
       data-tab-bar
       className="fixed inset-x-0 bottom-0 z-40 border-t border-edge bg-canvas/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
     >
-      <ul className="mx-auto grid max-w-lg grid-cols-5">
+      <ul className="mx-auto grid max-w-lg grid-cols-6">
         {TABS.map(({ tab, icon: Icon, shortKey }) => {
           const isActive = tab === active;
           const badge = tab === 'messages' ? messageBadge : 0;

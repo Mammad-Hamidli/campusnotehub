@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   Ban,
   Check,
+  CheckCheck,
+  Pencil,
   Loader2,
   Mail,
   MoreHorizontal,
@@ -33,7 +35,7 @@ type InboxItem = {
   lastMessage: { body: string; fromMe: boolean; createdAt: string };
 };
 
-type ChatMessage = { id: string; body: string; createdAt: string; fromMe: boolean; pending?: boolean };
+type ChatMessage = { id: string; body: string; createdAt: string; fromMe: boolean; editedAt?: string | null; deleted?: boolean; pending?: boolean };
 
 type ThreadMeta = {
   peer: ChatPeer;
@@ -320,10 +322,9 @@ function BlockedList() {
 /** Adds what is not there yet (by id), replacing an optimistic copy, oldest first. */
 function merge(current: ChatMessage[], incoming: ChatMessage[], replacing?: string): ChatMessage[] {
   const kept = replacing ? current.filter((m) => m.id !== replacing) : current;
-  const ids = new Set(kept.map((m) => m.id));
-  const fresh = incoming.filter((m) => !ids.has(m.id));
-  if (fresh.length === 0 && kept === current) return current;
-  return [...kept, ...fresh].sort((a, b) => Number(a.pending ?? false) - Number(b.pending ?? false) || a.createdAt.localeCompare(b.createdAt));
+  const byId = new Map(kept.map((message) => [message.id, message]));
+  for (const message of incoming) if (!byId.get(message.id)?.pending) byId.set(message.id, message);
+  return [...byId.values()].sort((a, b) => Number(a.pending ?? false) - Number(b.pending ?? false) || a.createdAt.localeCompare(b.createdAt));
 }
 
 function Conversation({ peer, tall, onBack }: { peer: ChatPeer; tall: boolean; onBack: () => void }) {
@@ -338,6 +339,8 @@ function Conversation({ peer, tall, onBack }: { peer: ChatPeer; tall: boolean; o
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingBody, setEditingBody] = useState('');
 
   const scroller = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
@@ -348,7 +351,10 @@ function Conversation({ peer, tall, onBack }: { peer: ChatPeer; tall: boolean; o
 
   useEffect(() => {
     latest.current = messages.reduce<string | null>(
-      (max, m) => (!m.pending && (!max || m.createdAt > max) ? m.createdAt : max),
+      (max, m) => {
+        const activity = m.editedAt && m.editedAt > m.createdAt ? m.editedAt : m.createdAt;
+        return !m.pending && (!max || activity > max) ? activity : max;
+      },
       null,
     );
   }, [messages]);
@@ -465,6 +471,34 @@ function Conversation({ peer, tall, onBack }: { peer: ChatPeer; tall: boolean; o
     } finally {
       setSending(false);
     }
+  }
+
+  const latestMineId = messages.filter((message) => message.fromMe && !message.pending).at(-1)?.id ?? null;
+
+  async function saveEdit(messageId: string) {
+    const body = editingBody.trim();
+    if (!body) return;
+    const response = await fetch(url, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messageId, body }) });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      toast.error(t(payload?.error ?? 'messages.failed'));
+      void refresh(false).catch(() => {});
+      return;
+    }
+    setMessages((items) => items.map((item) => item.id === messageId ? { ...item, body } : item));
+    setEditingId(null);
+  }
+
+  async function removeMessage(messageId: string) {
+    const ok = await confirm({ title: t('messages.deleteConfirm.title'), body: t('messages.deleteConfirm.body'), confirmLabel: t('messages.delete'), tone: 'danger' });
+    if (!ok) return;
+    const response = await fetch(url, { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messageId }) });
+    if (!response.ok) {
+      toast.error(t('messages.failed'));
+      return;
+    }
+    setMessages((items) => items.map((item) => item.id === messageId ? { ...item, body: '', deleted: true, editedAt: null } : item));
+    void refresh(false).catch(() => {});
   }
 
   async function respond(action: 'accept' | 'reject' | 'block') {
@@ -617,13 +651,27 @@ function Conversation({ peer, tall, onBack }: { peer: ChatPeer; tall: boolean; o
                     message.fromMe ? 'rounded-br-md bg-accent text-accent-fg' : 'rounded-bl-md bg-surface-inset text-fg'
                   } ${message.pending ? 'opacity-60' : ''}`}
                 >
-                  <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                  {editingId === message.id ? (
+                    <div className="space-y-1.5">
+                      <textarea autoFocus value={editingBody} onChange={(event) => setEditingBody(event.target.value)} maxLength={MAX_LENGTH} rows={3} className="w-full resize-y rounded-lg border border-edge bg-canvas px-2 py-1 text-fg" />
+                      <div className="flex justify-end gap-1">
+                        <button type="button" onClick={() => setEditingId(null)} className="rounded px-2 py-1 text-xs">{t('common.cancel')}</button>
+                        <button type="button" onClick={() => void saveEdit(message.id)} className="rounded bg-accent px-2 py-1 text-xs text-accent-fg"><CheckCheck className="mr-1 inline h-3 w-3" />{t('common.save')}</button>
+                      </div>
+                    </div>
+                  ) : <p className={`whitespace-pre-wrap break-words ${message.deleted ? 'italic opacity-75' : ''}`}>{message.deleted ? t('messages.deleted') : message.body}</p>}
+                  {message.fromMe && !message.pending && !message.deleted && editingId !== message.id && (
+                    <div className="mt-1 flex justify-end gap-1">
+                      {message.id === latestMineId && <button type="button" aria-label={t('messages.edit')} onClick={() => { setEditingId(message.id); setEditingBody(message.body); }} className="rounded p-1 opacity-80 hover:bg-black/10"><Pencil className="h-3 w-3" /></button>}
+                      <button type="button" aria-label={t('messages.delete')} onClick={() => void removeMessage(message.id)} className="rounded p-1 opacity-80 hover:bg-black/10"><X className="h-3 w-3" /></button>
+                    </div>
+                  )}
                   <time
                     dateTime={message.createdAt}
                     title={formatDate(message.createdAt, locale, 'dateTime')}
                     className={`mt-0.5 block text-right text-[0.625rem] ${message.fromMe ? 'opacity-75' : 'text-fg-subtle'}`}
                   >
-                    {message.pending ? t('messages.sending') : timeOf(message.createdAt)}
+                    {message.pending ? t('messages.sending') : `${timeOf(message.createdAt)}${message.editedAt && !message.deleted ? ` · ${t('messages.edited')}` : ''}`}
                   </time>
                 </div>
               </div>

@@ -16,6 +16,7 @@ import { MessagesPanel, type ChatPeer } from '@/components/messages/MessagesPane
 import type { FeedAd } from '@/lib/feed/ad';
 import { NotesList } from '@/components/notes/NotesList';
 import { MentorsList } from '@/components/mentors/MentorsList';
+import { SavedPosts } from './SavedPosts';
 import { can, type Viewer as PermissionViewer } from '@/lib/permissions';
 import { GradCap } from '@/components/ui/GradCap';
 import { FEED_UPLOAD_MAX_SIDE, uploadImage } from '@/lib/media/browser-upload';
@@ -511,18 +512,20 @@ export function DashboardShell({
                   ))
                 )}
               </div>
+            ) : tab === 'search' ? (
+              <UserSearch onMessage={(peer) => { setChatPeer(peer); setTab('messages'); }} />
             ) : tab === 'notes' ? (
               // These tabs rendered ModulePlaceholder - a static title card - so
               // the note list, its create button and the mentor directory never
               // appeared on the dashboard. The real modules are used instead.
               <NotesList embedded canUpload={canUploadNotes} />
             ) : tab === 'saved' ? (
-              <NotesList embedded source="saved" />
-            ) : tab === 'messages' ? (
-              // The right column's search and messages, full width, for
-              // screens too narrow to show that column.
               <div className="space-y-4">
-                <UserSearch onMessage={setChatPeer} />
+                <SavedPosts viewerId={viewer.id} readOnly={viewer.profileIncomplete} />
+                <NotesList embedded source="saved" />
+              </div>
+            ) : tab === 'messages' ? (
+              <div className="space-y-4">
                 <MessagesPanel openPeer={chatPeer} onOpenPeer={setChatPeer} tall />
               </div>
             ) : (
@@ -532,16 +535,12 @@ export function DashboardShell({
 
           {/* Right rail. Hidden below xl rather than stacked underneath: on a
               tablet these widgets would sit 4+ screens below the composer,
-              where nobody scrolls to. The graduation prompt also arrives as a
-              notification, and the user search and messages have their own
-              Messages tab below xl, so nothing is lost by hiding it here. */}
+              where nobody scrolls to. Search and full-screen Messages have
+              dedicated navigation tabs; the quick DM remains available here. */}
           <aside className="hidden w-80 shrink-0 space-y-4 xl:block">
-            {/* Not twice: on the Messages tab these are in the main column. */}
+            {/* Keep Quick DM in the rail except while its full-screen tab is open. */}
             {tab !== 'messages' && (
-              <>
-                <UserSearch onMessage={setChatPeer} />
-                <MessagesPanel openPeer={chatPeer} onOpenPeer={setChatPeer} />
-              </>
+              <MessagesPanel openPeer={chatPeer} onOpenPeer={setChatPeer} />
             )}
             {viewer.graduationYear && viewer.graduationMonth && (
               <GraduationCountdown year={viewer.graduationYear} month={viewer.graduationMonth} />

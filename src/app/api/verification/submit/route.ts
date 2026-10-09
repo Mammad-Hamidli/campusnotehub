@@ -16,6 +16,7 @@ import {
 import type { BufferedDocument } from '@/lib/verification/reviewBuffer';
 import { enqueueSubmission } from '@/lib/verification/aiQueue';
 import { requiredKindsFor } from '@/lib/verification/requirements';
+import { notifyAdminReviewQueue } from '@/lib/email/admin-review';
 
 // Must be the Node runtime: the pipeline holds Buffers and calls node:crypto.
 export const runtime = 'nodejs';
@@ -185,6 +186,7 @@ export async function POST(request: NextRequest) {
      * rejection gets its own email from the decision path.
      */
     sendEmailAsync(user.email, 'verificationSubmitted', { nickname: user.nickname });
+    notifyAdminReviewQueue('verification', caseId);
 
     return NextResponse.json(
       {

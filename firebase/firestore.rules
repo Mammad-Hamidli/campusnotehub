@@ -99,6 +99,11 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      match /savedPosts/{postId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
+
       // Follow graph. Public in the product, so readable; written server-side
       // so the denormalised counters stay consistent with it.
       match /followers/{followerId} {

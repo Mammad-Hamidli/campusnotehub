@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { can, denialKey } from '@/lib/permissions';
 import { findUserById } from '@/lib/firebase/repositories/users';
-import { listMessages, markInboxRead } from '@/lib/firebase/repositories/messages';
-import { loadThread, MAX_MESSAGE_LENGTH, MAX_REQUEST_MESSAGES, sendMessage } from '@/lib/messages/service';
+import { listEditedMessages, listMessages, markInboxRead } from '@/lib/firebase/repositories/messages';
+import { deleteSentMessage, editSentMessage, loadThread, MAX_MESSAGE_LENGTH, MAX_REQUEST_MESSAGES, sendMessage } from '@/lib/messages/service';
 import { chatMessage, chatPeer, isMessageable, USER_ID } from '@/lib/messages/serialize';
 import { clientIp, rateLimit } from '@/lib/security/ratelimit';
 import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
@@ -62,7 +62,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const after = before ? undefined : instant(request.nextUrl.searchParams.get('after'));
   const thread = await loadThread(auth.userId, peerId);
   const take = after ? CATCH_UP : PAGE;
-  const messages = thread.conversation ? await listMessages(thread.conversation.id, { before, after, take }) : [];
+  let messages = thread.conversation ? await listMessages(thread.conversation.id, { before, after, take }) : [];
+  if (after && thread.conversation) {
+    const byId = new Map(messages.map((message) => [message.id, message]));
+    for (const message of await listEditedMessages(thread.conversation.id, after, CATCH_UP)) byId.set(message.id, message);
+    messages = [...byId.values()].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
 
   // Read once the reader has the messages: on open, and when a poll brings theirs.
   if (!before && thread.conversation && (!after || messages.some((m) => m.senderId === peerId))) {
@@ -153,4 +158,35 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     { message: chatMessage(result.message, auth.userId), state: result.state },
     { status: 201, headers: { 'Cache-Control': 'no-store' } },
   );
+}
+
+const editSchema = z.object({ messageId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/), body: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH) });
+const messageIdSchema = z.object({ messageId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/) });
+
+/** PATCH /api/messages/:peerId edits only the sender's most recent message. */
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ peerId: string }> }) {
+  const auth = await authenticate(request);
+  if (!auth) return unauthorized();
+  if (!can(auth.viewer, 'messages:send')) return NextResponse.json({ error: denialKey(auth.viewer, 'messages:send') }, { status: 403 });
+  const { peerId } = await params;
+  const parsed = editSchema.safeParse(await request.json().catch(() => null));
+  if (!USER_ID.test(peerId) || !parsed.success) return unavailable();
+  const peer = await findUserById(peerId);
+  if (!isMessageable(peer, auth.userId)) return unavailable();
+  const changed = await editSentMessage({ senderId: auth.userId, recipientId: peerId, ...parsed.data });
+  return changed ? NextResponse.json({ ok: true }) : NextResponse.json({ error: 'messages.errors.editLatestOnly' }, { status: 409 });
+}
+
+/** DELETE /api/messages/:peerId removes any message authored by the caller. */
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ peerId: string }> }) {
+  const auth = await authenticate(request);
+  if (!auth) return unauthorized();
+  if (!can(auth.viewer, 'messages:send')) return NextResponse.json({ error: denialKey(auth.viewer, 'messages:send') }, { status: 403 });
+  const { peerId } = await params;
+  const parsed = messageIdSchema.safeParse(await request.json().catch(() => null));
+  if (!USER_ID.test(peerId) || !parsed.success) return unavailable();
+  const peer = await findUserById(peerId);
+  if (!isMessageable(peer, auth.userId)) return unavailable();
+  const deleted = await deleteSentMessage({ senderId: auth.userId, recipientId: peerId, messageId: parsed.data.messageId });
+  return deleted ? NextResponse.json({ ok: true }) : NextResponse.json({ error: 'messages.errors.messageNotFound' }, { status: 404 });
 }

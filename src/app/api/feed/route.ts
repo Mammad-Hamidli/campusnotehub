@@ -7,7 +7,7 @@ import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { toPlainText } from '@/lib/security/plainText';
 import { serializePost } from '@/lib/feed/serialize';
 import { resolveViewerAudience } from '@/lib/feed/visibility';
-import { createPost, feedPage, likedPostIds, newPostId } from '@/lib/firebase/repositories/posts';
+import { createPost, feedPage, likedPostIds, findSavedPostIds, newPostId } from '@/lib/firebase/repositories/posts';
 import { findUserById, findUsersByIds } from '@/lib/firebase/repositories/users';
 import { findUniversitiesByIds } from '@/lib/firebase/repositories/reference';
 import { claimMediaAssets } from '@/lib/firebase/repositories/media';
@@ -101,11 +101,12 @@ export async function GET(request: NextRequest) {
    */
   const authors = await findUsersByIds(rows.map((p) => p.authorId));
 
-  const [universities, liked, relationships] = await Promise.all([
+  const [universities, liked, saved, relationships] = await Promise.all([
     findUniversitiesByIds(
       [...authors.values()].map((a) => a.universityId).filter((id): id is string => Boolean(id)),
     ),
     viewer ? likedPostIds(rows.map((p) => p.id), viewer.id) : Promise.resolve(new Set<string>()),
+    viewer ? findSavedPostIds(viewer.id, rows.map((p) => p.id)) : Promise.resolve(new Set<string>()),
     visibilityRelationshipsFor([...authors.keys()], viewer),
   ]);
 
@@ -141,6 +142,7 @@ export async function GET(request: NextRequest) {
           viewer,
           relationship: author ? relationships.get(author.id) : undefined,
           likedByViewer: liked.has(post.id),
+          savedByViewer: saved.has(post.id),
         });
       }),
       nextCursor:

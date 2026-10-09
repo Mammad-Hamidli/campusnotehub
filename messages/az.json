@@ -32,6 +32,7 @@
   },
   "nav": {
     "feed": "Lent",
+    "search": "Axtarış",
     "notes": "UniNotes",
     "mentors": "PocketMentor",
     "notifications": "Bildirişlər",
@@ -53,6 +54,7 @@
     "messages": "Mesajlar",
     "short": {
       "feed": "Lent",
+      "search": "Axtar",
       "notes": "Notlar",
       "saved": "Saxlanan",
       "mentors": "Mentorlar",
@@ -452,6 +454,7 @@
       "tag": "#{tag}"
     },
     "empty": "Hələ paylaşım yoxdur. İlk sən ol.",
+    "saved": { "title": "Saxlanılmış paylaşımlar", "empty": "Hələ saxlanılmış paylaşımınız yoxdur." },
     "loadNew": "{count} yeni paylaşım",
     "deleted": "Bu paylaşım silinib",
     "characterCount": "{remaining} simvol qalıb",
@@ -489,7 +492,10 @@
       "deleteTitle": "Bu paylaşım silinsin?",
       "deleteBody": "Paylaşım hamı üçün lentdən silinəcək. Bu əməliyyat geri qaytarıla bilməz.",
       "deleted": "Paylaşımınız uğurla silindi.",
-      "likeFailed": "Bəyənməniz yadda saxlanılmadı. Yenidən cəhd edin."
+      "likeFailed": "Bəyənməniz yadda saxlanılmadı. Yenidən cəhd edin.",
+      "savePost": "Paylaşımı saxla",
+      "removeSavedPost": "Saxlanılmışlardan sil",
+      "saveFailed": "Saxlanılmış paylaşımlar yenilənmədi. Yenidən cəhd edin."
     },
     "translate": {
       "action": "Tərcümə et",
@@ -2117,6 +2123,11 @@
     "menu": "Söhbət əməliyyatları",
     "loadEarlier": "Əvvəlki mesajları yüklə",
     "startHint": "@{nickname} ilə salamlaşın.",
+    "edit": "Mesajı redaktə et",
+    "edited": "redaktə edildi",
+    "deleted": "Mesaj silindi",
+    "delete": "Mesajı sil",
+    "deleteConfirm": { "title": "Bu mesaj silinsin?", "body": "Söhbətdə hər kəs üçün silinəcək." },
     "sending": "Göndərilir…",
     "placeholder": "Mesaj yazın…",
     "send": "Göndər",
@@ -2149,6 +2160,8 @@
       "requestLimit": "Sorğunuz cavab gözləyir. Qəbul edildikdən sonra daha çox yaza bilərsiniz.",
       "requestQuota": "Bu gün həddən çox mesaj sorğusu göndərmisiniz. Sabah yenidən cəhd edin.",
       "requestGone": "Bu sorğu artıq cavablandırılıb və ya geri götürülüb.",
+      "editLatestOnly": "Yalnız göndərdiyiniz son mesajı redaktə edə bilərsiniz.",
+      "messageNotFound": "Mesaj tapılmadı.",
       "invalid": "2000 simvoladək mesaj yazın."
     }
   },

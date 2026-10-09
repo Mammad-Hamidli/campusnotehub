@@ -117,6 +117,7 @@ export const SAMPLE_PARAMS = {
     message: 'Salam!\n\nUniNotes-da fayl yükləyə bilmirəm - "Şəkil yüklənmədi" yazır.\nTəşəkkürlər.',
     locale: 'az',
   },
+  adminReviewQueue: { item: 'Verification request', url: 'https://campusnotehub.com/admin/verifications' },
   verificationAiDigest: {
     flagged: [
       { caseId: 'Xk2pQe7RtY9aLm3n', codes: ['NAME_MISMATCH'] },

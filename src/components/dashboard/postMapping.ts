@@ -30,6 +30,7 @@ export type ApiPost = {
   commentCount: number;
   shareCount: number;
   likedByViewer: boolean;
+  savedByViewer: boolean;
   author: {
     id: string;
     nickname: string;
@@ -100,5 +101,6 @@ export function toPost(row: ApiPost): Post {
     commentCount: row.commentCount,
     shareCount: row.shareCount,
     likedByViewer: row.likedByViewer,
+    savedByViewer: row.savedByViewer,
   };
 }

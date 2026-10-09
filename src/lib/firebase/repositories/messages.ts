@@ -56,6 +56,8 @@ export type MessageRecord = {
   createdAt: Date;
   /** The pending request this message belongs to, or null once delivered normally. */
   requestId: string | null;
+  editedAt?: Date | null;
+  deletedAt?: Date | null;
 };
 
 export function conversationId(a: string, b: string): string {
@@ -128,6 +130,12 @@ export async function listMessages(
   if (options.before) query = query.where('createdAt', '<', options.before);
   const snap = await query.orderBy('createdAt', 'desc').limit(options.take).get();
   return (docsToObjects<MessageRecord>(snap.docs) as MessageRecord[]).reverse();
+}
+
+/** Poll modifications separately so edits and deletions appear without reloading a thread. */
+export async function listEditedMessages(conversation: string, after: Date, take: number): Promise<MessageRecord[]> {
+  const snap = await messagesOf(conversation).where('editedAt', '>', after).orderBy('editedAt', 'asc').limit(take).get();
+  return docsToObjects<MessageRecord>(snap.docs) as MessageRecord[];
 }
 
 export type BlockRecord = { id: string; blockedId: string; createdAt: Date };

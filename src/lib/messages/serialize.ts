@@ -15,6 +15,8 @@ export type ChatMessage = {
   body: string;
   createdAt: string;
   fromMe: boolean;
+  editedAt: string | null;
+  deleted: boolean;
 };
 
 export function chatPeer(user: UserRecord, viewer: VisibilityViewer, relationship?: VisibilityRelationship): ChatPeer {
@@ -32,6 +34,8 @@ export function chatMessage(message: MessageRecord, viewerId: string): ChatMessa
     body: message.body,
     createdAt: message.createdAt.toISOString(),
     fromMe: message.senderId === viewerId,
+    editedAt: message.editedAt?.toISOString() ?? null,
+    deleted: Boolean(message.deletedAt),
   };
 }
 

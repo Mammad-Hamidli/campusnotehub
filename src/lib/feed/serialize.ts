@@ -71,6 +71,7 @@ export type PostContext = {
   viewer?: VisibilityViewer;
   relationship?: VisibilityRelationship;
   likedByViewer?: boolean;
+  savedByViewer?: boolean;
   shareCount?: number;
 };
 
@@ -93,6 +94,7 @@ export type SerializedPost = {
    */
   shareCount: number;
   likedByViewer: boolean;
+  savedByViewer: boolean;
   author: {
     id: string;
     nickname: string;
@@ -136,6 +138,7 @@ export function serializePost(post: PostRecord, context: PostContext): Serialize
     commentCount: post.commentCount ?? 0,
     shareCount: context.shareCount ?? post.shareCount ?? 0,
     likedByViewer: context.likedByViewer ?? false,
+    savedByViewer: context.savedByViewer ?? false,
     author: {
       id: author?.id ?? post.authorId,
       nickname: author?.nickname ?? 'unknown',

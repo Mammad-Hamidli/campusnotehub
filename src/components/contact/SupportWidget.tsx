@@ -9,6 +9,7 @@ import { useT } from '@/lib/i18n/LocaleProvider';
 export function SupportWidget() {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const [catTapped, setCatTapped] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -43,28 +44,35 @@ export function SupportWidget() {
 
   return (
     <>
-      <div data-support-controls className="fixed bottom-6 right-6 z-50 w-max">
-        <button
-          type="button"
-          data-support-kitten
-          onClick={meow}
-          aria-label={t('dashboard.rankings.meow')}
-          className="absolute bottom-[calc(100%+1mm)] left-0 flex h-9 w-9 items-center justify-center border-0 bg-transparent p-0 leading-none drop-shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-          style={{ animation: 'support-kitten-wander 5.6s infinite' }}
-        >
-          <span className="inline-block text-[2.25rem] leading-none">
-            🐈
-          </span>
-        </button>
-        <button
-          type="button"
-          data-support-button
-          onClick={() => setOpen(true)}
-          className="inline-flex h-12 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-accent-fg shadow-raised transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          <MessageSquareText className="h-4 w-4" aria-hidden="true" />
-          {t('contact.form.title')}
-        </button>
+      <div data-support-controls className="pointer-events-none fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-30 w-max sm:bottom-5 sm:right-5">
+        <div className="relative w-max">
+          <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+0.25rem)] flex justify-center">
+            <button
+              type="button"
+              data-support-kitten
+              onClick={() => {
+                meow();
+                setCatTapped(true);
+                window.setTimeout(() => setCatTapped(false), 650);
+              }}
+              aria-label={t('dashboard.rankings.meow')}
+              className={`pointer-events-auto block h-[115px] w-[63px] overflow-hidden bg-transparent p-0 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:h-[142px] sm:w-[78px] ${catTapped ? 'animate-[cat-tap_550ms_ease-out]' : ''}`}
+            >
+              {/* Transparent crop of the user-provided yellow mascot. */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- fixed local mascot asset needs no loader. */}
+              <img src="/brand/yellow-mascot.webp" alt="" className="h-full w-full object-cover" />
+            </button>
+          </div>
+          <button
+            type="button"
+            data-support-button
+            onClick={() => setOpen(true)}
+            className="pointer-events-auto inline-flex h-11 items-center gap-2 rounded-full bg-accent px-3.5 text-sm font-semibold text-accent-fg shadow-raised transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <MessageSquareText className="h-4 w-4" aria-hidden="true" />
+            {t('contact.form.title')}
+          </button>
+        </div>
       </div>
       {open && (
         <div

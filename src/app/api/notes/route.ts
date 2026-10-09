@@ -22,6 +22,7 @@ import {
   validateNoteFile,
 } from '@/lib/notes/fileTypes';
 import { sendEmailAsync } from '@/lib/email/send';
+import { notifyAdminReviewQueue } from '@/lib/email/admin-review';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -247,6 +248,7 @@ export async function POST(request: NextRequest) {
      * failure must not undo a stored note.
      */
     const seller = await findUserById(userId);
+    notifyAdminReviewQueue('note', note.id);
     if (seller) {
       sendEmailAsync(seller.email, 'noteUploaded', {
         nickname: seller.nickname,

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { UserRole } from '@/lib/enums';
 import { getViewer, requireSession, UnauthorizedError } from '@/lib/auth/session';
-import { findPostById, likedPostIds, softDeletePost } from '@/lib/firebase/repositories/posts';
+import { findPostById, findSavedPostIds, likedPostIds, softDeletePost } from '@/lib/firebase/repositories/posts';
 import { deleteMediaAsset, findMediaAsset } from '@/lib/firebase/repositories/media';
 import { writeAuditLog } from '@/lib/firebase/repositories/audit';
 import { findUniversitiesByIds } from '@/lib/firebase/repositories/reference';
@@ -48,9 +48,10 @@ export async function GET(
   }
   const { post, author } = found;
 
-  const [universities, liked, relationships] = await Promise.all([
+  const [universities, liked, saved, relationships] = await Promise.all([
     findUniversitiesByIds(author.universityId ? [author.universityId] : []),
     viewer ? likedPostIds([post.id], viewer.id) : Promise.resolve(new Set<string>()),
+    viewer ? findSavedPostIds(viewer.id, [post.id]) : Promise.resolve(new Set<string>()),
     visibilityRelationshipsFor([author.id], viewer),
   ]);
 
@@ -63,6 +64,7 @@ export async function GET(
         viewer,
         relationship: relationships.get(author.id),
         likedByViewer: liked.has(post.id),
+        savedByViewer: saved.has(post.id),
       }),
     },
     { headers: { 'Cache-Control': 'no-store' } },

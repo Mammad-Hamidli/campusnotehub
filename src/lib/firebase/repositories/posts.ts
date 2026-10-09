@@ -70,6 +70,7 @@ export type CommentRecord = {
 
 const posts = () => adminDb().collection(COLLECTIONS.posts);
 const comments = () => adminDb().collection(COLLECTIONS.comments);
+const savedPosts = (userId: string) => adminDb().collection(SUBCOLLECTIONS.savedPosts(userId));
 
 export function newPostId(): string {
   return posts().doc().id;
@@ -233,6 +234,30 @@ export async function likedPostIds(postIds: string[], viewerId: string): Promise
     if (snap.exists) liked.add(postIds[i]);
   });
   return liked;
+}
+
+/** Per-user post saves mirror the keyed, private note bookmark collection. */
+export async function setPostSaved(userId: string, postId: string, on: boolean): Promise<void> {
+  const ref = savedPosts(userId).doc(postId);
+  if (on) await ref.set({ postId, createdAt: new Date() });
+  else await ref.delete();
+}
+
+export async function findSavedPostIds(userId: string, postIds: string[]): Promise<Set<string>> {
+  if (!postIds.length) return new Set();
+  const snaps = await adminDb().getAll(...postIds.map((id) => savedPosts(userId).doc(id)));
+  return new Set(snaps.filter((snap) => snap.exists).map((snap) => snap.id));
+}
+
+export async function listSavedPostIds(userId: string, take = 100): Promise<string[]> {
+  const snap = await savedPosts(userId).orderBy('createdAt', 'desc').limit(take).get();
+  return snap.docs.map((doc) => doc.id);
+}
+
+export async function findPostsByIds(ids: string[]): Promise<PostRecord[]> {
+  if (!ids.length) return [];
+  const snaps = await adminDb().getAll(...ids.map((id) => posts().doc(id)));
+  return snaps.filter((snap) => snap.exists).map((snap) => ({ id: snap.id, ...snap.data() }) as PostRecord);
 }
 
 // ---------------------------------------------------------------------------

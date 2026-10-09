@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Flag, Heart, Link2, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Bookmark, Flag, Heart, Link2, MessageCircle, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useLocale } from '@/lib/i18n/LocaleProvider';
 import { formatDate } from '@/lib/i18n/dates';
 import { clampFeedAspect } from '@/lib/media/constants';
@@ -46,6 +46,7 @@ export type Post = {
   commentCount: number;
   shareCount: number;
   likedByViewer: boolean;
+  savedByViewer: boolean;
 };
 
 export function PostCard({
@@ -55,6 +56,7 @@ export function PostCard({
   readOnly = false,
   defaultShowComments = false,
   onDeleted,
+  onSavedChange,
 }: {
   post: Post;
   index?: number;
@@ -64,11 +66,14 @@ export function PostCard({
   /** Opens with the thread expanded - the single-post view a notification links to. */
   defaultShowComments?: boolean;
   onDeleted?: (postId: string) => void;
+  onSavedChange?: (postId: string, saved: boolean) => void;
 }) {
   const { locale, t } = useLocale();
   const toast = useToast();
   const confirm = useConfirm();
   const [liked, setLiked] = useState(post.likedByViewer);
+  const [saved, setSaved] = useState(post.savedByViewer);
+  const [saving, setSaving] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [commentCount, setCommentCount] = useState(post.commentCount);
   const [showComments, setShowComments] = useState(defaultShowComments);
@@ -78,6 +83,25 @@ export function PostCard({
 
   const isOwn = Boolean(viewerId) && post.authorId === viewerId;
   const profileHref = `/u/${encodeURIComponent(post.author.nickname)}`;
+
+  async function toggleSaved() {
+    if (saving) return;
+    const next = !saved;
+    setSaved(next);
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/feed/${encodeURIComponent(post.id)}/save`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ saved: next }),
+      });
+      if (!response.ok) throw new Error('save failed');
+      onSavedChange?.(post.id, next);
+    } catch {
+      setSaved(!next);
+      toast.error(t('feed.menu.saveFailed'));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   /**
    * Likes.
@@ -380,6 +404,9 @@ export function PostCard({
           onClick={readOnly ? undefined : toggleLike}
           disabled={readOnly}
         />
+        {viewerId && <button type="button" onClick={() => void toggleSaved()} disabled={saving} aria-pressed={saved} aria-label={t(saved ? 'feed.menu.removeSavedPost' : 'feed.menu.savePost')} title={t(saved ? 'feed.menu.removeSavedPost' : 'feed.menu.savePost')} className={`ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm transition hover:bg-surface-inset disabled:opacity-50 ${saved ? 'text-accent' : 'text-fg-muted'}`}>
+          <Bookmark className={`h-[1.05rem] w-[1.05rem] ${saved ? 'fill-current' : ''}`} aria-hidden="true" />
+        </button>}
         <ActionButton
           icon={MessageCircle}
           label={showComments ? t('feed.hideComments') : t('feed.showComments')}

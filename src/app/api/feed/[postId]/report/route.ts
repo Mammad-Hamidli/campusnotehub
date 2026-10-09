@@ -7,6 +7,7 @@ import { COLLECTIONS } from '@/lib/firebase/collections';
 import { forFirestore } from '@/lib/firebase/convert';
 import { findVisiblePost } from '@/lib/feed/visibility';
 import { toPlainText } from '@/lib/security/plainText';
+import { notifyAdminReviewQueue } from '@/lib/email/admin-review';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,7 @@ export async function POST(
   { params }: { params: Promise<{ postId: string }> },
 ) {
   let session;
+  let created = false;
   try {
     session = await requireSession(request);
   } catch (error) {
@@ -66,10 +68,13 @@ export async function POST(
         createdAt: new Date(),
       }),
     );
+    created = true;
   } catch (error) {
     // ALREADY_EXISTS: this reader has reported this post before.
     if ((error as { code?: number }).code !== 6) throw error;
   }
+
+  if (created) notifyAdminReviewQueue('report', `post__${postId}__${session.userId}`);
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }
