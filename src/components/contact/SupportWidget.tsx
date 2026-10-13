@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { MessageSquareText, X } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { ContactForm } from './ContactForm';
 import { useT } from '@/lib/i18n/LocaleProvider';
 
 /** Floating support entry point. Messages use the same protected contact API. */
 export function SupportWidget() {
+  const pathname = usePathname();
   const t = useT();
   const [open, setOpen] = useState(false);
   const [catTapped, setCatTapped] = useState(false);
@@ -46,7 +48,7 @@ export function SupportWidget() {
     <>
       <div data-support-controls className="pointer-events-none fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-30 w-max sm:bottom-5 sm:right-5">
         <div className="relative w-max">
-          <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+0.25rem)] flex justify-center">
+          {pathname === '/profile' && <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+0.25rem)] flex justify-center">
             <button
               type="button"
               data-support-kitten
@@ -62,12 +64,12 @@ export function SupportWidget() {
               {/* eslint-disable-next-line @next/next/no-img-element -- fixed local mascot asset needs no loader. */}
               <img src="/brand/yellow-mascot.webp" alt="" className="h-full w-full object-cover" />
             </button>
-          </div>
+          </div>}
           <button
             type="button"
             data-support-button
             onClick={() => setOpen(true)}
-            className="pointer-events-auto inline-flex h-11 items-center gap-2 rounded-full bg-accent px-3.5 text-sm font-semibold text-accent-fg shadow-raised transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="pointer-events-auto inline-flex h-11 items-center gap-2 rounded-full bg-accent px-3.5 text-sm font-semibold text-accent-fg shadow-raised transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent max-[768px]:hidden"
           >
             <MessageSquareText className="h-4 w-4" aria-hidden="true" />
             {t('contact.form.title')}

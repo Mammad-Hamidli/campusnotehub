@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Loader2, Search, UserRoundSearch } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
 import { BackLink } from '@/components/ui/BackLink';
-import { HANDLE_FRAGMENT, Hit, fetchUserPage, toFragment, type UserHit } from '@/components/dashboard/UserSearch';
+import { HANDLE_FRAGMENT, Hit, SearchFollowButton, fetchUserPage, toFragment, type UserHit } from '@/components/dashboard/UserSearch';
 
 const PAGE_SIZE = 20;
 const DEBOUNCE_MS = 250;
@@ -117,12 +117,15 @@ export function UserSearchResults({ initialQuery }: { initialQuery: string }) {
             <ul className="card divide-y divide-edge overflow-hidden">
               {state.users.map((user) => (
                 <li key={user.id}>
-                  <Link
-                    href={`/u/${encodeURIComponent(user.nickname)}`}
-                    className="flex min-w-0 items-center gap-2.5 px-3 py-2.5 transition hover:bg-surface-muted"
-                  >
-                    <Hit user={user} />
-                  </Link>
+                  <div className="flex min-w-0 items-center gap-2 px-3 py-2">
+                    <Link
+                      href={`/u/${encodeURIComponent(user.nickname)}`}
+                      className="flex min-w-0 flex-1 items-center gap-2.5 py-0.5 transition hover:bg-surface-muted"
+                    >
+                      <Hit user={user} />
+                    </Link>
+                    <SearchFollowButton user={user} />
+                  </div>
                 </li>
               ))}
             </ul>

@@ -257,7 +257,12 @@ export async function listSavedPostIds(userId: string, take = 100): Promise<stri
 export async function findPostsByIds(ids: string[]): Promise<PostRecord[]> {
   if (!ids.length) return [];
   const snaps = await adminDb().getAll(...ids.map((id) => posts().doc(id)));
-  return snaps.filter((snap) => snap.exists).map((snap) => ({ id: snap.id, ...snap.data() }) as PostRecord);
+  // Unlike feedPage, getAll returns raw Admin SDK snapshots. Restore Firestore
+  // Timestamps (including createdAt and nested media dates) before the shared
+  // serializer calls Date methods on these records.
+  return snaps
+    .map((snap) => docToObject<PostRecord>(snap))
+    .filter((post): post is PostRecord => post !== null);
 }
 
 // ---------------------------------------------------------------------------

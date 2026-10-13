@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { ArrowUp } from 'lucide-react';
 import { useToast } from '@/components/ui/Feedback';
 import { Sidebar, type DashboardTab } from './Sidebar';
 import { Composer } from './Composer';
@@ -93,6 +94,14 @@ export function DashboardShell({
   const [universityCodes, setUniversityCodes] = useState<string[]>([]);
   /** The conversation open in the messages panel; the search's "Message" button sets it. */
   const [chatPeer, setChatPeer] = useState<ChatPeer | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const update = () => setShowScrollTop(window.scrollY > 300);
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
 
   /**
    * Filter chips come from the database on every load - no hardcoded list -
@@ -550,6 +559,19 @@ export function DashboardShell({
           </aside>
         </div>
       </main>
+      {tab === 'feed' && (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label={t('feed.scrollToTop')}
+          title={t('feed.scrollToTop')}
+          aria-hidden={!showScrollTop}
+          tabIndex={showScrollTop ? 0 : -1}
+          className={`fixed bottom-5 left-1/2 z-30 flex h-11 w-11 -translate-x-1/2 items-center justify-center rounded-full bg-accent text-accent-fg shadow-raised transition-all duration-200 hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${showScrollTop ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}
+        >
+          <ArrowUp className="h-5 w-5" aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }

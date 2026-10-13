@@ -19,29 +19,37 @@ export async function GET(request: NextRequest) {
     if (error instanceof UnauthorizedError) return NextResponse.json({ error: 'errors.sessionExpired' }, { status: 401 });
     throw error;
   }
-  const ids = await listSavedPostIds(viewer.id);
-  const byId = new Map((await findPostsByIds(ids)).map((post) => [post.id, post]));
-  const audience = await resolveViewerAudience(viewer);
-  const rows = ids.map((id) => byId.get(id)).filter((post) =>
-    post && !post.isDeleted && post.audience?.some((token) => audience.tokens.includes(token)),
-  );
-  const authors = await findUsersByIds(rows.map((post) => post!.authorId));
-  const visible = rows.filter((post) => isPubliclyVisible(authors.get(post!.authorId)));
-  const [universities, liked, relationships] = await Promise.all([
-    findUniversitiesByIds([...authors.values()].map((author) => author.universityId).filter((id): id is string => Boolean(id))),
-    likedPostIds(visible.map((post) => post!.id), viewer.id),
-    visibilityRelationshipsFor([...authors.keys()], viewer),
-  ]);
-  return NextResponse.json({ posts: visible.map((post) => {
-    const author = authors.get(post!.authorId) ?? null;
-    return serializePost(post!, {
-      author,
-      university: author?.universityId ? universities.get(author.universityId) ?? null : null,
-      viewerId: viewer.id,
-      viewer,
-      relationship: author ? relationships.get(author.id) : undefined,
-      likedByViewer: liked.has(post!.id),
-      savedByViewer: true,
-    });
-  }) }, { headers: { 'Cache-Control': 'private, no-store' } });
+  try {
+    const ids = await listSavedPostIds(viewer.id);
+    const byId = new Map((await findPostsByIds(ids)).map((post) => [post.id, post]));
+    const audience = await resolveViewerAudience(viewer);
+    const rows = ids.map((id) => byId.get(id)).filter((post) =>
+      post && !post.isDeleted && post.audience?.some((token) => audience.tokens.includes(token)),
+    );
+    const authors = await findUsersByIds(rows.map((post) => post!.authorId));
+    const visible = rows.filter((post) => isPubliclyVisible(authors.get(post!.authorId)));
+    const [universities, liked, relationships] = await Promise.all([
+      findUniversitiesByIds([...authors.values()].map((author) => author.universityId).filter((id): id is string => Boolean(id))),
+      likedPostIds(visible.map((post) => post!.id), viewer.id),
+      visibilityRelationshipsFor([...authors.keys()], viewer),
+    ]);
+    return NextResponse.json({ posts: visible.map((post) => {
+      const author = authors.get(post!.authorId) ?? null;
+      return serializePost(post!, {
+        author,
+        university: author?.universityId ? universities.get(author.universityId) ?? null : null,
+        viewerId: viewer.id,
+        viewer,
+        relationship: author ? relationships.get(author.id) : undefined,
+        likedByViewer: liked.has(post!.id),
+        savedByViewer: true,
+      });
+    }) }, { headers: { 'Cache-Control': 'private, no-store' } });
+  } catch (error) {
+    console.error('[feed:saved] Failed to build saved posts response', { viewerId: viewer.id, error });
+    return NextResponse.json(
+      { error: 'errors.serverError' },
+      { status: 500, headers: { 'Cache-Control': 'private, no-store' } },
+    );
+  }
 }

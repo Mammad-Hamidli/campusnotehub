@@ -94,7 +94,10 @@ export function PostCard({
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ saved: next }),
       });
       if (!response.ok) throw new Error('save failed');
-      onSavedChange?.(post.id, next);
+      const result: { postId?: string; saved?: boolean } = await response.json();
+      if (result.postId !== post.id || result.saved !== next) throw new Error('save response mismatch');
+      setSaved(result.saved);
+      onSavedChange?.(post.id, result.saved);
     } catch {
       setSaved(!next);
       toast.error(t('feed.menu.saveFailed'));

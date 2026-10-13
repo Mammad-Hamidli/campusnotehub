@@ -2,12 +2,13 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Loader2, MessageCircle, Search, UserRoundSearch, X } from 'lucide-react';
+import { ArrowRight, Loader2, MessageCircle, Search, UserCheck, UserPlus, UserRoundSearch, X } from 'lucide-react';
 import { useT } from '@/lib/i18n/LocaleProvider';
+import { useToast } from '@/components/ui/Feedback';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import type { ChatPeer } from '@/components/messages/MessagesPanel';
 
-export type UserHit = ChatPeer & { headline: string | null };
+export type UserHit = ChatPeer & { headline: string | null; following: boolean; requested: boolean; canFollow: boolean };
 export type UserPage = { users: UserHit[]; nextCursor: string | null };
 
 /** Long enough to skip the keystrokes of a word being typed, short enough to feel live. */
@@ -209,6 +210,7 @@ export function UserSearch({
                       <MessageCircle className="h-4 w-4" aria-hidden="true" />
                     </button>
                   )}
+                  <SearchFollowButton user={user} />
                 </div>
               )}
             </li>
@@ -227,6 +229,53 @@ export function UserSearch({
         </Link>
       )}
     </section>
+  );
+}
+
+/** Follow/request state is included in the search payload and updated in place. */
+export function SearchFollowButton({ user }: { user: UserHit }) {
+  const t = useT();
+  const toast = useToast();
+  const [following, setFollowing] = useState(user.following);
+  const [requested, setRequested] = useState(user.requested);
+  const [busy, setBusy] = useState(false);
+  const removable = following || requested;
+
+  async function toggle() {
+    if (busy || (!removable && !user.canFollow)) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(user.nickname)}/follow`, {
+        method: removable ? 'DELETE' : 'POST',
+        cache: 'no-store',
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        toast.error(t(payload?.error ?? 'errors.generic'));
+        return;
+      }
+      setFollowing(Boolean(payload.following));
+      setRequested(Boolean(payload.requested));
+    } catch {
+      toast.error(t('errors.generic'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const label = following ? t('publicProfile.following') : requested ? t('publicProfile.requested') : t('publicProfile.follow');
+  return (
+    <button
+      type="button"
+      onClick={() => void toggle()}
+      disabled={busy || (!removable && !user.canFollow)}
+      aria-pressed={following || requested}
+      title={requested ? t('publicProfile.requestedHint') : undefined}
+      className={`mr-1 inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition disabled:opacity-50 ${removable ? 'bg-surface-inset text-fg' : 'bg-accent text-accent-fg hover:brightness-105'}`}
+    >
+      {following ? <UserCheck className="h-3.5 w-3.5" aria-hidden="true" /> : <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />}
+      {label}
+    </button>
   );
 }
 

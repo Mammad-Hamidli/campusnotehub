@@ -72,7 +72,16 @@ describe('GET /api/search/users', () => {
   it('shows a picture only where the owner lets this viewer see it', async () => {
     const response = await GET(new NextRequest('http://localhost/api/search/users?q=aysel'));
     expect((await response.json()).users).toEqual([
-      { id: 'u1', nickname: 'Aysel_01', avatarUrl: null, isVerified: false, headline: null },
+      {
+        id: 'u1',
+        nickname: 'Aysel_01',
+        avatarUrl: null,
+        isVerified: false,
+        headline: null,
+        following: false,
+        requested: false,
+        canFollow: true,
+      },
     ]);
   });
 });

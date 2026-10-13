@@ -203,7 +203,7 @@ export async function sendMessage(params: {
 }
 
 /** Edit the sender's newest message in a thread. */
-export async function editSentMessage(params: { senderId: string; recipientId: string; messageId: string; body: string }): Promise<boolean> {
+export async function editSentMessage(params: { senderId: string; recipientId: string; messageId: string; body: string }): Promise<Date | null> {
   const id = conversationId(params.senderId, params.recipientId);
   const ownMessages = messagesOf(id).where('senderId', '==', params.senderId).orderBy('createdAt', 'desc').limit(1);
   return adminDb().runTransaction(async (tx) => {
@@ -214,7 +214,7 @@ export async function editSentMessage(params: { senderId: string; recipientId: s
       tx.get(inboxRef(params.senderId, params.recipientId)),
       tx.get(inboxRef(params.recipientId, params.senderId)),
     ]);
-    if (latest.empty || latest.docs[0].id !== params.messageId || !target.exists || !conversation.exists) return false;
+    if (latest.empty || latest.docs[0].id !== params.messageId || !target.exists || !conversation.exists) return null;
     const editedAt = new Date(Math.max(
       Date.now(),
       Number(conversation.get('lastMessageAt')?.toMillis?.() ?? 0) + 1,
@@ -225,7 +225,7 @@ export async function editSentMessage(params: { senderId: string; recipientId: s
     if (conversation.get('lastMessageAt')?.toMillis?.() === createdAt?.toMillis?.()) {
       [mine, theirs].forEach((row) => { if (row.exists) tx.update(row.ref, { lastBody: params.body.slice(0, PREVIEW_LENGTH) }); });
     }
-    return true;
+    return editedAt;
   });
 }
 

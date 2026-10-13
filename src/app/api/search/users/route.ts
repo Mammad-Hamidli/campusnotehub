@@ -5,6 +5,9 @@ import { clientIp, rateLimit } from '@/lib/security/ratelimit';
 import { isMessageable } from '@/lib/messages/serialize';
 import { visibleAvatar } from '@/lib/profile/visibility';
 import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
+import { isFollowing } from '@/lib/firebase/repositories/follows';
+import { hasPendingRequest } from '@/lib/firebase/repositories/followRequests';
+import { can } from '@/lib/permissions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -83,8 +86,8 @@ export async function GET(request: NextRequest) {
   if (!FRAGMENT.test(raw) || (after !== undefined && (!CURSOR.test(after) || !after.startsWith(raw)))) {
     return NextResponse.json({ users: [], nextCursor: null }, { headers: { 'Cache-Control': 'no-store' } });
   }
-  const requested = Number.parseInt(params.get('limit') ?? '', 10);
-  const limit = Number.isFinite(requested) ? Math.min(MAX_LIMIT, Math.max(1, requested)) : DEFAULT_LIMIT;
+  const requestedLimit = Number.parseInt(params.get('limit') ?? '', 10);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(MAX_LIMIT, Math.max(1, requestedLimit)) : DEFAULT_LIMIT;
 
   const rate = await rateLimit('search', { userId: auth.userId, ip: clientIp(request.headers) });
   if (!rate.ok) {
@@ -95,13 +98,20 @@ export async function GET(request: NextRequest) {
   }
 
   const { hits, next } = await page(raw, limit, after, auth.userId);
-  const relationships = await visibilityRelationshipsFor(hits.map((user) => user.id), auth.viewer);
-  const users = hits.map((user) => ({
+  const [relationships, following, requestedStates] = await Promise.all([
+    visibilityRelationshipsFor(hits.map((user) => user.id), auth.viewer),
+    Promise.all(hits.map((user) => isFollowing(auth.userId, user.id))),
+    Promise.all(hits.map((user) => hasPendingRequest(auth.userId, user.id))),
+  ]);
+  const users = hits.map((user, index) => ({
     id: user.id,
     nickname: user.nickname,
     avatarUrl: visibleAvatar(user, auth.viewer, relationships.get(user.id)),
     isVerified: user.isVerified,
     headline: user.headline,
+    following: following[index],
+    requested: requestedStates[index],
+    canFollow: can(auth.viewer, 'users:follow'),
   }));
 
   return NextResponse.json({ users, nextCursor: next }, { headers: { 'Cache-Control': 'no-store' } });

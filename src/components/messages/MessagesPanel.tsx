@@ -341,6 +341,7 @@ function Conversation({ peer, tall, onBack }: { peer: ChatPeer; tall: boolean; o
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingBody, setEditingBody] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const scroller = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
@@ -477,16 +478,32 @@ function Conversation({ peer, tall, onBack }: { peer: ChatPeer; tall: boolean; o
 
   async function saveEdit(messageId: string) {
     const body = editingBody.trim();
-    if (!body) return;
-    const response = await fetch(url, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messageId, body }) });
-    if (!response.ok) {
+    if (!body || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ messageId, body }),
+      });
       const payload = await response.json().catch(() => null);
-      toast.error(t(payload?.error ?? 'messages.failed'));
-      void refresh(false).catch(() => {});
-      return;
+      if (!response.ok) {
+        toast.error(t(payload?.error ?? 'messages.failed'));
+        void refresh(false).catch(() => {});
+        return;
+      }
+      // Older deployments returned { ok: true } before the API included
+      // editedAt. A successful edit is still authoritative; use a local
+      // timestamp until the next thread refresh supplies the server value.
+      const editedAt = typeof payload?.editedAt === 'string' ? payload.editedAt : new Date().toISOString();
+      setMessages((items) => items.map((item) => item.id === messageId ? { ...item, body, editedAt } : item));
+      setEditingId(null);
+    } catch {
+      toast.error(t('errors.network'));
+    } finally {
+      setSavingEdit(false);
     }
-    setMessages((items) => items.map((item) => item.id === messageId ? { ...item, body } : item));
-    setEditingId(null);
   }
 
   async function removeMessage(messageId: string) {
@@ -656,7 +673,7 @@ function Conversation({ peer, tall, onBack }: { peer: ChatPeer; tall: boolean; o
                       <textarea autoFocus value={editingBody} onChange={(event) => setEditingBody(event.target.value)} maxLength={MAX_LENGTH} rows={3} className="w-full resize-y rounded-lg border border-edge bg-canvas px-2 py-1 text-fg" />
                       <div className="flex justify-end gap-1">
                         <button type="button" onClick={() => setEditingId(null)} className="rounded px-2 py-1 text-xs">{t('common.cancel')}</button>
-                        <button type="button" onClick={() => void saveEdit(message.id)} className="rounded bg-accent px-2 py-1 text-xs text-accent-fg"><CheckCheck className="mr-1 inline h-3 w-3" />{t('common.save')}</button>
+                        <button type="button" onClick={() => void saveEdit(message.id)} disabled={savingEdit} className="rounded bg-accent px-2 py-1 text-xs text-accent-fg disabled:opacity-50"><CheckCheck className="mr-1 inline h-3 w-3" />{t('common.save')}</button>
                       </div>
                     </div>
                   ) : <p className={`whitespace-pre-wrap break-words ${message.deleted ? 'italic opacity-75' : ''}`}>{message.deleted ? t('messages.deleted') : message.body}</p>}

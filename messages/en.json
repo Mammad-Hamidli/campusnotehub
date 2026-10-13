@@ -456,6 +456,7 @@
     "empty": "No posts yet. Be the first.",
     "saved": { "title": "Saved posts", "empty": "You have no saved posts yet." },
     "loadNew": "{count} new posts",
+    "scrollToTop": "Scroll to top",
     "deleted": "This post was deleted",
     "characterCount": "{remaining} characters left",
     "comments": "Comments",

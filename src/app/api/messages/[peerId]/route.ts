@@ -173,8 +173,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!USER_ID.test(peerId) || !parsed.success) return unavailable();
   const peer = await findUserById(peerId);
   if (!isMessageable(peer, auth.userId)) return unavailable();
-  const changed = await editSentMessage({ senderId: auth.userId, recipientId: peerId, ...parsed.data });
-  return changed ? NextResponse.json({ ok: true }) : NextResponse.json({ error: 'messages.errors.editLatestOnly' }, { status: 409 });
+  let editedAt: Date | null;
+  try {
+    editedAt = await editSentMessage({ senderId: auth.userId, recipientId: peerId, ...parsed.data });
+  } catch (error) {
+    console.error('[messages:edit] Failed to persist message edit', {
+      senderId: auth.userId,
+      recipientId: peerId,
+      messageId: parsed.data.messageId,
+      error,
+    });
+    return NextResponse.json({ error: 'errors.serverError' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
+  }
+  return editedAt
+    ? NextResponse.json({ ok: true, editedAt: editedAt.toISOString() }, { headers: { 'Cache-Control': 'no-store' } })
+    : NextResponse.json({ error: 'messages.errors.editLatestOnly' }, { status: 409 });
 }
 
 /** DELETE /api/messages/:peerId removes any message authored by the caller. */

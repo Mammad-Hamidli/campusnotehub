@@ -456,6 +456,7 @@
     "empty": "Hələ paylaşım yoxdur. İlk sən ol.",
     "saved": { "title": "Saxlanılmış paylaşımlar", "empty": "Hələ saxlanılmış paylaşımınız yoxdur." },
     "loadNew": "{count} yeni paylaşım",
+    "scrollToTop": "Yuxarı qayıt",
     "deleted": "Bu paylaşım silinib",
     "characterCount": "{remaining} simvol qalıb",
     "comments": "Şərhlər",
