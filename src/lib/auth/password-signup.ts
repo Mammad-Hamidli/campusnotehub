@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { UserRole, VerificationStatus } from '@/lib/enums';
 import {
   createUser,
@@ -28,7 +29,7 @@ import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
  * One implementation so the two cannot drift: the rate limit, the
  * credentials-in-URL guard, the blocklist, the one-transaction account write,
  * the device record and the session are identical. The track decides only the
- * schema (a mentor's university is optional), the role, `mentorSince` and
+ * schema (a mentor's university is optional), the role, the mentor fields and
  * where the client is sent next. It is chosen by the ENDPOINT, never by a
  * body field - registerSchema strips unknown keys precisely so a client cannot
  * pick its own role.
@@ -201,6 +202,16 @@ export async function passwordSignup(request: NextRequest, track: SignupTrack): 
   const input = parsed.data;
   const email = input.email;
 
+  const mentorPaymentDetails = track === 'mentor' ? {
+    bankName: process.env.MENTOR_PAYMENT_BANK_NAME?.trim(),
+    cardholder: process.env.MENTOR_PAYMENT_CARDHOLDER?.trim(),
+    cardNumber: process.env.MENTOR_PAYMENT_CARD_NUMBER?.replace(/\s+/g, ''),
+  } : null;
+  if (mentorPaymentDetails && (!mentorPaymentDetails.bankName || !mentorPaymentDetails.cardholder || !mentorPaymentDetails.cardNumber)) {
+    console.error('[mentor-signup] Payment instruction email is not configured. Set MENTOR_PAYMENT_BANK_NAME, MENTOR_PAYMENT_CARDHOLDER, and MENTOR_PAYMENT_CARD_NUMBER.');
+    return NextResponse.json({ error: 'mentors.join.paymentUnavailable' }, { status: 503 });
+  }
+
   // Blocklist check before any write. A banned identity gets the same generic
   // response as a duplicate email - telling someone *which* rule caught them
   // is free tuning information.
@@ -228,6 +239,11 @@ export async function passwordSignup(request: NextRequest, track: SignupTrack): 
   const { firstName, lastName } = splitFullName(input.fullName);
   const now = new Date();
   const isMentor = track === 'mentor';
+  const mentorInput = input as typeof input & {
+    mentorType: 'INDIVIDUAL' | 'COURSE';
+    courseEmail?: string;
+    teacherCount?: number;
+  };
 
   try {
     /**
@@ -258,12 +274,27 @@ export async function passwordSignup(request: NextRequest, track: SignupTrack): 
         lastName,
         /**
          * A mentor account is the same user document as a student's; the role
-         * is what differs, and with it what can() grants. The join date is the
-         * signup itself - it anchors the monthly fee reminder on the mentor
-         * panel (src/lib/mentors/billing.ts).
+         * is what differs. It starts INACTIVE: `mentorRegistrationStatus:
+         * PENDING` keeps it from applying, offering or being booked
+         * (mentorActivationPending), and `mentorSince` - the fee anchor - stays
+         * null. Both change when a moderator approves its payment receipt
+         * (decideMentorPaymentReceipt).
          */
         role: isMentor ? UserRole.MENTOR : UserRole.STUDENT,
-        mentorSince: isMentor ? now : null,
+        mentorSince: null,
+        ...(isMentor ? {
+          mentorType: mentorInput.mentorType,
+          courseEmail: mentorInput.mentorType === 'COURSE' ? mentorInput.courseEmail! : null,
+          mentorRegistrationStatus: 'PENDING' as const,
+          // Reserve the required number of editable instructor profiles now;
+          // names, bios, photos and timetables are completed in account settings.
+          courseTeachers: mentorInput.mentorType === 'COURSE'
+            ? Array.from({ length: mentorInput.teacherCount! }, () => ({
+                id: randomUUID(), fullName: '', specialization: '', bio: '', avatarUrl: null,
+                timezone: 'Asia/Baku', availability: [],
+              }))
+            : [],
+        } : {}),
         nickname: input.nickname,
         locale: input.locale,
         universityId: university?.id ?? null,
@@ -349,6 +380,16 @@ export async function passwordSignup(request: NextRequest, track: SignupTrack): 
       },
       { dedupeKey: `welcome:${user.id}` },
     );
+
+    if (isMentor) {
+      sendEmailAsync(user.email, 'mentorPaymentInstructions', {
+        nickname: user.nickname,
+        monthlyFee: mentorInput.mentorType === 'COURSE' ? 30 : 10,
+        bankName: mentorPaymentDetails!.bankName!,
+        cardholder: mentorPaymentDetails!.cardholder!,
+        cardNumber: mentorPaymentDetails!.cardNumber!,
+      }, { dedupeKey: `mentor-payment-instructions:${user.id}` });
+    }
 
     // A confirmation link for the address. Failure to send must not fail the
     // registration: the account can request another from Settings -> Security.

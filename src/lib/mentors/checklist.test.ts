@@ -75,3 +75,26 @@ describe('buildMentorChecklist', () => {
     expect(Object.values(all).every((s) => s === 'done')).toBe(true);
   });
 });
+
+describe('the payment step of a /mentors/join account', () => {
+  it('is absent for an account that never needed one', () => {
+    expect(states({}).payment).toBeUndefined();
+  });
+
+  it('asks for the receipt, then waits for the moderator, then is done', () => {
+    expect(states({ payment: { activated: false, receiptPending: false } }).payment).toBe('current');
+    expect(states({ payment: { activated: false, receiptPending: true } }).payment).toBe('waiting');
+    expect(states({ payment: { activated: true, receiptPending: false } }).payment).toBe('done');
+  });
+
+  it('locks the application until the payment is approved, even when verified', () => {
+    const steps = buildMentorChecklist({
+      ...fresh,
+      verificationStatus: VerificationStatus.VERIFIED,
+      payment: { activated: false, receiptPending: false },
+    });
+    const application = steps.find((s) => s.key === 'application')!;
+    expect(application).toMatchObject({ state: 'locked', hint: 'lockedPayment' });
+    expect(steps.map((s) => s.key)).toEqual(['account', 'payment', 'email', 'identity', 'application', 'listing']);
+  });
+});

@@ -8,7 +8,9 @@ import {
   BadgeCheck,
   Building2,
   ClipboardCheck,
+  CreditCard,
   LayoutDashboard,
+  Megaphone,
   Menu as MenuIcon,
   LogOut,
   ScrollText,
@@ -31,6 +33,8 @@ const NAV: { href: string; icon: LucideIcon; labelKey: string }[] = [
   { href: '/admin/verifications', icon: BadgeCheck, labelKey: 'admin.nav.verifications' },
   { href: '/admin/reviews', icon: ClipboardCheck, labelKey: 'admin.nav.reviews' },
   { href: '/admin/universities', icon: Building2, labelKey: 'admin.nav.universities' },
+  { href: '/admin/announcements', icon: Megaphone, labelKey: 'admin.nav.announcements' },
+  { href: '/admin/mentor-payments', icon: CreditCard, labelKey: 'admin.nav.mentorPayments' },
   { href: '/admin/audit-logs', icon: ScrollText, labelKey: 'admin.nav.auditLogs' },
 ];
 

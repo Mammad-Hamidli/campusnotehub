@@ -166,7 +166,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 at all; see IdentityPromptSlot for why the session read is free.
               */}
               <IdentityPromptSlot />
-              <SupportWidget />
+              <SupportWidget isAuthenticated={Boolean(viewer)} />
               {/* "Following" badges next to names, and the live notification
                   bell (likes, comments, follow requests), on every route. */}
               <FollowingProvider viewerId={viewer?.id ?? null}>

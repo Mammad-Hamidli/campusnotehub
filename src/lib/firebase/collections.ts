@@ -140,10 +140,12 @@ export const COLLECTIONS = {
   supportInbox: 'supportInbox',
   /** PocketMentor applications, keyed by applicant user id. */
   mentorApplications: 'mentorApplications',
+  mentorPaymentReceipts: 'mentorPaymentReceipts',
   /** User-filed account deletion requests, keyed by user id; reviewed by an admin. */
   accountDeletionRequests: 'accountDeletionRequests',
   /** Staff-set switches, one document each - `feedAd` lists the promoted mentors. Server-only. */
   siteConfig: 'siteConfig',
+  announcements: 'announcements',
 } as const;
 
 /**

@@ -51,7 +51,7 @@ export function OnboardingChecklist({ steps, t }: { steps: ChecklistStep[]; t: T
                 </p>
                 {step.state !== 'done' && (
                   <p className="mt-0.5 text-xs leading-relaxed text-fg-muted">
-                    {t(`mentorDashboard.checklist.${step.key}.${step.state}`)}
+                    {t(`mentorDashboard.checklist.${step.key}.${step.hint ?? step.state}`)}
                   </p>
                 )}
                 {step.note && (

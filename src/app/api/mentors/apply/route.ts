@@ -124,6 +124,11 @@ export async function POST(request: NextRequest) {
   ) {
     return NextResponse.json({ error: 'errors.forbidden' }, { status: 403 });
   }
+  // Payment first: an approved application publishes a bookable profile, so
+  // an account that has not been activated cannot ask for one.
+  if (viewer.mentorActivationPending) {
+    return NextResponse.json({ error: 'mentors.payment.required' }, { status: 403 });
+  }
   if (viewer.verificationStatus !== VerificationStatus.VERIFIED) {
     return NextResponse.json({ error: 'errors.verificationRequired' }, { status: 403 });
   }
@@ -176,7 +181,6 @@ export async function POST(request: NextRequest) {
     availability: input.availability,
     timezone: input.timezone,
   });
-
   await writeAuditLog({
     actorId: userId,
     action: 'MENTOR_APPLICATION_SUBMITTED',

@@ -454,7 +454,10 @@
       "tag": "#{tag}"
     },
     "empty": "No posts yet. Be the first.",
-    "saved": { "title": "Saved posts", "empty": "You have no saved posts yet." },
+    "saved": {
+      "title": "Saved posts",
+      "empty": "You have no saved posts yet."
+    },
     "loadNew": "{count} new posts",
     "scrollToTop": "Scroll to top",
     "deleted": "This post was deleted",
@@ -642,6 +645,11 @@
     "signInToDownload": "Sign in to download"
   },
   "mentors": {
+    "payment": {
+      "alreadyDecided": "This payment receipt has already been reviewed.",
+      "required": "Your mentor account is activated once your first payment is confirmed. Reply to the payment instructions email with your receipt.",
+      "pendingForApproval": "This mentor has not paid yet. Approve their payment receipt first."
+    },
     "title": "PocketMentor",
     "subtitle": "One-on-one career guidance from working professionals",
     "becomeMentor": "Become a mentor",
@@ -815,6 +823,29 @@
       "title": "Create your mentor account",
       "subtitle": "Share your experience with students. Your account is ready right away; your mentor profile goes live after a moderator reviews it.",
       "universityHint": "Optional. Leave it empty if you are not affiliated with a university.",
+      "type": "Mentor account type",
+      "individual": "Individual",
+      "course": "Course",
+      "typeRequired": "Choose Individual or Course / company to continue.",
+      "courseEmail": "Primary course email address",
+      "courseName": "Course Name",
+      "teacherCount": "Number of teachers / instructors (minimum 2)",
+      "teacherCountInvalid": "Enter a whole number from 2 to 30.",
+      "courseEmailRequired": "Enter the primary course email address.",
+      "courseEmailInvalid": "Enter a valid course email address.",
+      "teachers": "Teachers / instructors",
+      "teacherName": "Full name",
+      "teacherSpecialization": "Bio / specialization",
+      "teacherBio": "Additional bio (optional)",
+      "teachersRequired": "Add a full name and specialization for each teacher.",
+      "addTeacher": "Add teacher",
+      "removeTeacher": "Remove teacher",
+      "monthlyFee": "Monthly subscription: {amount} AZN/month.",
+      "paymentNotice": "No payments are processed directly inside the platform. Payment instructions will be sent to your email.",
+      "paymentUnavailable": "Mentor registration is temporarily unavailable until payment instructions are configured. Please try again later.",
+      "chooseType": "Choose a mentor account type",
+      "changeType": "Change account type: {type}",
+      "courseOnly": "Course teacher settings are only available to course accounts.",
       "nextSteps": "Next, from your mentor panel: confirm your email, verify your identity (national ID only), then submit your mentor profile for review.",
       "submit": "Create mentor account",
       "haveAccount": "Already have an account?",
@@ -905,13 +936,19 @@
         "current": "Tell students about your experience and set your weekly availability.",
         "waiting": "A moderator is reviewing your application. We will email you the decision.",
         "locked": "Available once your identity is verified.",
-        "cta": "Open application"
+        "cta": "Open application",
+        "lockedPayment": "Available once your first payment is confirmed."
       },
       "listing": {
         "title": "Go live in the mentor directory",
         "current": "Your profile is approved but not taking bookings. Turn bookings on in your schedule.",
         "locked": "Your profile appears in the directory once your application is approved.",
         "cta": "Open schedule"
+      },
+      "payment": {
+        "title": "Pay the first monthly fee",
+        "current": "Transfer the fee using the details we emailed you, then reply to that email with the receipt. Your account is activated once it is confirmed.",
+        "waiting": "We received your receipt. A moderator is checking the transfer."
       }
     },
     "fee": {
@@ -1247,6 +1284,10 @@
   "dashboard": {
     "greeting": "Hi, {name}",
     "subtitle": "Here is what is happening on campus today",
+    "announcement": {
+      "label": "Campus announcement",
+      "eyebrow": "Campus update"
+    },
     "mentorPrompt": {
       "title": "Complete your mentor profile",
       "body": "Your account is ready. Submit your mentor profile to appear in the directory — a moderator reviews every application.",
@@ -1264,7 +1305,12 @@
       "subtitle": "Most bought this week",
       "viewAll": "View all"
     },
-    "rankings": { "universities": "Top universities", "noteSharers": "Top note sharers", "rank": "Rank {rank}", "meow": "Make the kitten meow" },
+    "rankings": {
+      "universities": "Top universities",
+      "noteSharers": "Top note sharers",
+      "rank": "Rank {rank}",
+      "meow": "Make the kitten meow"
+    },
     "feedAd": {
       "title": "Featured mentor",
       "badge": "Ad"
@@ -1319,7 +1365,55 @@
       "auditLogs": "Audit logs",
       "backToApp": "Back to app",
       "skipToContent": "Skip to content",
-      "reviews": "Reviews"
+      "reviews": "Reviews",
+      "announcements": "Announcements",
+      "mentorPayments": "Mentor payments"
+    },
+    "announcements": {
+      "title": "Announcements",
+      "description": "Create polished, scheduled announcements for the top of the student dashboard.",
+      "newTitle": "New announcement",
+      "editTitle": "Edit announcement",
+      "cancelEdit": "Cancel edit",
+      "create": "Publish announcement",
+      "saveChanges": "Save changes",
+      "saving": "Saving…",
+      "preview": "Live preview",
+      "previewTitle": "Your announcement title",
+      "previewBody": "Your message will appear here.",
+      "listTitle": "All announcements",
+      "empty": "No announcements yet",
+      "emptyHint": "Create one to share a campus update with students.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "edit": "Edit announcement",
+      "delete": "Delete announcement",
+      "confirmDelete": "Delete this announcement? This cannot be undone.",
+      "created": "Announcement created.",
+      "updated": "Announcement updated.",
+      "deleted": "Announcement deleted.",
+      "imageUploaded": "Image uploaded.",
+      "removeImage": "Remove image",
+      "imageTooLarge": "Choose an image smaller than 4 MB.",
+      "invalidImage": "This image could not be processed.",
+      "fields": {
+        "title": "Headline",
+        "body": "Message",
+        "actionLabel": "Action button text",
+        "actionUrl": "Action link",
+        "startsAt": "Starts at (optional)",
+        "endsAt": "Ends at (optional)",
+        "accent": "Color style",
+        "image": "Upload image",
+        "active": "Publish when saved"
+      },
+      "accents": {
+        "violet": "Violet",
+        "blue": "Ocean",
+        "amber": "Sunset",
+        "rose": "Berry",
+        "emerald": "Mint"
+      }
     },
     "common": {
       "all": "All",
@@ -1700,9 +1794,46 @@
       "rejectHint": "Reason for declining (emailed to the user)",
       "confirmTitle": "Delete this account?",
       "confirmBody": "This soft-deletes @{nickname}, signs them out everywhere and emails them. Type the nickname to confirm."
+    },
+    "mentorPayments": {
+      "title": "Mentor payments",
+      "description": "Receipts mentors sent in reply to the payment email. Check the transfer in the support mailbox, then decide. Approving the first receipt activates the mentor account.",
+      "tabs": {
+        "PENDING": "Pending",
+        "APPROVED": "Approved",
+        "INVALID": "Rejected"
+      },
+      "empty": "No receipts here.",
+      "noAccount": "Account deleted",
+      "awaitingActivation": "Awaiting activation",
+      "decidedAt": "Decided {when}",
+      "approve": "Approve",
+      "reject": "Reject",
+      "confirmApprove": "Approve the payment from {name}? If the account is waiting for activation, it becomes an active mentor now.",
+      "confirmReject": "Reject the receipt from {name}? They will be emailed and can send a new one.",
+      "activated": "Payment approved. The mentor account is now active.",
+      "approved": "Payment approved.",
+      "rejected": "Receipt rejected."
     }
   },
   "settings": {
+    "courseTeachers": {
+      "title": "Course teachers",
+      "description": "Set up each instructor's profile picture, biography, specialization and weekly timetable. These profiles are managed by this course account.",
+      "empty": "No instructors added yet.",
+      "teacher": "Teacher",
+      "picture": "Profile picture",
+      "name": "Full name",
+      "specialization": "Specialization",
+      "bio": "Biography",
+      "timezone": "Time zone",
+      "availability": "Weekly availability",
+      "add": "Add instructor",
+      "remove": "Remove instructor",
+      "save": "Save teacher settings",
+      "saved": "Teacher settings saved.",
+      "application": "Course profile application"
+    },
     "title": "Settings",
     "subtitle": "Manage your profile and privacy",
     "saved": "Your changes were saved",
@@ -2128,7 +2259,10 @@
     "edited": "edited",
     "deleted": "Message deleted",
     "delete": "Delete message",
-    "deleteConfirm": { "title": "Delete this message?", "body": "It will be removed for everyone in this conversation." },
+    "deleteConfirm": {
+      "title": "Delete this message?",
+      "body": "It will be removed for everyone in this conversation."
+    },
     "sending": "Sending…",
     "placeholder": "Write a message…",
     "send": "Send",
@@ -2162,6 +2296,7 @@
       "requestQuota": "You've started too many message requests today. Try again tomorrow.",
       "requestGone": "This request was already answered or withdrawn.",
       "editLatestOnly": "Only your latest sent message can be edited.",
+      "editDisabled": "Message editing is temporarily unavailable.",
       "messageNotFound": "That message could not be found.",
       "invalid": "Write a message of up to 2000 characters."
     }

@@ -60,6 +60,10 @@ export type TemplateName =
   | 'mentorApplicationSubmitted'
   | 'mentorApplicationApproved'
   | 'mentorApplicationRejected'
+  | 'mentorPaymentInstructions'
+  | 'mentorReceiptReceived'
+  | 'mentorPaymentApproved'
+  | 'mentorPaymentInvalid'
   | 'noteApproved'
   | 'noteRejected'
   | 'followRequest'
@@ -134,6 +138,44 @@ export const TEMPLATES = {
         text: 'If you did not create this account, please contact support and do not click the button above.',
       },
     ],
+  }),
+
+  mentorPaymentInstructions: (p: { nickname: string; monthlyFee: number; bankName: string; cardholder: string; cardNumber: string }): EmailContent => ({
+    subject: 'Mentor subscription payment instructions',
+    heading: 'Complete your mentor subscription payment',
+    preheader: `Manual bank transfer instructions for ${p.monthlyFee} AZN per month.`,
+    blocks: [
+      { kind: 'paragraph', text: hi(p.nickname) },
+      { kind: 'paragraph', text: `Your mentor subscription is ${p.monthlyFee} AZN per month. Transfer the amount manually using the official details below; no payment is processed inside the platform.` },
+      { kind: 'facts', rows: [
+        { label: 'Bank', value: p.bankName },
+        { label: 'Cardholder', value: p.cardholder },
+        { label: 'Card number', value: p.cardNumber },
+        { label: 'Monthly fee', value: `${p.monthlyFee} AZN` },
+      ] },
+      { kind: 'paragraph', text: 'Reply to this email and attach your payment receipt. We will review it and email you the result.' },
+    ],
+  }),
+
+  mentorReceiptReceived: (): EmailContent => ({
+    subject: 'We received your payment receipt',
+    heading: 'Payment receipt received',
+    preheader: 'Your payment receipt is being reviewed.',
+    blocks: [{ kind: 'paragraph', text: 'Thank you. Your payment receipt is being reviewed. You will receive a status update (Account Approved / Invalid Receipt) within maximum 3 business days.' }],
+  }),
+
+  mentorPaymentApproved: (p: { nickname: string }): EmailContent => ({
+    subject: 'Mentor account approved',
+    heading: 'Account Approved',
+    preheader: 'Your payment receipt was approved.',
+    blocks: [{ kind: 'paragraph', text: hi(p.nickname) }, { kind: 'paragraph', text: 'Your payment receipt is valid and your mentor account has been approved.' }],
+  }),
+
+  mentorPaymentInvalid: (p: { nickname: string }): EmailContent => ({
+    subject: 'Mentor payment receipt needs attention',
+    heading: 'Invalid Receipt',
+    preheader: 'Your payment receipt could not be validated.',
+    blocks: [{ kind: 'paragraph', text: hi(p.nickname) }, { kind: 'paragraph', text: 'We could not validate your payment receipt. Please reply with a clear receipt showing the transfer details.' }],
   }),
 
   verificationSubmitted: (p: { nickname: string }): EmailContent => ({

@@ -72,6 +72,10 @@ export const SAMPLE_PARAMS = {
     nickname: 'aysel',
     reason: 'Please add more detail about your work experience.',
   },
+  mentorPaymentInstructions: { nickname: 'aysel', monthlyFee: 10, bankName: 'Example Bank', cardholder: 'CampusNoteHub', cardNumber: '0000 0000 0000 0000' },
+  mentorReceiptReceived: undefined,
+  mentorPaymentApproved: { nickname: 'aysel' },
+  mentorPaymentInvalid: { nickname: 'aysel' },
   noteApproved: { nickname: 'aysel', title: 'Alqoritmlər - tam semestr konspekti' },
   noteRejected: {
     nickname: 'aysel',

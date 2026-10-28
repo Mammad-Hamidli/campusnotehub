@@ -77,6 +77,8 @@ function selfProjection(user: UserRecord) {
     locale: user.locale,
     timezone: user.timezone,
     role: user.role,
+    mentorType: user.mentorType ?? null,
+    mentorRegistrationStatus: user.mentorRegistrationStatus ?? null,
     accountStatus: user.accountStatus,
     frozenUntil: user.frozenUntil,
     frozenReason: user.frozenReason,
@@ -240,12 +242,17 @@ const patchSchema = z
     /** null clears it. */
     graduationYear: z.number().int().min(1950).max(new Date().getFullYear() + 10).nullable().optional(),
     graduationMonth: z.number().int().min(1).max(12).nullable().optional(),
+    /**
+     * Organisation-safe here; the stricter person-name rule is applied in the
+     * handler for everyone except course accounts, whose name is a business
+     * name ("A+ Learning Center") - the same split as mentorRegisterSchema.
+     */
     fullName: z
       .string()
       .trim()
       .min(3)
       .max(120)
-      .regex(/^[\p{L}\s'-]+$/u, 'errors.validationFailed')
+      .regex(/^[^<>\u0000-\u001f]+$/u, 'errors.validationFailed')
       .optional(),
     headline: z.string().trim().max(160).optional(),
     bio: z.string().trim().max(1000).optional(),
@@ -296,7 +303,15 @@ export async function PATCH(request: NextRequest) {
   const input = parsed.data;
   const data: Record<string, unknown> = {};
 
-  if (input.fullName !== undefined) data.fullName = input.fullName;
+  if (input.fullName !== undefined) {
+    if (!/^[\p{L}\s'-]+$/u.test(input.fullName) && (await findUserById(userId))?.mentorType !== 'COURSE') {
+      return NextResponse.json(
+        { error: 'errors.validationFailed', fields: { fullName: ['errors.validationFailed'] } },
+        { status: 400 },
+      );
+    }
+    data.fullName = input.fullName;
+  }
   // An emptied optional text field means "clear it", which is null in the
   // database rather than an empty string - otherwise `headline: ''` renders as
   // a blank line where the UI expected nothing at all.

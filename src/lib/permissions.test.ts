@@ -88,3 +88,12 @@ describe('mentors:console - the mentor panel', () => {
     expect(can(null, 'mentors:console')).toBe(false);
   });
 });
+
+describe('an unpaid /mentors/join account', () => {
+  it('keeps the mentor panel but cannot offer sessions, even once verified', () => {
+    const pending = viewer({ role: UserRole.MENTOR, verificationStatus: VerificationStatus.VERIFIED, mentorActivationPending: true });
+    expect(can(pending, 'mentors:console')).toBe(true);
+    expect(can(pending, 'mentors:offer')).toBe(false);
+    expect(can({ ...pending, mentorActivationPending: false }, 'mentors:offer')).toBe(true);
+  });
+});

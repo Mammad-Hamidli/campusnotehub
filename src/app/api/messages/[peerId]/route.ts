@@ -4,7 +4,7 @@ import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 import { can, denialKey } from '@/lib/permissions';
 import { findUserById } from '@/lib/firebase/repositories/users';
 import { listEditedMessages, listMessages, markInboxRead } from '@/lib/firebase/repositories/messages';
-import { deleteSentMessage, editSentMessage, loadThread, MAX_MESSAGE_LENGTH, MAX_REQUEST_MESSAGES, sendMessage } from '@/lib/messages/service';
+import { deleteSentMessage, loadThread, MAX_MESSAGE_LENGTH, MAX_REQUEST_MESSAGES, sendMessage } from '@/lib/messages/service';
 import { chatMessage, chatPeer, isMessageable, USER_ID } from '@/lib/messages/serialize';
 import { clientIp, rateLimit } from '@/lib/security/ratelimit';
 import { visibilityRelationshipsFor } from '@/lib/profile/visibility.server';
@@ -160,34 +160,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   );
 }
 
-const editSchema = z.object({ messageId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/), body: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH) });
 const messageIdSchema = z.object({ messageId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/) });
 
-/** PATCH /api/messages/:peerId edits only the sender's most recent message. */
+/** Message editing is temporarily disabled across the product. */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ peerId: string }> }) {
   const auth = await authenticate(request);
   if (!auth) return unauthorized();
-  if (!can(auth.viewer, 'messages:send')) return NextResponse.json({ error: denialKey(auth.viewer, 'messages:send') }, { status: 403 });
-  const { peerId } = await params;
-  const parsed = editSchema.safeParse(await request.json().catch(() => null));
-  if (!USER_ID.test(peerId) || !parsed.success) return unavailable();
-  const peer = await findUserById(peerId);
-  if (!isMessageable(peer, auth.userId)) return unavailable();
-  let editedAt: Date | null;
-  try {
-    editedAt = await editSentMessage({ senderId: auth.userId, recipientId: peerId, ...parsed.data });
-  } catch (error) {
-    console.error('[messages:edit] Failed to persist message edit', {
-      senderId: auth.userId,
-      recipientId: peerId,
-      messageId: parsed.data.messageId,
-      error,
-    });
-    return NextResponse.json({ error: 'errors.serverError' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
-  }
-  return editedAt
-    ? NextResponse.json({ ok: true, editedAt: editedAt.toISOString() }, { headers: { 'Cache-Control': 'no-store' } })
-    : NextResponse.json({ error: 'messages.errors.editLatestOnly' }, { status: 409 });
+  return NextResponse.json({ error: 'messages.errors.editDisabled' }, { status: 410, headers: { 'Cache-Control': 'no-store' } });
 }
 
 /** DELETE /api/messages/:peerId removes any message authored by the caller. */

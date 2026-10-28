@@ -18,6 +18,7 @@ import {
 } from '@/lib/firebase/repositories/sessions';
 import { findUserById, updateUser } from '@/lib/firebase/repositories/users';
 import type { Viewer } from '@/lib/permissions';
+import { mentorActivationPending } from '@/lib/mentors/membership';
 
 /**
  * Access-token lifetime.
@@ -594,6 +595,7 @@ async function loadSession(request?: NextRequest, passive = false): Promise<Sess
       profileIncomplete: user.profileIncomplete === true,
       passwordSetupRequired: user.passwordSetupRequired === true,
       mentorSince: user.mentorSince ?? null,
+      mentorActivationPending: mentorActivationPending(user),
     },
   };
 }

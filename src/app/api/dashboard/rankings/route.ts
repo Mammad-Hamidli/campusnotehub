@@ -9,6 +9,16 @@ import { requireSession, UnauthorizedError } from '@/lib/auth/session';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/**
+ * The same for every viewer and expensive to build (one count per university
+ * plus up to 20k note reads), so each instance rebuilds it at most every ten
+ * minutes instead of on every dashboard load.
+ */
+const TTL_MS = 10 * 60 * 1000;
+let cached: { at: number; body: Promise<Rankings> } | null = null;
+
+type Rankings = Awaited<ReturnType<typeof buildRankings>>;
+
 /** Dashboard community rankings, based on active students and published notes. */
 export async function GET(request: NextRequest) {
   try {
@@ -18,6 +28,16 @@ export async function GET(request: NextRequest) {
     throw error;
   }
 
+  if (!cached || Date.now() - cached.at > TTL_MS) {
+    const body = buildRankings();
+    cached = { at: Date.now(), body };
+    // A failed build must not be served for the next ten minutes.
+    body.catch(() => { if (cached?.body === body) cached = null; });
+  }
+  return NextResponse.json(await cached.body, { headers: { 'Cache-Control': 'private, no-store' } });
+}
+
+async function buildRankings() {
   const universities = await listUniversities();
   const db = adminDb();
   const universityCounts = await Promise.all(universities.map(async (university) => {
@@ -57,8 +77,8 @@ export async function GET(request: NextRequest) {
       : [];
   }).slice(0, 5);
 
-  return NextResponse.json({
+  return {
     universities: universityCounts.sort((a, b) => b.count - a.count || a.code.localeCompare(b.code)).slice(0, 10),
     topNoteSharers: users,
-  }, { headers: { 'Cache-Control': 'private, no-store' } });
+  };
 }

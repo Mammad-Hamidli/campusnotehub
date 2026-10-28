@@ -4,6 +4,8 @@ import { simpleParser } from 'mailparser';
 import { adminDb } from '@/lib/firebase/admin.core';
 import { COLLECTIONS } from '@/lib/firebase/collections';
 import { MAIL_ACCOUNT, roleMailbox } from './identity';
+import { findUserByEmail } from '@/lib/firebase/repositories/users';
+import { sendEmailAsync } from './send';
 
 /**
  * Inbound mail: the platform mailbox, over IMAP.
@@ -18,9 +20,9 @@ import { MAIL_ACCOUNT, roleMailbox } from './identity';
  * users write, nothing answers, and no log records it.
  *
  * This reads UNSEEN messages, records each one in Firestore where the admin
- * side can see it, and marks it seen so the next run does not re-read it. It
- * does NOT reply, delete, or move anything by default - a human still works
- * the mailbox in Gmail, and this is the copy the product can act on.
+ * side can see it, and marks it seen so the next run does not re-read it.
+ * Mentor payment receipts get a narrow, deduplicated acknowledgment; other
+ * messages remain available for the team to work in Gmail.
  *
  * ---------------------------------------------------------------------------
  * THE MAILBOX IS FIXED
@@ -130,6 +132,12 @@ export async function drainSupportInbox(limit = 25): Promise<InboxResult> {
         if (stored) result.stored += 1;
         else result.skipped += 1;
 
+        // The support copy above is the record of truth; a receipt-queue failure
+        // must not leave the message unseen and stall every later run on it.
+        await recordMentorPaymentReceipt(parsed, uid).catch((error) => {
+          console.error('[inbox] mentor payment receipt not recorded', error);
+        });
+
         // Only after the row is safely written: a crash before this point
         // leaves the message unseen and it is simply read again, whereas
         // marking first would lose it.
@@ -151,6 +159,63 @@ export async function drainSupportInbox(limit = 25): Promise<InboxResult> {
 }
 
 type Parsed = Awaited<ReturnType<typeof simpleParser>>;
+
+/** Route replies to the mentor payment instructions into the review queue. */
+async function recordMentorPaymentReceipt(parsed: Parsed, uid: number): Promise<void> {
+  const fromAddress = parsed.from?.value?.[0]?.address?.trim().toLowerCase();
+  const subject = parsed.subject?.trim() ?? '';
+  if (!fromAddress || !/(mentor subscription payment instructions|payment receipt)/i.test(subject)) return;
+  // Our own acknowledgement ("We received your payment receipt") matches the
+  // subject rule, so an out-of-office reply to it would otherwise become a new
+  // receipt, a new acknowledgement, another auto-reply - forever.
+  if (isAutomatedReply(parsed)) return;
+
+  const user = await findUserByEmail(fromAddress);
+  // A mentor account: active (mentorSince) or still waiting for the first
+  // payment to be approved (mentorRegistrationStatus set, mentorSince null).
+  if (!user || user.deletedAt || (!user.mentorSince && !user.mentorRegistrationStatus)) return;
+
+  const id = documentId(parsed.messageId, uid);
+  const receipts = adminDb().collection(COLLECTIONS.mentorPaymentReceipts);
+  const ref = receipts.doc(id);
+  // Equality-only filters: served by Firestore's single-field indexes.
+  const alreadyPending = !(await receipts.where('userId', '==', user.id).where('status', '==', 'PENDING').limit(1).get()).empty;
+  const created = await adminDb().runTransaction(async (tx) => {
+    const existing = await tx.get(ref);
+    if (existing.exists) return false;
+    tx.create(ref, {
+      userId: user.id,
+      status: 'PENDING',
+      fromAddress,
+      subject: subject.slice(0, 500),
+      receivedAt: new Date(),
+      attachmentNames: (parsed.attachments ?? []).map((file) => file.filename?.slice(0, 255) ?? 'attachment'),
+      decidedAt: null,
+      decidedById: null,
+    });
+    return true;
+  });
+  // One acknowledgement per review cycle: follow-up mail while a receipt is
+  // still pending is queued for the moderator but not answered again.
+  if (created && !alreadyPending) {
+    sendEmailAsync(fromAddress, 'mentorReceiptReceived', undefined, { dedupeKey: `mentor-receipt-received:${id}` });
+  }
+}
+
+/** RFC 3834 Auto-Submitted plus the de-facto vacation/list markers. */
+function isAutomatedReply(parsed: Parsed): boolean {
+  // mailparser hands structured headers back as { value, params }.
+  const header = (name: string) => {
+    const raw = parsed.headers.get(name) as unknown;
+    const value = raw && typeof raw === 'object' && 'value' in raw ? (raw as { value: unknown }).value : raw;
+    return String(value ?? '').trim().toLowerCase();
+  };
+  const autoSubmitted = header('auto-submitted');
+  return (autoSubmitted !== '' && autoSubmitted !== 'no')
+    || /^(bulk|junk|list|auto_reply)$/.test(header('precedence'))
+    || parsed.headers.has('x-autoreply')
+    || parsed.headers.has('x-autorespond');
+}
 
 /** Returns false when this message was already recorded. */
 async function store(parsed: Parsed, uid: number): Promise<boolean> {

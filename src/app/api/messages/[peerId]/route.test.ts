@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import { createFakeFirestore } from '@/test/fakeFirestore';
 
 const fake = createFakeFirestore();
+vi.mock('server-only', () => ({}));
 vi.mock('@/lib/firebase/admin.core', () => ({ adminDb: () => fake.db }));
 
 const quota = { 'messages:send': true, 'messages:request': true } as Record<string, boolean>;

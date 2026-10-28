@@ -21,6 +21,7 @@ import { SavedPosts } from './SavedPosts';
 import { can, type Viewer as PermissionViewer } from '@/lib/permissions';
 import { GradCap } from '@/components/ui/GradCap';
 import { FEED_UPLOAD_MAX_SIDE, uploadImage } from '@/lib/media/browser-upload';
+import { DashboardAnnouncement } from './DashboardAnnouncement';
 
 /** 'all' or a university code. The codes are loaded from /api/universities. */
 type UniversityFilter = string;
@@ -439,15 +440,18 @@ export function DashboardShell({
               </div>
             )}
 
-            <header className="mb-5">
-              <h1 className="text-xl font-bold tracking-tight text-fg">
-                {t('dashboard.greeting', { name: viewer.nickname })}
-                {/* Inline and em-sized: shorter than the line box, so the
-                    heading's height is unchanged. */}
-                <GradCap className="ml-2 w-[1.3em] align-[-0.12em]" />
-              </h1>
-              <p className="mt-0.5 text-sm text-fg-muted">{t('dashboard.subtitle')}</p>
-            </header>
+            <div className="relative">
+              <DashboardAnnouncement />
+              <header className="mb-5">
+                <h1 className="text-xl font-bold tracking-tight text-fg">
+                  {t('dashboard.greeting', { name: viewer.nickname })}
+                  {/* Inline and em-sized: shorter than the line box, so the
+                      heading's height is unchanged. */}
+                  <GradCap className="ml-2 w-[1.3em] align-[-0.12em]" />
+                </h1>
+                <p className="mt-0.5 text-sm text-fg-muted">{t('dashboard.subtitle')}</p>
+              </header>
+            </div>
 
             {tab === 'feed' && focusPostId ? (
               <FocusedPost

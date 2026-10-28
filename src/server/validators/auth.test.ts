@@ -148,12 +148,15 @@ describe('splitFullName', () => {
 });
 
 describe('mentorRegisterSchema - mentor sign-up at /mentors/join', () => {
-  it('accepts the student fields', () => {
-    expect(mentorRegisterSchema.safeParse(student).success).toBe(true);
+  const individual = { ...student, mentorType: 'INDIVIDUAL' };
+  const course = { ...student, universityId: undefined, fullName: 'A+ Learning Center', email: 'office@course.az', mentorType: 'COURSE', courseEmail: 'office@course.az', teacherCount: 2 };
+
+  it('accepts individual fields with an optional university', () => {
+    expect(mentorRegisterSchema.safeParse(individual).success).toBe(true);
   });
 
   it('makes the university optional', () => {
-    const rest: Record<string, unknown> = { ...student };
+    const rest: Record<string, unknown> = { ...individual };
     delete rest.universityId;
     const parsed = mentorRegisterSchema.safeParse(rest);
     expect(parsed.success).toBe(true);
@@ -161,18 +164,33 @@ describe('mentorRegisterSchema - mentor sign-up at /mentors/join', () => {
   });
 
   it('still refuses an unknown university code when one is given', () => {
-    expect(mentorRegisterSchema.safeParse({ ...student, universityId: 'NOPE' }).success).toBe(false);
+    expect(mentorRegisterSchema.safeParse({ ...individual, universityId: 'NOPE' }).success).toBe(false);
+  });
+
+  it('requires one course email and at least two teachers without a university', () => {
+    expect(mentorRegisterSchema.safeParse(course).success).toBe(true);
+    expect(mentorRegisterSchema.safeParse({ ...course, universityId: 'BDU' }).success).toBe(false);
+    expect(mentorRegisterSchema.safeParse({ ...course, teacherCount: 1 }).success).toBe(false);
+    expect(mentorRegisterSchema.safeParse({ ...course, teacherCount: undefined }).success).toBe(false);
+  });
+
+  it('refuses a course email that differs from the confirmed account email', () => {
+    expect(mentorRegisterSchema.safeParse({ ...course, courseEmail: 'someone-else@example.com' }).success).toBe(false);
+  });
+
+  it('rejects person-name punctuation for Individual registrations', () => {
+    expect(mentorRegisterSchema.safeParse({ ...individual, fullName: 'A+ Learning Center' }).success).toBe(false);
   });
 
   it('never takes the role from the body', () => {
-    const parsed = mentorRegisterSchema.safeParse({ ...student, role: 'ADMIN', accountType: 'TEACHER' });
+    const parsed = mentorRegisterSchema.safeParse({ ...individual, role: 'ADMIN', accountType: 'TEACHER' });
     expect(parsed.success && 'role' in parsed.data).toBe(false);
     expect(parsed.success && 'accountType' in parsed.data).toBe(false);
   });
 
   it('keeps every other field required', () => {
     for (const key of ['fullName', 'nickname', 'email', 'phone', 'password'] as const) {
-      const rest: Record<string, unknown> = { ...student };
+      const rest: Record<string, unknown> = { ...individual };
       delete rest[key];
       expect(mentorRegisterSchema.safeParse(rest).success).toBe(false);
     }

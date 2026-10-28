@@ -4,7 +4,7 @@ import { docToObject, docsToObjects, forFirestore } from '../convert';
 import { findMentorByUserId, mentorCollections, replaceRulesInBatch } from './mentors';
 import type { WeeklyRule } from '@/lib/mentors/schedule';
 import type { UserRole } from '@/lib/enums';
-import { roleAfterMentorApproval } from '@/lib/mentors/membership';
+import { mentorActivationPending, roleAfterMentorApproval } from '@/lib/mentors/membership';
 
 /**
  * PocketMentor applications.
@@ -102,16 +102,12 @@ export async function rejectMentorApplication(
   actorId: string,
   reason: string,
 ): Promise<void> {
-  await applications()
-    .doc(userId)
-    .update(
-      forFirestore({
-        status: 'REJECTED',
-        decidedAt: new Date(),
-        decidedById: actorId,
-        rejectionReason: reason,
-      }),
-    );
+  await applications().doc(userId).update(forFirestore({
+    status: 'REJECTED',
+    decidedAt: new Date(),
+    decidedById: actorId,
+    rejectionReason: reason,
+  }));
 }
 
 /**
@@ -137,6 +133,11 @@ export async function approveMentorApplication(
     findMentorByUserId(application.userId),
     applicantRef.get(),
   ]);
+  // Approval publishes a bookable profile; an unpaid /mentors/join account
+  // must be activated by a payment receipt first.
+  if (applicantSnap.exists && mentorActivationPending({ mentorRegistrationStatus: applicantSnap.get('mentorRegistrationStatus') })) {
+    throw new Error('MENTOR_PAYMENT_PENDING');
+  }
   const profileRef = existing
     ? db.collection(COLLECTIONS.mentorProfiles).doc(existing.id)
     : db.collection(COLLECTIONS.mentorProfiles).doc();

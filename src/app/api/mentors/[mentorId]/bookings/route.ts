@@ -7,6 +7,7 @@ import { can } from '@/lib/permissions';
 import { rateLimit, clientIp } from '@/lib/security/ratelimit';
 import { assertSlotBookable, BookingError, getDaySlots } from '@/lib/mentors/availability';
 import { createSessionRequest } from '@/lib/mentors/request-service';
+import { mentorActivationPending } from '@/lib/mentors/membership';
 
 export const runtime = 'nodejs';
 
@@ -102,6 +103,12 @@ export async function POST(
     const { endsAt, sessionMinutes } = await assertSlotBookable({ mentorId, startsAt, menteeId: userId });
     const [mentor, mentee] = await Promise.all([findMentorById(mentorId), findUserById(userId)]);
     if (!mentor || !mentee) return NextResponse.json({ error: 'errors.notFound' }, { status: 404 });
+    // Only an activated (paid) mentor account takes requests. Its profile
+    // should not be approved before that, but an approval is not the gate.
+    const owner = await findUserById(mentor.userId);
+    if (!owner || owner.deletedAt || mentorActivationPending(owner)) {
+      return NextResponse.json({ error: 'mentors.notAccepting' }, { status: 409 });
+    }
 
     const { booking, replay } = await createSessionRequest({
       mentor: { id: mentor.id, userId: mentor.userId, timezone: mentor.timezone },

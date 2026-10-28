@@ -454,7 +454,10 @@
       "tag": "#{tag}"
     },
     "empty": "Hələ paylaşım yoxdur. İlk sən ol.",
-    "saved": { "title": "Saxlanılmış paylaşımlar", "empty": "Hələ saxlanılmış paylaşımınız yoxdur." },
+    "saved": {
+      "title": "Saxlanılmış paylaşımlar",
+      "empty": "Hələ saxlanılmış paylaşımınız yoxdur."
+    },
     "loadNew": "{count} yeni paylaşım",
     "scrollToTop": "Yuxarı qayıt",
     "deleted": "Bu paylaşım silinib",
@@ -642,6 +645,11 @@
     "signInToDownload": "Yükləmək üçün daxil olun"
   },
   "mentors": {
+    "payment": {
+      "alreadyDecided": "Bu ödəniş qəbzi artıq yoxlanılıb.",
+      "required": "Mentor hesabınız ilk ödənişiniz təsdiqləndikdən sonra aktivləşir. Ödəniş təlimatı məktubuna qəbzlə cavab verin.",
+      "pendingForApproval": "Bu mentor hələ ödəniş etməyib. Əvvəlcə ödəniş qəbzini təsdiqləyin."
+    },
     "title": "PocketMentor",
     "subtitle": "Peşəkarlarla birbaşa karyera məsləhəti",
     "becomeMentor": "Mentor ol",
@@ -815,6 +823,29 @@
       "title": "Mentor hesabınızı yaradın",
       "subtitle": "Təcrübənizi tələbələrlə bölüşün. Hesabınız dərhal hazır olur; mentor profiliniz isə moderator yoxladıqdan sonra dərc olunur.",
       "universityHint": "İstəyə bağlıdır. Heç bir universitetlə əlaqəniz yoxdursa, boş saxlayın.",
+      "type": "Mentor hesabının növü",
+      "individual": "Şəxsi",
+      "course": "Kurs",
+      "typeRequired": "Davam etmək üçün Fərdi və ya Kurs / şirkət seçin.",
+      "courseEmail": "Kursun əsas e-poçt ünvanı",
+      "courseName": "Kurs adı",
+      "teacherCount": "Müəllim / təlimçi sayı (minimum 2)",
+      "teacherCountInvalid": "2 ilə 30 arasında tam ədəd daxil edin.",
+      "courseEmailRequired": "Kursun əsas e-poçt ünvanını daxil edin.",
+      "courseEmailInvalid": "Düzgün kurs e-poçt ünvanı daxil edin.",
+      "teachers": "Müəllimlər / təlimçilər",
+      "teacherName": "Ad və soyad",
+      "teacherSpecialization": "Bioqrafiya / ixtisaslaşma",
+      "teacherBio": "Əlavə bioqrafiya (istəyə bağlı)",
+      "teachersRequired": "Hər müəllim üçün ad və ixtisaslaşma daxil edin.",
+      "addTeacher": "Müəllim əlavə et",
+      "removeTeacher": "Müəllimi sil",
+      "monthlyFee": "Aylıq abunə haqqı: ayda {amount} AZN.",
+      "paymentNotice": "Platforma daxilində birbaşa ödəniş qəbul edilmir. Ödəniş təlimatları e-poçtunuza göndəriləcək.",
+      "paymentUnavailable": "Ödəniş təlimatları konfiqurasiya olunana qədər mentor qeydiyyatı müvəqqəti əlçatan deyil. Daha sonra yenidən cəhd edin.",
+      "chooseType": "Mentor hesabının növünü seçin",
+      "changeType": "Hesab növünü dəyiş: {type}",
+      "courseOnly": "Kurs müəllimlərinin parametrləri yalnız kurs hesablarında mövcuddur.",
       "nextSteps": "Sonrakı addımlar mentor panelinizdədir: e-poçtunuzu təsdiqləyin, şəxsiyyətinizi doğrulayın (yalnız şəxsiyyət vəsiqəsi), sonra mentor profilinizi yoxlamaya göndərin.",
       "submit": "Mentor hesabı yarat",
       "haveAccount": "Artıq hesabınız var?",
@@ -905,13 +936,19 @@
         "current": "Təcrübəniz barədə yazın və həftəlik əlçatanlığınızı seçin.",
         "waiting": "Müraciətiniz moderator tərəfindən yoxlanılır. Qərarı e-poçtla bildirəcəyik.",
         "locked": "Şəxsiyyətiniz doğrulandıqdan sonra əlçatan olacaq.",
-        "cta": "Müraciəti aç"
+        "cta": "Müraciəti aç",
+        "lockedPayment": "İlk ödənişiniz təsdiqləndikdən sonra mövcud olacaq."
       },
       "listing": {
         "title": "Mentor kataloquna çıxın",
         "current": "Profiliniz təsdiqlənib, lakin sifariş qəbul etmir. Cədvəldə sifarişləri aktivləşdirin.",
         "locked": "Müraciətiniz təsdiqləndikdən sonra profiliniz kataloqda görünəcək.",
         "cta": "Cədvəli aç"
+      },
+      "payment": {
+        "title": "İlk aylıq haqqı ödəyin",
+        "current": "Haqqı sizə göndərdiyimiz rekvizitlərlə köçürün, sonra həmin məktuba qəbzlə cavab verin. Təsdiqdən sonra hesabınız aktivləşəcək.",
+        "waiting": "Qəbzinizi aldıq. Moderator köçürməni yoxlayır."
       }
     },
     "fee": {
@@ -1247,6 +1284,10 @@
   "dashboard": {
     "greeting": "Salam, {name}",
     "subtitle": "Kampusda bu gün nə baş verir",
+    "announcement": {
+      "label": "Kampus elanı",
+      "eyebrow": "Kampus xəbəri"
+    },
     "mentorPrompt": {
       "title": "Mentor profilinizi tamamlayın",
       "body": "Hesabınız hazırdır. Kataloqda görünmək üçün mentor profilinizi göndərin — moderator hər müraciətə baxır.",
@@ -1264,7 +1305,12 @@
       "subtitle": "Bu həftə ən çox alınanlar",
       "viewAll": "Hamısına bax"
     },
-    "rankings": { "universities": "Ən çox tələbəsi olan universitetlər", "noteSharers": "Ən çox konspekt paylaşanlar", "rank": "Reytinq: {rank}", "meow": "Pişiyin miyoldamasını eşit" },
+    "rankings": {
+      "universities": "Ən çox tələbəsi olan universitetlər",
+      "noteSharers": "Ən çox konspekt paylaşanlar",
+      "rank": "Reytinq: {rank}",
+      "meow": "Pişiyin miyoldamasını eşit"
+    },
     "feedAd": {
       "title": "Seçilmiş mentor",
       "badge": "Reklam"
@@ -1319,7 +1365,55 @@
       "auditLogs": "Audit jurnalı",
       "backToApp": "Tətbiqə qayıt",
       "skipToContent": "Məzmuna keç",
-      "reviews": "Yoxlamalar"
+      "reviews": "Yoxlamalar",
+      "announcements": "Elanlar",
+      "mentorPayments": "Mentor ödənişləri"
+    },
+    "announcements": {
+      "title": "Elanlar",
+      "description": "Tələbə panelinin yuxarısında görünəcək rəngli və planlaşdırılmış elanlar yaradın.",
+      "newTitle": "Yeni elan",
+      "editTitle": "Elanı redaktə et",
+      "cancelEdit": "Redaktədən çıx",
+      "create": "Elanı yayımla",
+      "saveChanges": "Dəyişiklikləri saxla",
+      "saving": "Saxlanılır…",
+      "preview": "Canlı önbaxış",
+      "previewTitle": "Elanınızın başlığı",
+      "previewBody": "Elan mətni burada görünəcək.",
+      "listTitle": "Bütün elanlar",
+      "empty": "Hələ elan yoxdur",
+      "emptyHint": "Kampus xəbərlərini paylaşmaq üçün elan yaradın.",
+      "active": "Aktiv",
+      "inactive": "Deaktiv",
+      "edit": "Elanı redaktə et",
+      "delete": "Elanı sil",
+      "confirmDelete": "Bu elan silinsin? Bu əməliyyatı geri qaytarmaq olmur.",
+      "created": "Elan yaradıldı.",
+      "updated": "Elan yeniləndi.",
+      "deleted": "Elan silindi.",
+      "imageUploaded": "Şəkil yükləndi.",
+      "removeImage": "Şəkli sil",
+      "imageTooLarge": "4 MB-dan kiçik şəkil seçin.",
+      "invalidImage": "Bu şəkli emal etmək mümkün olmadı.",
+      "fields": {
+        "title": "Başlıq",
+        "body": "Mətn",
+        "actionLabel": "Düymənin mətni",
+        "actionUrl": "Düymə keçidi",
+        "startsAt": "Başlama vaxtı (istəyə görə)",
+        "endsAt": "Bitmə vaxtı (istəyə görə)",
+        "accent": "Rəng üslubu",
+        "image": "Şəkil yüklə",
+        "active": "Yadda saxlayanda yayımla"
+      },
+      "accents": {
+        "violet": "Bənövşəyi",
+        "blue": "Okean",
+        "amber": "Günbatımı",
+        "rose": "Giləmeyvə",
+        "emerald": "Nanə"
+      }
     },
     "common": {
       "all": "Hamısı",
@@ -1700,9 +1794,46 @@
       "rejectHint": "Rədd səbəbi (istifadəçiyə e-poçtla göndərilir)",
       "confirmTitle": "Bu hesab silinsin?",
       "confirmBody": "@{nickname} hesabı silinəcək, bütün cihazlardan çıxış ediləcək və ona e-poçt göndəriləcək. Təsdiq üçün ləqəbi yazın."
+    },
+    "mentorPayments": {
+      "title": "Mentor ödənişləri",
+      "description": "Mentorların ödəniş məktubuna cavab olaraq göndərdiyi qəbzlər. Köçürməni dəstək poçt qutusunda yoxlayın, sonra qərar verin. İlk qəbzin təsdiqi mentor hesabını aktivləşdirir.",
+      "tabs": {
+        "PENDING": "Gözləyir",
+        "APPROVED": "Təsdiqlənib",
+        "INVALID": "Rədd edilib"
+      },
+      "empty": "Burada qəbz yoxdur.",
+      "noAccount": "Hesab silinib",
+      "awaitingActivation": "Aktivləşdirmə gözləyir",
+      "decidedAt": "Qərar: {when}",
+      "approve": "Təsdiqlə",
+      "reject": "Rədd et",
+      "confirmApprove": "{name} tərəfindən ödənişi təsdiqləyirsiniz? Hesab aktivləşdirmə gözləyirsə, indi aktiv mentor olacaq.",
+      "confirmReject": "{name} tərəfindən qəbzi rədd edirsiniz? Mentora məktub göndəriləcək və yeni qəbz göndərilə bilər.",
+      "activated": "Ödəniş təsdiqləndi. Mentor hesabı artıq aktivdir.",
+      "approved": "Ödəniş təsdiqləndi.",
+      "rejected": "Qəbz rədd edildi."
     }
   },
   "settings": {
+    "courseTeachers": {
+      "title": "Kurs müəllimləri",
+      "description": "Hər təlimçi üçün profil şəklini, bioqrafiyanı, ixtisaslaşmanı və həftəlik cədvəli qurun. Bu profilləri kurs hesabı idarə edir.",
+      "empty": "Hələ təlimçi əlavə edilməyib.",
+      "teacher": "Müəllim",
+      "picture": "Profil şəkli",
+      "name": "Ad və soyad",
+      "specialization": "İxtisaslaşma",
+      "bio": "Bioqrafiya",
+      "timezone": "Saat qurşağı",
+      "availability": "Həftəlik uyğunluq cədvəli",
+      "add": "Təlimçi əlavə et",
+      "remove": "Təlimçini sil",
+      "save": "Müəllim məlumatlarını yadda saxla",
+      "saved": "Müəllim məlumatları yadda saxlandı.",
+      "application": "Kurs profili üçün müraciət"
+    },
     "title": "Tənzimləmələr",
     "subtitle": "Profilinizi və məxfilik parametrlərinizi idarə edin",
     "saved": "Dəyişikliklər saxlanıldı",
@@ -2128,7 +2259,10 @@
     "edited": "redaktə edildi",
     "deleted": "Mesaj silindi",
     "delete": "Mesajı sil",
-    "deleteConfirm": { "title": "Bu mesaj silinsin?", "body": "Söhbətdə hər kəs üçün silinəcək." },
+    "deleteConfirm": {
+      "title": "Bu mesaj silinsin?",
+      "body": "Söhbətdə hər kəs üçün silinəcək."
+    },
     "sending": "Göndərilir…",
     "placeholder": "Mesaj yazın…",
     "send": "Göndər",
@@ -2162,6 +2296,7 @@
       "requestQuota": "Bu gün həddən çox mesaj sorğusu göndərmisiniz. Sabah yenidən cəhd edin.",
       "requestGone": "Bu sorğu artıq cavablandırılıb və ya geri götürülüb.",
       "editLatestOnly": "Yalnız göndərdiyiniz son mesajı redaktə edə bilərsiniz.",
+      "editDisabled": "Mesaj redaktəsi müvəqqəti əlçatan deyil.",
       "messageNotFound": "Mesaj tapılmadı.",
       "invalid": "2000 simvoladək mesaj yazın."
     }

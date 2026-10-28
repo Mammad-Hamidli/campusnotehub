@@ -7,7 +7,7 @@ import { ContactForm } from './ContactForm';
 import { useT } from '@/lib/i18n/LocaleProvider';
 
 /** Floating support entry point. Messages use the same protected contact API. */
-export function SupportWidget() {
+export function SupportWidget({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
   const pathname = usePathname();
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -48,7 +48,7 @@ export function SupportWidget() {
     <>
       <div data-support-controls className="pointer-events-none fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-30 w-max sm:bottom-5 sm:right-5">
         <div className="relative w-max">
-          {pathname === '/profile' && <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+0.25rem)] flex justify-center">
+          {pathname === '/' && !isAuthenticated && <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+0.25rem)] flex justify-center">
             <button
               type="button"
               data-support-kitten

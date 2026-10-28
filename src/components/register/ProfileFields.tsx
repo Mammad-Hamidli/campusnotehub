@@ -25,6 +25,8 @@ export function ProfileFields({
   onUniversityPicked,
   universityHint,
   universityOptional = false,
+  showUniversity = true,
+  fullNameLabel,
 }: {
   value: ProfileForm;
   errors: ProfileErrors;
@@ -41,6 +43,10 @@ export function ProfileFields({
   universityHint?: string;
   /** Mentor signup: a mentor need not belong to a university. */
   universityOptional?: boolean;
+  /** Course signup uses the organization name in the shared name field. */
+  fullNameLabel?: string;
+  /** Hide institution details when they do not apply to this registration. */
+  showUniversity?: boolean;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -49,7 +55,7 @@ export function ProfileFields({
 
   return (
     <div className="space-y-5">
-      <Field id="fullName" label={t('auth.register.fullName')} hint={t('auth.register.nameHint')} error={errors.fullName && t(errors.fullName)}>
+      <Field id="fullName" label={fullNameLabel ?? t('auth.register.fullName')} hint={t('auth.register.nameHint')} error={errors.fullName && t(errors.fullName)}>
         <input
           id="fullName"
           name="name"
@@ -91,7 +97,7 @@ export function ProfileFields({
         </div>
       </Field>
 
-      <Field
+      {showUniversity && <Field
         id="university"
         label={t('auth.register.university')}
         hint={universityHint}
@@ -115,7 +121,7 @@ export function ProfileFields({
             </option>
           ))}
         </select>
-      </Field>
+      </Field>}
 
       {showEmail && (
         <Field

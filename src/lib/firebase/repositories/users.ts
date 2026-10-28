@@ -92,6 +92,12 @@ export type UserRecord = {
    * documents written before the field existed.
    */
   mentorSince?: Date | null;
+  /** Mentor subscription and optional course routing details. */
+  mentorType?: 'INDIVIDUAL' | 'COURSE' | null;
+  /** Course registration is not bookable until its application is reviewed. */
+  mentorRegistrationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
+  courseEmail?: string | null;
+  courseTeachers?: CourseTeacherRecord[];
   frozenUntil: Date | null;
   frozenReason: string | null;
   frozenById: string | null;
@@ -134,6 +140,17 @@ export type UserRecord = {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
+};
+
+/** Instructor profiles maintained privately by a course account owner. */
+export type CourseTeacherRecord = {
+  id: string;
+  fullName: string;
+  specialization: string;
+  bio: string;
+  avatarUrl: string | null;
+  timezone: string;
+  availability: WeeklyRule[];
 };
 
 /** Never returned to a client, never joined onto a user document. */
@@ -542,6 +559,10 @@ export function newUserDefaults(): Omit<
     graduationPromptedAt: null,
     mentorAvailability: null,
     mentorSince: null,
+    mentorType: null,
+    mentorRegistrationStatus: null,
+    courseEmail: null,
+    courseTeachers: [],
     frozenUntil: null,
     frozenReason: null,
     frozenById: null,
@@ -748,6 +769,31 @@ export async function updateUser(id: string, patch: Record<string, unknown>): Pr
     throw new Error('updateUser cannot change a nickname: it is a claimed login identifier');
   }
   await users().doc(id).update(forFirestore({ ...patch, updatedAt: new Date() }));
+}
+
+/**
+ * Read-modify-write of a course account's instructor list in one transaction.
+ * The roster save and the per-teacher picture upload both rewrite the whole
+ * array; done as two plain reads and writes, a save racing an upload drops the
+ * new picture or brings back a teacher the owner just removed.
+ *
+ * `mutate` returns the next list, or null to leave the document untouched.
+ * Resolves to [before, after], or null when nothing was written.
+ */
+export async function updateCourseTeachers(
+  id: string,
+  mutate: (current: CourseTeacherRecord[]) => CourseTeacherRecord[] | null,
+): Promise<[CourseTeacherRecord[], CourseTeacherRecord[]] | null> {
+  return adminDb().runTransaction(async (tx) => {
+    const ref = users().doc(id);
+    const snap = await tx.get(ref);
+    if (!snap.exists) return null;
+    const current = (snap.get('courseTeachers') ?? []) as CourseTeacherRecord[];
+    const next = mutate(current);
+    if (!next) return null;
+    tx.update(ref, forFirestore({ courseTeachers: next, updatedAt: new Date() }));
+    return [current, next] as [CourseTeacherRecord[], CourseTeacherRecord[]];
+  });
 }
 
 /**

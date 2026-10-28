@@ -98,14 +98,14 @@ export const EMPTY_DOCUMENTS: DocumentMap = {
  */
 export function validateProfile(
   form: ProfileForm,
-  options: { requirePassword: boolean; requireEmail: boolean; requirePhone?: boolean; requireUniversity?: boolean },
+  options: { requirePassword: boolean; requireEmail: boolean; requirePhone?: boolean; requireUniversity?: boolean; organizationName?: boolean },
 ): ProfileErrors {
   const errors: ProfileErrors = {};
 
   const fullName = form.fullName.trim().replace(/\s+/g, ' ');
   if (!fullName) errors.fullName = 'errors.fieldRequired';
   else if (fullName.length < 2) errors.fullName = 'auth.errors.nameTooShort';
-  else if (!/^[\p{L}\s'-]+$/u.test(fullName)) errors.fullName = 'auth.errors.nameInvalid';
+  else if (options.organizationName ? /[<>\u0000-\u001f]/u.test(fullName) : !/^[\p{L}\s'-]+$/u.test(fullName)) errors.fullName = 'auth.errors.nameInvalid';
 
   const nickname = form.nickname.trim();
   if (!nickname) errors.nickname = 'errors.fieldRequired';

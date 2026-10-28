@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { getViewer } from '@/lib/auth/session';
 import { can } from '@/lib/permissions';
 import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
-import { RegisterAside } from '@/components/register/RegisterAside';
 import { MentorSignupForm } from '@/components/mentors/MentorSignupForm';
 
 export const metadata: Metadata = {
@@ -30,12 +29,8 @@ export default async function MentorJoinPage() {
   if (viewer) redirect(can(viewer, 'mentors:console') ? MENTOR_DASHBOARD_PATH : '/mentors/apply');
 
   return (
-    <div className="flex min-h-dvh flex-col lg:flex-row">
-      <RegisterAside variant="mentor" />
-
-      <main id="main" className="flex flex-1 items-start justify-center px-4 py-10 sm:px-8 lg:py-16">
-        <MentorSignupForm />
-      </main>
-    </div>
+    <main id="main" className="flex min-h-dvh items-start justify-center px-4 py-10 sm:px-8 lg:py-16">
+      <MentorSignupForm />
+    </main>
   );
 }

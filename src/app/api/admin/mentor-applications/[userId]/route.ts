@@ -53,7 +53,14 @@ export async function PATCH(
     // Set when the approval changed the applicant's role (STUDENT -> MENTOR).
     let promotedTo: string | null = null;
     if (decision === 'APPROVE') {
-      ({ profileId, promotedTo } = await approveMentorApplication(application, actor.id));
+      try {
+        ({ profileId, promotedTo } = await approveMentorApplication(application, actor.id));
+      } catch (error) {
+        if (error instanceof Error && error.message === 'MENTOR_PAYMENT_PENDING') {
+          return NextResponse.json({ error: 'mentors.payment.pendingForApproval' }, { status: 409 });
+        }
+        throw error;
+      }
     } else {
       await rejectMentorApplication(userId, actor.id, reason!);
     }

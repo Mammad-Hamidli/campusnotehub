@@ -679,7 +679,7 @@ function Conversation({ peer, tall, onBack }: { peer: ChatPeer; tall: boolean; o
                   ) : <p className={`whitespace-pre-wrap break-words ${message.deleted ? 'italic opacity-75' : ''}`}>{message.deleted ? t('messages.deleted') : message.body}</p>}
                   {message.fromMe && !message.pending && !message.deleted && editingId !== message.id && (
                     <div className="mt-1 flex justify-end gap-1">
-                      {message.id === latestMineId && <button type="button" aria-label={t('messages.edit')} onClick={() => { setEditingId(message.id); setEditingBody(message.body); }} className="rounded p-1 opacity-80 hover:bg-black/10"><Pencil className="h-3 w-3" /></button>}
+                      {message.id === latestMineId && <button type="button" aria-label={t('messages.edit')} title={t('messages.edit')} disabled className="cursor-not-allowed rounded p-1 opacity-35"><Pencil className="h-3 w-3" /></button>}
                       <button type="button" aria-label={t('messages.delete')} onClick={() => void removeMessage(message.id)} className="rounded p-1 opacity-80 hover:bg-black/10"><X className="h-3 w-3" /></button>
                     </div>
                   )}

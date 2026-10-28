@@ -9,7 +9,7 @@
  * at all. Client code imports ./constants instead.
  */
 import 'server-only';
-import sharp from 'sharp';
+import sharp, { type Metadata } from 'sharp';
 import { ACCEPTED_IMAGE_MIME, FEED_IMAGE_MAX_WIDTH, MAX_IMAGE_BYTES, clampFeedAspect } from './constants';
 
 /**
@@ -216,7 +216,7 @@ export async function processAvatar(input: Buffer): Promise<ImageResult> {
  * so a portrait phone photo is stored landscape with a flag - and from the
  * per-frame height of an animated GIF, whose `height` is every frame stacked.
  */
-function feedTargetSize(metadata: sharp.Metadata): { width: number; height: number } {
+function feedTargetSize(metadata: Metadata): { width: number; height: number } {
   const rawWidth = metadata.width!;
   const rawHeight = metadata.pageHeight ?? metadata.height!;
   const turned = (metadata.orientation ?? 1) >= 5;

@@ -60,6 +60,12 @@ export type Viewer = {
    * overwrite - see src/lib/mentors/membership.ts.
    */
   mentorSince?: Date | null;
+  /**
+   * A /mentors/join account whose payment has not been approved yet
+   * (mentorActivationPending in src/lib/mentors/membership.ts). It keeps the
+   * mentor panel - which tells it how to pay - but cannot offer sessions.
+   */
+  mentorActivationPending?: boolean;
 };
 
 /**
@@ -117,6 +123,7 @@ export function can(viewer: Viewer | null, capability: Capability): boolean {
   }
   if (capability === 'mentors:offer') {
     return (
+      !viewer.mentorActivationPending &&
       viewer.verificationStatus === VerificationStatus.VERIFIED &&
       (viewer.role === UserRole.MENTOR || viewer.role === UserRole.ALUMNI || viewer.role === UserRole.TEACHER)
     );

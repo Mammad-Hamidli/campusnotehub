@@ -10,7 +10,7 @@ export const maxDuration = 60;
  * GET /api/cron/support-inbox
  *
  * Reads unseen mail from supportcampushub@gmail.com over IMAP into the
- * `supportInbox` collection. Wired to an hourly Vercel cron entry (see
+ * `supportInbox` collection. Wired to a daily Vercel cron entry (see
  * vercel.json); `npm run email:inbox` does the same thing from a shell.
  * Authenticated with `Authorization: Bearer $CRON_SECRET`.
  *

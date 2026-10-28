@@ -30,11 +30,13 @@ import { VerificationSection, type IdentityState } from './VerificationSection';
 import { DeletionRequestCard } from './DeletionRequestCard';
 import { DevicesPanel } from './DevicesPanel';
 import { AvatarUploader } from '@/components/profile/AvatarUploader';
+import { CourseTeacherSettings } from './CourseTeacherSettings';
 
 type Section = 'profile' | 'verification' | 'privacy' | 'appearance' | 'account';
 
 export type SettingsData = {
   nickname: string;
+  mentorType: 'INDIVIDUAL' | 'COURSE' | null;
   /** Saved the moment it is uploaded (POST /api/me/avatar), never by the Save bar. */
   avatarUrl: string | null;
   fullName: string;
@@ -85,6 +87,7 @@ export type SettingsData = {
  */
 const EMPTY: SettingsData = {
   nickname: '',
+  mentorType: null,
   avatarUrl: null,
   fullName: '',
   email: '',
@@ -170,6 +173,7 @@ export function SettingsView() {
         const u = body.user;
         const next: SettingsData = {
           nickname: u.nickname ?? '',
+          mentorType: u.mentorType === 'COURSE' || u.mentorType === 'INDIVIDUAL' ? u.mentorType : null,
           avatarUrl: u.avatarUrl ?? null,
           fullName: u.fullName ?? '',
           email: u.email ?? '',
@@ -393,17 +397,20 @@ export function SettingsView() {
 
           <div className="min-w-0 space-y-6">
             {section === 'profile' && (
-              <ProfileSection
-                data={data}
-                universityLocked={baseline.isVerified && Boolean(baseline.universityId)}
-                onChange={patch}
-                onAvatarChange={(avatarUrl) => {
-                  // Already persisted by the upload - move the baseline too, so
-                  // a new picture never shows up as an unsaved change.
-                  setData((prev) => ({ ...prev, avatarUrl }));
-                  setBaseline((prev) => ({ ...prev, avatarUrl }));
-                }}
-              />
+              <>
+                <ProfileSection
+                  data={data}
+                  universityLocked={baseline.isVerified && Boolean(baseline.universityId)}
+                  onChange={patch}
+                  onAvatarChange={(avatarUrl) => {
+                    // Already persisted by the upload - move the baseline too, so
+                    // a new picture never shows up as an unsaved change.
+                    setData((prev) => ({ ...prev, avatarUrl }));
+                    setBaseline((prev) => ({ ...prev, avatarUrl }));
+                  }}
+                />
+                {data.mentorType === 'COURSE' && <CourseTeacherSettings />}
+              </>
             )}
             {section === 'verification' && (
               <VerificationSection

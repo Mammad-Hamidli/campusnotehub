@@ -141,7 +141,7 @@ export const registerSchema = z
     phone: phoneSchema,
     password,
     locale: z.enum(['az', 'en', 'ru']).default('az'),
-    acceptTerms: z.literal(true, { errorMap: () => ({ message: 'auth.errors.termsRequired' }) }),
+    acceptTerms: z.literal(true, { error: 'auth.errors.termsRequired' }),
     /** Client-side signal only; never trusted on its own. */
     deviceFingerprint: z.string().max(128).optional(),
   });
@@ -156,7 +156,29 @@ export const registerSchema = z
  * `role` or `accountType` a client sends.
  */
 export const mentorRegisterSchema = registerSchema.extend({
+  // Course names may contain digits and common business punctuation; human
+  // names keep the stricter shared profile rule below.
+  fullName: z.string().trim().transform((v) => v.replace(/\s+/g, ' ')).pipe(
+    z.string().min(2, 'auth.errors.nameTooShort').max(120).regex(/^[^<>\u0000-\u001f]+$/u, 'auth.errors.nameInvalid'),
+  ),
   universityId: universityCodeSchema.optional(),
+  mentorType: z.enum(['INDIVIDUAL', 'COURSE']),
+  courseEmail: z.string().trim().toLowerCase().email().max(254).optional(),
+  teacherCount: z.number().int().min(2).max(30).optional(),
+}).superRefine((value, ctx) => {
+  if (value.mentorType === 'COURSE') {
+    if (!value.courseEmail) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['courseEmail'], message: 'errors.fieldRequired' });
+    // The course email IS the login address. Only the account email gets a
+    // confirmation link, and booking mail goes to courseEmail - a second,
+    // unconfirmed address would let anyone aim that mail at a stranger.
+    else if (value.courseEmail !== value.email) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['courseEmail'], message: 'errors.validationFailed' });
+    if (value.teacherCount === undefined) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['teacherCount'], message: 'errors.fieldRequired' });
+    if (value.universityId !== undefined) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['universityId'], message: 'errors.validationFailed' });
+  } else {
+    if (!/^[\p{L}\s'-]+$/u.test(value.fullName)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fullName'], message: 'auth.errors.nameInvalid' });
+    if (value.courseEmail) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['mentorType'], message: 'errors.validationFailed' });
+    if (value.teacherCount !== undefined) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['mentorType'], message: 'errors.validationFailed' });
+  }
 });
 
 /**
@@ -172,7 +194,7 @@ export const completeProfileSchema = z.object({
   universityId: universityCodeSchema,
   password,
   email: z.string().trim().toLowerCase().email('auth.errors.emailInvalid').max(254).optional(),
-  acceptTerms: z.literal(true, { errorMap: () => ({ message: 'auth.errors.termsRequired' }) }),
+  acceptTerms: z.literal(true, { error: 'auth.errors.termsRequired' }),
 });
 
 /** Setting the FIRST password on an account that signed up through Google. */

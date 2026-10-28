@@ -46,6 +46,10 @@ export function MentorSignupForm() {
   const [submitting, setSubmitting] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [fingerprint, setFingerprint] = useState<string | undefined>();
+  const [mentorType, setMentorType] = useState<'INDIVIDUAL' | 'COURSE' | ''>('');
+  const [step, setStep] = useState<'select' | 'details'>('select');
+  const [courseEmail, setCourseEmail] = useState('');
+  const [teacherCount, setTeacherCount] = useState('2');
   // Guards a double press creating (or 409-ing on) a second account.
   const submittedRef = useRef(false);
 
@@ -67,15 +71,30 @@ export function MentorSignupForm() {
     event.preventDefault();
     if (submitting || submittedRef.current) return;
 
-    const found = validateProfile(form, {
+    const submittedForm = mentorType === 'COURSE' ? { ...form, email: courseEmail } : form;
+    const found = validateProfile(submittedForm, {
       requirePassword: true,
-      requireEmail: true,
+      requireEmail: mentorType !== 'COURSE',
       requirePhone: true,
       requireUniversity: false,
+      organizationName: mentorType === 'COURSE',
     });
     setErrors(found);
     if (Object.keys(found).length > 0) {
       setShowSummary(true);
+      return;
+    }
+
+    if (!mentorType || (mentorType === 'COURSE' && !courseEmail.trim())) {
+      setFormError(!mentorType ? 'mentors.join.typeRequired' : 'mentors.join.courseEmailRequired');
+      return;
+    }
+    if (mentorType === 'COURSE' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(courseEmail.trim())) {
+      setFormError('mentors.join.courseEmailInvalid');
+      return;
+    }
+    if (mentorType === 'COURSE' && (!/^\d+$/.test(teacherCount) || Number(teacherCount) < 2 || Number(teacherCount) > 30)) {
+      setFormError('mentors.join.teacherCountInvalid');
       return;
     }
 
@@ -91,14 +110,16 @@ export function MentorSignupForm() {
           fullName: form.fullName.trim().replace(/\s+/g, ' '),
           nickname: form.nickname.trim(),
           // Left out rather than sent empty: '' is not a university code.
-          universityId: form.universityId || undefined,
-          email: form.email.trim().toLowerCase(),
+          ...(mentorType !== 'COURSE' && form.universityId ? { universityId: form.universityId } : {}),
+          email: (mentorType === 'COURSE' ? courseEmail : form.email).trim().toLowerCase(),
           // E.164; validateProfile() has already refused anything unparseable.
           phone: normalizeAzPhone(form.phone) ?? '',
           password: form.password,
           locale: document.documentElement.lang || 'az',
           acceptTerms: form.acceptTerms,
           deviceFingerprint: fingerprint,
+          mentorType,
+          ...(mentorType === 'COURSE' ? { courseEmail: courseEmail.trim().toLowerCase(), teacherCount: Number(teacherCount) } : {}),
         }),
       });
 
@@ -112,6 +133,10 @@ export function MentorSignupForm() {
       // 400 and 409 share the `fields` shape - see RegisterForm.
       if (res.status === 409 || res.status === 400) {
         const fieldErrors = fieldErrorsFrom(body);
+        if (mentorType === 'COURSE' && fieldErrors.email) {
+          setFormError(fieldErrors.email);
+          return;
+        }
         if (Object.keys(fieldErrors).length > 0) {
           setErrors(fieldErrors);
           setShowSummary(true);
@@ -124,7 +149,7 @@ export function MentorSignupForm() {
       }
 
       if (!res.ok) {
-        setFormError(res.status === 429 ? 'errors.rateLimited' : res.status === 400 ? 'errors.validationFailed' : 'errors.generic');
+        setFormError(res.status === 429 ? 'errors.rateLimited' : res.status === 400 ? 'errors.validationFailed' : typeof body.error === 'string' && body.error === 'mentors.join.paymentUnavailable' ? body.error : 'errors.generic');
         return;
       }
 
@@ -151,6 +176,32 @@ export function MentorSignupForm() {
     );
   }
 
+  if (step === 'select') {
+    return (
+      <div className="mx-auto grid w-full max-w-lg gap-4 sm:grid-cols-2" aria-label={t('mentors.join.chooseType')}>
+        {(['INDIVIDUAL', 'COURSE'] as const).map((type) => (
+          <button
+            key={type}
+            type="button"
+            onClick={() => {
+              if (mentorType !== type) {
+                setCourseEmail('');
+                update({ email: '' });
+              }
+              setMentorType(type);
+              setFormError(null);
+              setStep('details');
+            }}
+            className="card flex min-h-44 flex-col items-center justify-center gap-3 p-6 text-center transition hover:border-accent hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <GraduationCap className="h-8 w-8 text-accent" aria-hidden="true" />
+            <span className="text-lg font-semibold text-fg">{t(type === 'INDIVIDUAL' ? 'mentors.join.individual' : 'mentors.join.course')}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-lg animate-rise">
       <p className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-accent">
@@ -159,6 +210,9 @@ export function MentorSignupForm() {
       </p>
       <h1 className="mt-3 text-balance text-2xl font-bold tracking-tight text-fg">{t('mentors.join.title')}</h1>
       <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{t('mentors.join.subtitle')}</p>
+      <button type="button" className="mt-3 text-sm font-semibold text-accent hover:underline" onClick={() => setStep('select')}>
+        {t('mentors.join.changeType', { type: t(mentorType === 'INDIVIDUAL' ? 'mentors.join.individual' : 'mentors.join.course') })}
+      </button>
 
       {showSummary && <ErrorSummary errors={errors} />}
 
@@ -169,12 +223,30 @@ export function MentorSignupForm() {
           value={form}
           errors={errors}
           onChange={update}
-          showEmail
+          showEmail={mentorType === 'INDIVIDUAL'}
           showPhone
           showPassword
           universityOptional
+          showUniversity={mentorType !== 'COURSE'}
+          fullNameLabel={mentorType === 'COURSE' ? t('mentors.join.courseName') : undefined}
           universityHint={t('mentors.join.universityHint')}
         />
+
+        {mentorType === 'COURSE' && <label className="mt-6 block text-sm font-medium">{t('mentors.join.courseEmail')}
+          <input type="email" required value={courseEmail} onChange={(event) => {
+            setCourseEmail(event.target.value);
+            update({ email: event.target.value });
+          }} className="input mt-1 w-full" autoComplete="email" />
+        </label>}
+
+        {mentorType === 'COURSE' && <label className="mt-5 block text-sm font-medium">{t('mentors.join.teacherCount')}
+          <input type="number" required min={2} max={30} step={1} value={teacherCount} onChange={(event) => setTeacherCount(event.target.value)} className="input mt-1 w-full" inputMode="numeric" />
+        </label>}
+
+        {mentorType && <div className="mt-4 rounded-xl border border-accent/30 bg-accent-soft p-4 text-sm leading-relaxed text-fg">
+          <p className="font-semibold">{t('mentors.join.monthlyFee', { amount: mentorType === 'COURSE' ? '30' : '10' })}</p>
+          <p className="mt-2">{t('mentors.join.paymentNotice')}</p>
+        </div>}
 
         <p className="mt-5 flex items-start gap-2.5 rounded-xl border border-edge bg-surface-muted p-3.5 text-xs leading-relaxed text-fg-muted">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-verified" aria-hidden="true" />

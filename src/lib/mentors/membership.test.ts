@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { UserRole } from '@/lib/enums';
-import { mentorJoinDate, mentorSincePatchForRoleChange, roleAfterMentorApproval } from './membership';
+import { mentorActivationPending, mentorJoinDate, mentorSincePatchForRoleChange, roleAfterMentorApproval } from './membership';
 
 const now = new Date('2026-09-28T10:00:00Z');
 const earlier = new Date('2026-01-10T10:00:00Z');
@@ -55,5 +55,21 @@ describe('mentorJoinDate', () => {
 
   it('is null for an account that is not a mentor', () => {
     expect(mentorJoinDate({ role: UserRole.STUDENT, mentorSince: null, createdAt: earlier })).toBeNull();
+  });
+});
+
+describe('mentorActivationPending', () => {
+  it('holds a PENDING or REJECTED registration and releases APPROVED and legacy accounts', () => {
+    expect(mentorActivationPending({ mentorRegistrationStatus: 'PENDING' })).toBe(true);
+    expect(mentorActivationPending({ mentorRegistrationStatus: 'REJECTED' })).toBe(true);
+    expect(mentorActivationPending({ mentorRegistrationStatus: 'APPROVED' })).toBe(false);
+    expect(mentorActivationPending({ mentorRegistrationStatus: null })).toBe(false);
+    expect(mentorActivationPending({})).toBe(false);
+  });
+
+  it('gives an unpaid MENTOR account no join date to bill from', () => {
+    expect(
+      mentorJoinDate({ role: UserRole.MENTOR, mentorSince: null, createdAt: earlier, mentorRegistrationStatus: 'PENDING' }),
+    ).toBeNull();
   });
 });

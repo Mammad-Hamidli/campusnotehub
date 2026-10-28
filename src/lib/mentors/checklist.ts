@@ -5,6 +5,8 @@ import { VERIFICATION_SETTINGS_HREF } from '@/lib/verification/requirements';
  * The mentor panel's onboarding checklist, derived from live data.
  *
  *   account      always done - the panel is only shown to a mentor account
+ *   payment      /mentors/join accounts only: the first fee's receipt was
+ *                approved, which activates the account
  *   email        the address is confirmed
  *   identity     /verify (ID only for mentors); in review counts as waiting
  *   application  the mentor profile a moderator reviews (/mentors/apply)
@@ -14,7 +16,7 @@ import { VERIFICATION_SETTINGS_HREF } from '@/lib/verification/requirements';
  * with the thing it describes. Pure: the page does the reads.
  */
 
-export type ChecklistStepKey = 'account' | 'email' | 'identity' | 'application' | 'listing';
+export type ChecklistStepKey = 'account' | 'payment' | 'email' | 'identity' | 'application' | 'listing';
 
 /**
  *   done     finished
@@ -31,6 +33,8 @@ export type ChecklistStep = {
   href?: string;
   /** A moderator's reason, shown under a rejected application. */
   note?: string | null;
+  /** Overrides the state as the hint text key, when one state has two causes. */
+  hint?: string;
 };
 
 export type ChecklistInput = {
@@ -38,6 +42,11 @@ export type ChecklistInput = {
   verificationStatus: VerificationStatus;
   application: { status: 'PENDING' | 'APPROVED' | 'REJECTED'; rejectionReason: string | null } | null;
   profile: { isApproved: boolean; isAcceptingBookings: boolean } | null;
+  /**
+   * The activation payment of a /mentors/join account; null for an account
+   * that never needed one (legacy mentors, approved ALUMNI/TEACHER).
+   */
+  payment?: { activated: boolean; receiptPending: boolean } | null;
 };
 
 export function buildMentorChecklist(input: ChecklistInput): ChecklistStep[] {
@@ -46,6 +55,7 @@ export function buildMentorChecklist(input: ChecklistInput): ChecklistStep[] {
     input.verificationStatus === VerificationStatus.PROCESSING ||
     input.verificationStatus === VerificationStatus.NEEDS_REVIEW;
   const approved = input.profile?.isApproved === true || input.application?.status === 'APPROVED';
+  const unpaid = input.payment ? !input.payment.activated : false;
 
   const identity: ChecklistStep = {
     key: 'identity',
@@ -64,7 +74,9 @@ export function buildMentorChecklist(input: ChecklistInput): ChecklistStep[] {
     ? { key: 'application', state: 'done' }
     : input.application?.status === 'PENDING'
       ? { key: 'application', state: 'waiting', href: '/mentors/apply' }
-      : !verified
+      : unpaid
+        ? { key: 'application', state: 'locked', hint: 'lockedPayment' }
+        : !verified
         ? { key: 'application', state: 'locked' }
         : {
             key: 'application',
@@ -80,8 +92,16 @@ export function buildMentorChecklist(input: ChecklistInput): ChecklistStep[] {
         ? { key: 'listing', state: 'current', href: '/mentors/schedule' }
         : { key: 'listing', state: 'locked' };
 
+  const payment: ChecklistStep[] = input.payment
+    ? [{
+        key: 'payment',
+        state: input.payment.activated ? 'done' : input.payment.receiptPending ? 'waiting' : 'current',
+      }]
+    : [];
+
   return [
     { key: 'account', state: 'done' },
+    ...payment,
     {
       key: 'email',
       state: input.emailVerified ? 'done' : 'current',

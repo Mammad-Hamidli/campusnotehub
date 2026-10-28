@@ -52,6 +52,25 @@ export function mentorJoinDate(user: {
   role: UserRole;
   mentorSince?: Date | null;
   createdAt: Date;
+  mentorRegistrationStatus?: MentorRegistrationStatus | null;
 }): Date | null {
+  // Not activated yet: no fee is owed, so there is no join date to bill from.
+  if (mentorActivationPending(user)) return null;
   return user.mentorSince ?? (user.role === UserRole.MENTOR ? user.createdAt : null);
+}
+
+export type MentorRegistrationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+/**
+ * A mentor-track signup that has not been activated yet.
+ *
+ * `/mentors/join` writes `mentorRegistrationStatus: PENDING`; it only becomes
+ * APPROVED when a moderator approves a payment receipt
+ * (decideMentorPaymentReceipt). Until then the account can open its panel -
+ * that is where it is told to pay - but it cannot apply, be booked, or start
+ * the fee clock. `null` is every account that never went through that
+ * signup (students, legacy mentors), which this gate leaves alone.
+ */
+export function mentorActivationPending(user: { mentorRegistrationStatus?: MentorRegistrationStatus | null }): boolean {
+  return user.mentorRegistrationStatus === 'PENDING' || user.mentorRegistrationStatus === 'REJECTED';
 }

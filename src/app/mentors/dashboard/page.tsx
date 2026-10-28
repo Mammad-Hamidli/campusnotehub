@@ -14,7 +14,8 @@ import { findCalendarLink } from '@/lib/firebase/repositories/calendarLinks';
 import { answerDeadline, isPendingRequest } from '@/lib/mentors/requests';
 import { billingSnapshot } from '@/lib/mentors/billing';
 import { buildMentorChecklist } from '@/lib/mentors/checklist';
-import { mentorJoinDate } from '@/lib/mentors/membership';
+import { mentorActivationPending, mentorJoinDate } from '@/lib/mentors/membership';
+import { hasPendingMentorPaymentReceipt } from '@/lib/firebase/repositories/mentorPayments';
 import { DEFAULT_LOCALE, DICTIONARIES, LOCALE_COOKIE, isLocale, translate } from '@/lib/i18n/dictionaries';
 import { MENTOR_DASHBOARD_PATH } from '@/lib/site';
 import { OnboardingChecklist } from '@/components/mentors/dashboard/OnboardingChecklist';
@@ -113,6 +114,13 @@ export default async function MentorDashboardPage({
       ? { status: application.status, rejectionReason: application.rejectionReason }
       : null,
     profile: profile ? { isApproved: profile.isApproved, isAcceptingBookings: profile.isAcceptingBookings } : null,
+    payment: user.mentorRegistrationStatus
+      ? {
+          activated: !mentorActivationPending(user),
+          // Only read while it can change the step: an active account is done.
+          receiptPending: mentorActivationPending(user) && (await hasPendingMentorPaymentReceipt(user.id)),
+        }
+      : null,
   });
   const onboarding = steps.some((step) => step.state !== 'done');
 

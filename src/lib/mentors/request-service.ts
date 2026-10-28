@@ -407,7 +407,7 @@ function sendRequestEmail(booking: BookingRecord, menteeNickname: string): void 
     const mentor = await findUserById(booking.mentorUserId);
     if (!mentor || mentor.deletedAt) return;
     await sendEmail(
-      mentor.email,
+      mentor.courseEmail || mentor.email,
       'bookingRequested',
       {
         nickname: mentor.nickname,
